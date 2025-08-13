@@ -1,6 +1,11 @@
 
 import { useState } from 'react';
 
+function generateJoinCode() {
+  // Simple 6-character alphanumeric code
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
 export default function CreateCompetition() {
   const [form, setForm] = useState({
   type: 'stroke',
@@ -10,6 +15,7 @@ export default function CreateCompetition() {
   notes: '',
   });
   const [created, setCreated] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -17,12 +23,11 @@ export default function CreateCompetition() {
 
   function handleSubmit(e) {
     e.preventDefault();
-    // Use a simple join code for now (could be random or user input)
-    const joinCode = 'ABC123';
-    // Save competition details to localStorage
+    const code = generateJoinCode();
+    setJoinCode(code);
     localStorage.setItem(
-      `comp_${joinCode}`,
-      JSON.stringify({ ...form, code: joinCode })
+      `comp_${code}`,
+      JSON.stringify({ ...form, code })
     );
     setCreated(true);
   }
@@ -37,7 +42,7 @@ export default function CreateCompetition() {
           <p className="mb-2">Date: <span className="font-medium">{form.date}</span></p>
           {form.fourballs && <p className="mb-2">4 Balls: <span className="font-medium">{form.fourballs}</span></p>}
           {form.notes && <p className="mb-2">Notes: <span className="font-medium">{form.notes}</span></p>}
-          <p className="mt-4 text-green-600 font-bold">Share the join code: <span className="bg-gray-200 px-2 py-1 rounded">ABC123</span></p>
+          <p className="mt-4 text-green-600 font-bold">Share the join code: <span className="bg-gray-200 px-2 py-1 rounded">{joinCode}</span></p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow w-full max-w-md">

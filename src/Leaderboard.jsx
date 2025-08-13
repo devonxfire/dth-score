@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 // Westlake Golf Club holes: par and stroke index
 const defaultHoles = [
   { number: 1, par: 4, index: 5 },
@@ -22,9 +21,11 @@ const defaultHoles = [
   { number: 17, par: 3, index: 16 },
   { number: 18, par: 4, index: 8 },
 ];
-export default function Leaderboard() {
+
+function Leaderboard() {
   const [entries, setEntries] = useState([]);
   const location = useLocation();
+  const navigate = useNavigate();
   const filterDate = location.state?.date;
   const filterType = location.state?.type;
 
@@ -80,8 +81,14 @@ export default function Leaderboard() {
   return (
     <div className="min-h-screen flex flex-col items-center bg-gray-50 px-4 py-8">
       <div className="bg-white rounded shadow p-6 w-full max-w-3xl mb-8">
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-4 py-2 px-4 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
+        >
+          ← Back to Scorecard
+        </button>
         <h2 className="text-2xl font-bold text-purple-700 mb-2">Leaderboard</h2>
-        {comp && <div className="text-lg font-semibold text-gray-700 mb-1">{comp}</div>}
+        {comp && <div className="text-lg font-semibold text-gray-700 mb-1">{comp.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>}
         {date && <div className="text-md text-gray-500 mb-4">{date}</div>}
         {entries.length === 0 ? (
           <div className="text-gray-500">No scores submitted yet.</div>
@@ -121,3 +128,5 @@ export default function Leaderboard() {
     </div>
   );
 }
+
+export default Leaderboard;

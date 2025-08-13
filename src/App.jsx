@@ -16,7 +16,6 @@ function Landing() {
       <main className="flex flex-col sm:flex-row gap-8 w-full max-w-4xl mx-auto justify-center">
         <Link to="/create" className="py-3 px-8 rounded-lg bg-green-600 text-white font-semibold shadow hover:bg-green-700 transition flex-1 text-center">Create Competition</Link>
         <Link to="/join" className="py-3 px-8 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition flex-1 text-center">Join Competition</Link>
-        <Link to="/scorecard" className="py-3 px-8 rounded-lg bg-purple-600 text-white font-semibold shadow hover:bg-purple-700 transition flex-1 text-center">Scorecard (Demo)</Link>
         <Link to="/leaderboard" className="py-3 px-8 rounded-lg bg-yellow-500 text-white font-semibold shadow hover:bg-yellow-600 transition flex-1 text-center">Leaderboard</Link>
       </main>
       {/* Footer */}
