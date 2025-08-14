@@ -39,6 +39,7 @@ export default function RecentCompetitions() {
               <tr className="bg-gray-100">
                 <th className="border px-2 py-1">Date</th>
                 <th className="border px-2 py-1">Type</th>
+                <th className="border px-2 py-1">Info</th>
                 <th className="border px-2 py-1">Status</th>
                 <th className="border px-2 py-1">Join</th>
                 <th className="border px-2 py-1">Leaderboard</th>
@@ -59,6 +60,15 @@ export default function RecentCompetitions() {
                   <tr key={idx}>
                     <td className="border px-2 py-1">{comp.date?.split('-').reverse().join('/')}</td>
                     <td className="border px-2 py-1">{comp.type?.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</td>
+                    <td className="border px-2 py-1">
+                      <button
+                        className="py-1 px-3 bg-gray-500 text-white rounded hover:bg-gray-700 transition"
+                        onClick={() => navigate('/competition-info', { state: { comp } })}
+                        title="View Competition Info"
+                      >
+                        Info
+                      </button>
+                    </td>
                     <td className="border px-2 py-1">{status}</td>
                     <td className="border px-2 py-1">
                       {status === 'Open' ? (

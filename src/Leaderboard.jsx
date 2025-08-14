@@ -65,6 +65,61 @@ function Leaderboard() {
   // Determine comp type
   const isMedal = comp.toLowerCase().includes('medal');
   const isStableford = comp.toLowerCase().includes('stableford');
+  const isAlliance = comp.toLowerCase().includes('alliance');
+  // Alliance (2 scores to count) team logic
+  function getAllianceTeams() {
+    // Get groups from comp data (from CreateCompetition)
+    let groups = [];
+    try {
+      const compData = JSON.parse(localStorage.getItem(`comp_${entries[0]?.player?.code}`));
+      groups = compData?.groups || [];
+    } catch {}
+    // Map group: { players: [names], teeTime }
+    // For each group, find player entries
+    return groups.map((group, idx) => {
+      // Find player entries for this group
+      const groupEntries = (group.players || [])
+        .map(name => entries.find(e => e.player?.name === name))
+        .filter(Boolean);
+      // For each hole, get best 2 stableford points
+      const holes = 18;
+      let teamPoints = 0;
+      let thru = 0;
+      for (let h = 0; h < holes; h++) {
+        // Get points for each player for this hole
+        const pts = groupEntries.map(e => {
+          // Calculate points for this hole only
+          const ph = getPlayingHandicap(e);
+          const gross = parseInt(e.scores?.[h] || 0);
+          if (!gross) return 0;
+          const hole = defaultHoles[h];
+          let shots = 0;
+          if (ph > 0) {
+            shots = Math.floor(ph / 18);
+            if (hole.index <= (ph % 18)) shots += 1;
+          }
+          const net = gross - shots;
+          const par = hole.par;
+          if (net === par - 2) return 4;
+          if (net === par - 1) return 3;
+          if (net === par) return 2;
+          if (net === par + 1) return 1;
+          return 0;
+        });
+        // Best 2 scores to count
+        const best2 = pts.sort((a, b) => b - a).slice(0, 2);
+        if (best2.some(p => p > 0)) thru = h + 1;
+        teamPoints += best2.reduce((a, b) => a + b, 0);
+      }
+      return {
+        groupNum: idx + 1,
+        teeTime: group.teeTime,
+        players: group.players,
+        teamPoints,
+        thru,
+      };
+    });
+  }
 
   // Helper: calculate net and points
   function getPlayingHandicap(entry) {
@@ -127,21 +182,45 @@ function Leaderboard() {
         {entries[0]?.player?.code && (
           <div className="text-xs text-gray-400 mb-4">Invite Code: <span className="font-mono">{entries[0].player.code}</span></div>
         )}
-        {entries.length === 0 ? (
+        {isAlliance ? (
+          <table className="min-w-full border text-center">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border px-2 py-1">Group</th>
+                <th className="border px-2 py-1">Tee Time</th>
+                <th className="border px-2 py-1">Players</th>
+                <th className="border px-2 py-1">Team Points</th>
+                <th className="border px-2 py-1">Thru</th>
+              </tr>
+            </thead>
+            <tbody>
+              {getAllianceTeams()
+                .sort((a, b) => b.teamPoints - a.teamPoints)
+                .map((team, idx) => (
+                  <tr key={idx}>
+                    <td className="border px-2 py-1 font-bold">{team.groupNum}</td>
+                    <td className="border px-2 py-1">{team.teeTime}</td>
+                    <td className="border px-2 py-1">{team.players.join(', ')}</td>
+                    <td className="border px-2 py-1 font-bold">{team.teamPoints}</td>
+                    <td className="border px-2 py-1">{team.thru === 18 ? 'F' : team.thru}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        ) : entries.length === 0 ? (
           <div className="text-gray-500">No scores submitted yet.</div>
         ) : (
           <table className="min-w-full border text-center">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border px-2 py-1">Pos</th>
+                <th className="border px-2 py-1">Position</th>
                 <th className="border px-2 py-1">Player</th>
-                <th className="border px-2 py-1">Gross</th>
-                {showThru && <th className="border px-2 py-1">PAR</th>}
-                {showThru && <th className="border px-2 py-1">Thru</th>}
+                <th className="border px-2 py-1">Par</th>
                 {isMedal && <th className="border px-2 py-1">Net</th>}
+                {isMedal && <th className="border px-2 py-1">Thru</th>}
                 {isStableford && <>
-                  <th className="border px-2 py-1">Net</th>
                   <th className="border px-2 py-1">Points</th>
+                  <th className="border px-2 py-1">Thru</th>
                 </>}
               </tr>
             </thead>
@@ -163,13 +242,12 @@ function Leaderboard() {
                     <tr key={idx}>
                       <td className="border px-2 py-1 font-bold">{idx + 1}</td>
                       <td className="border px-2 py-1">{entry.player?.name}</td>
-                      <td className="border px-2 py-1 font-bold">{entry.total}</td>
-                      {showThru && <td className="border px-2 py-1">{getParDiff(entry)}</td>}
-                      {showThru && <td className="border px-2 py-1">{holesPlayed}</td>}
+                      <td className="border px-2 py-1 font-bold">{getParDiff(entry)}</td>
                       {isMedal && <td className="border px-2 py-1">{getNet(entry)}</td>}
+                      {isMedal && <td className="border px-2 py-1 font-bold">{holesPlayed === 18 ? 'F' : holesPlayed}</td>}
                       {isStableford && <>
-                        <td className="border px-2 py-1">{getNet(entry)}</td>
                         <td className="border px-2 py-1">{getStablefordPoints(entry)}</td>
+                        <td className="border px-2 py-1">{holesPlayed === 18 ? 'F' : holesPlayed}</td>
                       </>}
                     </tr>
                   );

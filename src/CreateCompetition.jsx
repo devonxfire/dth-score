@@ -6,22 +6,28 @@ function formatDate(dateStr) {
 }
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import FourballAssignment from './FourballAssignment';
 
 function generateJoinCode() {
   // Simple 6-character alphanumeric code
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
+
 export default function CreateCompetition() {
   const [form, setForm] = useState({
-  type: 'stroke',
-  date: '',
-  handicapAllowance: '95',
-  fourballs: '',
-  notes: '',
+    type: 'stroke',
+    date: '',
+    handicapAllowance: '95',
+    fourballs: '',
+    notes: '',
   });
   const [created, setCreated] = useState(false);
   const [joinCode, setJoinCode] = useState('');
+  const [showGroups, setShowGroups] = useState(false);
+  const [groups, setGroups] = useState([]);
+  const navigate = useNavigate();
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -29,13 +35,25 @@ export default function CreateCompetition() {
 
   function handleSubmit(e) {
     e.preventDefault();
+    // If fourballs entered, show group assignment
+    if (form.fourballs && !showGroups) {
+      setShowGroups(true);
+      return;
+    }
+    // Otherwise, finalize comp creation
     const code = generateJoinCode();
     setJoinCode(code);
     localStorage.setItem(
       `comp_${code}`,
-      JSON.stringify({ ...form, code })
+      JSON.stringify({ ...form, code, groups })
     );
     setCreated(true);
+  }
+
+  function handleAssign(groupsData) {
+    setGroups(groupsData);
+    // Now submit the comp
+    handleSubmit({ preventDefault: () => {} });
   }
 
   return (
@@ -49,7 +67,19 @@ export default function CreateCompetition() {
           {form.fourballs && <p className="mb-2">4 Balls: <span className="font-medium">{form.fourballs}</span></p>}
           {form.notes && <p className="mb-2">Notes: <span className="font-medium">{form.notes}</span></p>}
           <p className="mt-4 text-green-600 font-bold">Share the join code: <span className="bg-gray-200 px-2 py-1 rounded">{joinCode}</span></p>
+          <p className="mt-2 text-gray-700">Invite others to join your competition by sending them the join code above.</p>
+          <button
+            className="mt-6 py-2 px-6 bg-green-600 text-white rounded font-semibold hover:bg-green-700 transition"
+            onClick={() => navigate('/')}
+          >
+            Back to Home
+          </button>
         </div>
+      ) : showGroups ? (
+        <FourballAssignment
+          fourballs={parseInt(form.fourballs) || 1}
+          onAssign={handleAssign}
+        />
       ) : (
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow w-full max-w-md">
           <div className="mb-4">
@@ -88,14 +118,12 @@ export default function CreateCompetition() {
                 onChange={handleChange}
                 className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
               >
-               
                 <option value="85">85%</option>
                 <option value="90">90%</option>
                 <option value="95">95%</option>
                 <option value="100">100%</option>
               </select>
             </div>
-        
           <div className="mb-4">
             <label className="block mb-1 font-medium" htmlFor="fourballs">How many 4 Balls are playing today?</label>
             <input
@@ -122,7 +150,7 @@ export default function CreateCompetition() {
               placeholder="Optional notes (e.g. special rules, sponsor etc.)"
             />
           </div>
-          <button type="submit" className="w-full py-2 px-4 bg-green-600 text-white font-semibold rounded hover:bg-green-700 transition">Create Competition</button>
+          <button type="submit" className="w-full py-2 px-4 bg-green-600 text-white font-semibold rounded hover:bg-green-700 transition">Next: Assign Groups</button>
         </form>
       )}
     </div>

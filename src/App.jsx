@@ -1,7 +1,9 @@
+
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import CreateCompetition from './CreateCompetition';
 import JoinCompetition from './JoinCompetition';
 import RecentCompetitions from './RecentCompetitions';
+import CompetitionInfo from './CompetitionInfo';
 import Scorecard from './Scorecard';
 import Leaderboard from './Leaderboard';
 
@@ -33,8 +35,9 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/create" element={<CreateCompetition />} />
-  <Route path="/join" element={<RecentCompetitions />} />
-  <Route path="/join/form" element={<JoinCompetition />} />
+        <Route path="/join" element={<RecentCompetitions />} />
+        <Route path="/competition-info" element={<CompetitionInfo />} />
+        <Route path="/join/form" element={<JoinCompetition />} />
         <Route path="/scorecard" element={<Scorecard />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
       </Routes>
