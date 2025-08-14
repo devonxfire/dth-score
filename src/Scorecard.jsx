@@ -64,8 +64,13 @@ export default function Scorecard(props) {
     return playingHandicap ? parseInt(playingHandicap) : 0;
   }
 
-  // Calculate Stableford points per hole
+  // Determine comp type
+  const isMedal = competition.type?.toLowerCase().includes('medal');
+  const isStableford = competition.type?.toLowerCase().includes('stableford');
+
+  // Calculate Stableford points per hole (for Stableford only)
   function getPointsPerHole() {
+    if (!isStableford) return [];
     const ph = getPlayingHandicap();
     const points = [];
     for (let i = 0; i < defaultHoles.length; i++) {
@@ -95,6 +100,26 @@ export default function Scorecard(props) {
     return getPointsPerHole().reduce((sum, val) => sum + (parseInt(val) || 0), 0);
   }
 
+  // Medal: Net per hole and total
+  function getNetPerHole() {
+    if (!isMedal) return [];
+    const ph = getPlayingHandicap();
+    // Allocate shots per hole
+    let shotsPerHole = Array(18).fill(Math.floor(ph / 18));
+    for (let i = 0; i < ph % 18; i++) {
+      // Find hole with index == i+1
+      const idx = defaultHoles.findIndex(h => h.index === i + 1);
+      if (idx !== -1) shotsPerHole[idx] += 1;
+    }
+    return scores.map((score, idx) => {
+      if (!score) return '';
+      return parseInt(score) - shotsPerHole[idx];
+    });
+  }
+  function totalNet() {
+    return getNetPerHole().reduce((sum, val) => sum + (parseInt(val) || 0), 0);
+  }
+
   function handleSaveScores() {
     const entry = {
       player,
@@ -111,9 +136,21 @@ export default function Scorecard(props) {
   return (
     <div className="min-h-screen flex flex-col items-center bg-gray-50 px-4 py-8">
       <div className="bg-white rounded shadow p-6 w-full max-w-3xl mb-8">
+        <div className="flex justify-between mb-2">
+          <button
+            onClick={() => navigate('/')}
+            className="py-2 px-4 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition mr-2"
+          >
+            Home
+          </button>
+        </div>
         <h2 className="text-2xl font-bold text-green-700 mb-2">{player.name ? `${player.name}'s Scorecard` : 'Scorecard'}</h2>
         <div className="mb-2 text-gray-700">
-          <span className="font-semibold">Competition:</span> {competition.type} <br />
+          <span className="font-semibold">Competition:</span> {competition.type
+            ? competition.type
+                .replace(/[-_]/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase())
+            : ''} <br />
           <span className="font-semibold">Date:</span> {formatDate(competition.date)} <br />
           <span className="font-semibold">Tee Box:</span> {player.teebox} <br />
           <span className="font-semibold">Handicap Allowance:</span> {competition.handicapAllowance}% <br />
@@ -157,13 +194,24 @@ export default function Scorecard(props) {
                 ))}
                 <td className="border px-2 py-1 font-bold">{totalScore()}</td>
               </tr>
-              <tr>
-                <td className="border px-2 py-1 font-semibold">Points</td>
-                {getPointsPerHole().map((pt, idx) => (
-                  <td key={idx} className="border px-2 py-1">{pt}</td>
-                ))}
-                <td className="border px-2 py-1 font-bold">{totalPoints()}</td>
-              </tr>
+              {isMedal && (
+                <tr>
+                  <td className="border px-2 py-1 font-semibold">Net</td>
+                  {getNetPerHole().map((net, idx) => (
+                    <td key={idx} className="border px-2 py-1">{net}</td>
+                  ))}
+                  <td className="border px-2 py-1 font-bold">{totalNet()}</td>
+                </tr>
+              )}
+              {isStableford && (
+                <tr>
+                  <td className="border px-2 py-1 font-semibold">Points</td>
+                  {getPointsPerHole().map((pt, idx) => (
+                    <td key={idx} className="border px-2 py-1">{pt}</td>
+                  ))}
+                  <td className="border px-2 py-1 font-bold">{totalPoints()}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

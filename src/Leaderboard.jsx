@@ -1,3 +1,25 @@
+  // Helper: get par for holes played
+  function getParDiff(entry) {
+    const holesPlayed = entry.scores?.filter(s => s && s !== '').length || 0;
+    if (!holesPlayed) return '';
+    let gross = 0;
+    let par = 0;
+    for (let i = 0; i < holesPlayed; i++) {
+      gross += parseInt(entry.scores[i] || 0);
+      par += defaultHoles[i]?.par || 0;
+    }
+    const diff = gross - par;
+    if (holesPlayed === 0) return '';
+    if (diff === 0) return 'E';
+    if (diff > 0) return `+${diff}`;
+    return `${diff}`;
+  }
+// Format date as DD/MM/YYYY
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+}
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 // Westlake Golf Club holes: par and stroke index
@@ -78,27 +100,44 @@ function Leaderboard() {
     return points;
   }
 
+  // Determine if any player has played less than 18 holes
+  const showThru = entries.some(e => (e.scores?.filter(s => s && s !== '').length || 0) < 18);
+
   return (
     <div className="min-h-screen flex flex-col items-center bg-gray-50 px-4 py-8">
       <div className="bg-white rounded shadow p-6 w-full max-w-3xl mb-8">
-        <button
-          onClick={() => navigate(-1)}
-          className="mb-4 py-2 px-4 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
-        >
-          ← Back to Scorecard
-        </button>
+        <div className="flex justify-between mb-4">
+          <button
+            onClick={() => navigate('/')}
+            className="py-2 px-4 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition mr-2"
+          >
+            Home
+          </button>
+          <button
+            onClick={() => navigate(-1)}
+            className="py-2 px-4 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
+          >
+            ← Back to Scorecard
+          </button>
+        </div>
         <h2 className="text-2xl font-bold text-purple-700 mb-2">Leaderboard</h2>
         {comp && <div className="text-lg font-semibold text-gray-700 mb-1">{comp.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>}
-        {date && <div className="text-md text-gray-500 mb-4">{date}</div>}
+        {date && <div className="text-md text-gray-500 mb-1">{formatDate(date)}</div>}
+        {/* Show invite code for testing */}
+        {entries[0]?.player?.code && (
+          <div className="text-xs text-gray-400 mb-4">Invite Code: <span className="font-mono">{entries[0].player.code}</span></div>
+        )}
         {entries.length === 0 ? (
           <div className="text-gray-500">No scores submitted yet.</div>
         ) : (
           <table className="min-w-full border text-center">
             <thead>
               <tr className="bg-gray-100">
+                <th className="border px-2 py-1">Pos</th>
                 <th className="border px-2 py-1">Player</th>
-                <th className="border px-2 py-1">Tee Box</th>
                 <th className="border px-2 py-1">Gross</th>
+                {showThru && <th className="border px-2 py-1">PAR</th>}
+                {showThru && <th className="border px-2 py-1">Thru</th>}
                 {isMedal && <th className="border px-2 py-1">Net</th>}
                 {isStableford && <>
                   <th className="border px-2 py-1">Net</th>
@@ -108,19 +147,33 @@ function Leaderboard() {
             </thead>
             <tbody>
               {entries
-                .sort((a, b) => b.total - a.total)
-                .map((entry, idx) => (
-                  <tr key={idx}>
-                    <td className="border px-2 py-1">{entry.player?.name}</td>
-                    <td className="border px-2 py-1">{entry.player?.teebox}</td>
-                    <td className="border px-2 py-1 font-bold">{entry.total}</td>
-                    {isMedal && <td className="border px-2 py-1">{getNet(entry)}</td>}
-                    {isStableford && <>
-                      <td className="border px-2 py-1">{getNet(entry)}</td>
-                      <td className="border px-2 py-1">{getStablefordPoints(entry)}</td>
-                    </>}
-                  </tr>
-                ))}
+                .slice()
+                .sort((a, b) => {
+                  if (isMedal) {
+                    return getNet(a) - getNet(b); // lowest net first
+                  } else if (isStableford) {
+                    return getStablefordPoints(b) - getStablefordPoints(a); // highest points first
+                  } else {
+                    return b.total - a.total; // fallback: highest gross first
+                  }
+                })
+                .map((entry, idx) => {
+                  const holesPlayed = entry.scores?.filter(s => s && s !== '').length || 0;
+                  return (
+                    <tr key={idx}>
+                      <td className="border px-2 py-1 font-bold">{idx + 1}</td>
+                      <td className="border px-2 py-1">{entry.player?.name}</td>
+                      <td className="border px-2 py-1 font-bold">{entry.total}</td>
+                      {showThru && <td className="border px-2 py-1">{getParDiff(entry)}</td>}
+                      {showThru && <td className="border px-2 py-1">{holesPlayed}</td>}
+                      {isMedal && <td className="border px-2 py-1">{getNet(entry)}</td>}
+                      {isStableford && <>
+                        <td className="border px-2 py-1">{getNet(entry)}</td>
+                        <td className="border px-2 py-1">{getStablefordPoints(entry)}</td>
+                      </>}
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         )}

@@ -1,3 +1,9 @@
+// Format date as DD/MM/YYYY
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+}
 
 import { useState } from 'react';
 
@@ -39,7 +45,7 @@ export default function CreateCompetition() {
         <div className="bg-white p-6 rounded shadow text-center">
           <h3 className="text-xl font-semibold mb-2">Competition Created!</h3>
           <p className="mb-2">Type: <span className="font-medium capitalize">{form.type}</span></p>
-          <p className="mb-2">Date: <span className="font-medium">{form.date}</span></p>
+          <p className="mb-2">Date: <span className="font-medium">{formatDate(form.date)}</span></p>
           {form.fourballs && <p className="mb-2">4 Balls: <span className="font-medium">{form.fourballs}</span></p>}
           {form.notes && <p className="mb-2">Notes: <span className="font-medium">{form.notes}</span></p>}
           <p className="mt-4 text-green-600 font-bold">Share the join code: <span className="bg-gray-200 px-2 py-1 rounded">{joinCode}</span></p>
