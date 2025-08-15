@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { DTH_PLAYERS } from './dthPlayers';
 
@@ -5,11 +6,23 @@ export default function FourballAssignment({ fourballs, onAssign }) {
   // fourballs: number of 4balls
   // onAssign: callback with array of { players: [], teeTime: '' }
   const [groups, setGroups] = useState(
-    Array.from({ length: fourballs }, () => ({ players: [], teeTime: '' }))
+    Array.from({ length: fourballs }, () => ({ players: Array(4).fill(''), teeTime: '' }))
   );
   const [available, setAvailable] = useState(DTH_PLAYERS);
+  // Track guest names for each group/player slot
+  const [guestNames, setGuestNames] = useState(
+    Array.from({ length: fourballs }, () => Array(4).fill(''))
+  );
 
   function handlePlayerChange(groupIdx, playerIdx, value) {
+    // If switching away from GUEST, clear guest name
+    if (groups[groupIdx].players[playerIdx] === 'GUEST' && value !== 'GUEST') {
+      setGuestNames(prev => {
+        const updated = prev.map(arr => arr.slice());
+        updated[groupIdx][playerIdx] = '';
+        return updated;
+      });
+    }
     const newGroups = groups.map((g, i) =>
       i === groupIdx
         ? {
@@ -24,12 +37,26 @@ export default function FourballAssignment({ fourballs, onAssign }) {
     setAvailable(DTH_PLAYERS.filter(name => !selected.includes(name)));
   }
 
-  function handleAddPlayer(groupIdx) {
-    const newGroups = groups.map((g, i) =>
-      i === groupIdx ? { ...g, players: [...g.players, ''] } : g
-    );
-    setGroups(newGroups);
+  function handleGuestNameChange(groupIdx, playerIdx, value) {
+    setGuestNames(prev => {
+      const updated = prev.map(arr => arr.slice());
+      updated[groupIdx][playerIdx] = value;
+      return updated;
+    });
+    // Update the player name in groups to be 'GUEST ' + value
+    setGroups(prevGroups => prevGroups.map((g, i) =>
+      i === groupIdx
+        ? {
+            ...g,
+            players: g.players.map((p, j) =>
+              j === playerIdx ? (value ? `GUEST ${value}` : 'GUEST') : p
+            ),
+          }
+        : g
+    ));
   }
+
+
 
   function handleTeeTimeChange(groupIdx, value) {
     const newGroups = groups.map((g, i) =>
@@ -62,27 +89,28 @@ export default function FourballAssignment({ fourballs, onAssign }) {
           {group.players.map((player, pIdx) => (
             <div key={pIdx} className="mb-2">
               <select
-                value={player}
+                value={player.startsWith('GUEST') ? 'GUEST' : player}
                 onChange={e => handlePlayerChange(idx, pIdx, e.target.value)}
                 className="border rounded px-2 py-1"
                 required
               >
                 <option value="">Select player</option>
-                {available.concat(player).map(
+                {available.concat(player.startsWith('GUEST') ? 'GUEST' : player).map(
                   name => name && <option key={name} value={name}>{name}</option>
                 )}
               </select>
+              {player === 'GUEST' || player.startsWith('GUEST ') ? (
+                <input
+                  type="text"
+                  className="border rounded px-2 py-1 ml-2"
+                  placeholder="Enter guest name"
+                  value={guestNames[idx][pIdx]}
+                  onChange={e => handleGuestNameChange(idx, pIdx, e.target.value.replace(/^GUEST\s*/i, ''))}
+                  required
+                />
+              ) : null}
             </div>
           ))}
-          {group.players.length < 4 && (
-            <button
-              type="button"
-              className="py-1 px-3 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-              onClick={() => handleAddPlayer(idx)}
-            >
-              Add Player
-            </button>
-          )}
         </div>
       ))}
       <button type="submit" className="w-full py-2 px-4 bg-green-600 text-white font-semibold rounded hover:bg-green-700 transition">Save Groups</button>

@@ -22,4 +22,5 @@ export const DTH_PLAYERS = [
   'Wayne',
   'Dean',
   'Brett',
+  'GUEST',
 ];

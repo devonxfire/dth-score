@@ -1,3 +1,8 @@
+
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import FourballAssignment from './FourballAssignment';
+
 // Format date as DD/MM/YYYY
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -5,24 +10,33 @@ function formatDate(dateStr) {
   return `${day}/${month}/${year}`;
 }
 
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import FourballAssignment from './FourballAssignment';
-
 function generateJoinCode() {
   // Simple 6-character alphanumeric code
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
 
-export default function CreateCompetition() {
+function CreateCompetition() {
   const [form, setForm] = useState({
     type: 'stroke',
     date: '',
+    club: 'Westlake Golf Club',
     handicapAllowance: '95',
     fourballs: '',
     notes: '',
   });
+
+  // Set default allowance based on comp type
+  function handleTypeChange(e) {
+    const type = e.target.value;
+    let allowance = '95';
+    if (type === 'alliance' || type === '4bbb-stableford') {
+      allowance = '85';
+    } else if (type === 'medal-strokeplay' || type === 'individual-stableford') {
+      allowance = '95';
+    }
+    setForm(prev => ({ ...prev, type, handicapAllowance: allowance }));
+  }
   const [created, setCreated] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [showGroups, setShowGroups] = useState(false);
@@ -45,15 +59,21 @@ export default function CreateCompetition() {
     setJoinCode(code);
     localStorage.setItem(
       `comp_${code}`,
-      JSON.stringify({ ...form, code, groups })
+      JSON.stringify({ ...form, joinCode: code, code, groups })
     );
     setCreated(true);
   }
 
   function handleAssign(groupsData) {
     setGroups(groupsData);
-    // Now submit the comp
-    handleSubmit({ preventDefault: () => {} });
+    // Save comp with groups immediately
+    const code = generateJoinCode();
+    setJoinCode(code);
+    localStorage.setItem(
+      `comp_${code}`,
+      JSON.stringify({ ...form, joinCode: code, code, groups: groupsData })
+    );
+    setCreated(true);
   }
 
   return (
@@ -64,6 +84,7 @@ export default function CreateCompetition() {
           <h3 className="text-xl font-semibold mb-2">Competition Created!</h3>
           <p className="mb-2">Type: <span className="font-medium capitalize">{form.type}</span></p>
           <p className="mb-2">Date: <span className="font-medium">{formatDate(form.date)}</span></p>
+          <p className="mb-2">Club: <span className="font-medium">{form.club}</span></p>
           {form.fourballs && <p className="mb-2">4 Balls: <span className="font-medium">{form.fourballs}</span></p>}
           {form.notes && <p className="mb-2">Notes: <span className="font-medium">{form.notes}</span></p>}
           <p className="mt-4 text-green-600 font-bold">Share the join code: <span className="bg-gray-200 px-2 py-1 rounded">{joinCode}</span></p>
@@ -95,12 +116,23 @@ export default function CreateCompetition() {
             />
           </div>
           <div className="mb-4">
+            <label className="block mb-1 font-medium" htmlFor="club">Club</label>
+            <input
+              id="club"
+              name="club"
+              type="text"
+              value={form.club}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
+            />
+          </div>
+          <div className="mb-4">
             <label className="block mb-1 font-medium" htmlFor="type">Competition Type</label>
             <select
               id="type"
               name="type"
               value={form.type}
-              onChange={handleChange}
+              onChange={handleTypeChange}
               className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
             >
               <option value="4bbb-stableford">4BBB Stableford (2 Scores to Count)</option>
@@ -150,9 +182,10 @@ export default function CreateCompetition() {
               placeholder="Optional notes (e.g. special rules, sponsor etc.)"
             />
           </div>
-          <button type="submit" className="w-full py-2 px-4 bg-green-600 text-white font-semibold rounded hover:bg-green-700 transition">Next: Assign Groups</button>
+          <button type="submit" className="w-full py-2 px-4 bg-green-600 text-white font-semibold rounded hover:bg-green-700 transition">Next: Assign 4 Balls</button>
         </form>
       )}
     </div>
   );
 }
+export default CreateCompetition;
