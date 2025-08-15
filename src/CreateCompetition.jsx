@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import PageBackground from './PageBackground';
 import { useNavigate } from 'react-router-dom';
 import FourballAssignment from './FourballAssignment';
 
@@ -77,115 +78,124 @@ function CreateCompetition() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 px-4">
-      <h2 className="text-2xl font-bold mb-4 text-green-700">Create Competition</h2>
-      {created ? (
-        <div className="bg-white p-6 rounded shadow text-center">
-          <h3 className="text-xl font-semibold mb-2">Competition Created!</h3>
-          <p className="mb-2">Type: <span className="font-medium capitalize">{form.type}</span></p>
-          <p className="mb-2">Date: <span className="font-medium">{formatDate(form.date)}</span></p>
-          <p className="mb-2">Club: <span className="font-medium">{form.club}</span></p>
-          {form.fourballs && <p className="mb-2">4 Balls: <span className="font-medium">{form.fourballs}</span></p>}
-          {form.notes && <p className="mb-2">Notes: <span className="font-medium">{form.notes}</span></p>}
-          <p className="mt-4 text-green-600 font-bold">Share the join code: <span className="bg-gray-200 px-2 py-1 rounded">{joinCode}</span></p>
-          <p className="mt-2 text-gray-700">Invite others to join your competition by sending them the join code above.</p>
-          <button
-            className="mt-6 py-2 px-6 bg-green-600 text-white rounded font-semibold hover:bg-green-700 transition"
-            onClick={() => navigate('/')}
-          >
-            Back to Home
-          </button>
+    <PageBackground>
+      <div className="flex flex-col items-center min-h-screen justify-center px-4">
+        <div className="flex flex-col items-center px-4 mt-12">
+          <h2 className="text-5xl font-bold text-white mb-1 drop-shadow-lg text-center">Create Competition</h2>
+          <p className="text-xl text-white mb-6 drop-shadow text-center">Set up a new golf competition below.</p>
         </div>
-      ) : showGroups ? (
-        <FourballAssignment
-          fourballs={parseInt(form.fourballs) || 1}
-          onAssign={handleAssign}
-        />
-      ) : (
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow w-full max-w-md">
-          <div className="mb-4">
-            <label className="block mb-1 font-medium" htmlFor="date">Date</label>
-            <input
-              id="date"
-              name="date"
-              type="date"
-              required
-              value={form.date}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
-            />
+        <div className="flex flex-col items-center px-4 mt-8 w-full">
+          <div className="w-full max-w-md rounded-2xl shadow-lg bg-transparent" style={{ backdropFilter: 'none' }}>
+            {created ? (
+              <div className="text-white text-center p-6">
+                <h3 className="text-xl font-semibold mb-2">Competition Created!</h3>
+                <p className="mb-2">Type: <span className="font-medium capitalize">{form.type}</span></p>
+                <p className="mb-2">Date: <span className="font-medium">{formatDate(form.date)}</span></p>
+                <p className="mb-2">Club: <span className="font-medium">{form.club}</span></p>
+                {form.fourballs && <p className="mb-2">4 Balls: <span className="font-medium">{form.fourballs}</span></p>}
+                {form.notes && <p className="mb-2">Notes: <span className="font-medium">{form.notes}</span></p>}
+                <p className="mt-4 text-green-200 font-bold">Share the join code: <span className="bg-white/20 px-2 py-1 rounded text-white">{joinCode}</span></p>
+                <p className="mt-2 text-white/80">Invite others to join your competition by sending them the join code above.</p>
+                <button
+                  className="mt-6 py-2 px-6 bg-transparent border border-white text-white rounded-2xl font-semibold hover:bg-white hover:text-black transition"
+                  onClick={() => navigate('/')}
+                >
+                  Back to Home
+                </button>
+              </div>
+            ) : showGroups ? (
+              <FourballAssignment
+                fourballs={parseInt(form.fourballs) || 1}
+                onAssign={handleAssign}
+              />
+            ) : (
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
+                <div className="mb-4">
+                  <label className="block mb-1 font-medium text-white" htmlFor="date">Date</label>
+                  <input
+                    id="date"
+                    name="date"
+                    type="date"
+                    required
+                    value={form.date}
+                    onChange={handleChange}
+                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block mb-1 font-medium text-white" htmlFor="club">Club</label>
+                  <input
+                    id="club"
+                    name="club"
+                    type="text"
+                    value={form.club}
+                    onChange={handleChange}
+                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block mb-1 font-medium text-white" htmlFor="type">Competition Type</label>
+                  <select
+                    id="type"
+                    name="type"
+                    value={form.type}
+                    onChange={handleTypeChange}
+                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
+                  >
+                    <option value="4bbb-stableford">4BBB Stableford (2 Scores to Count)</option>
+                    <option value="alliance">Alliance</option>
+                    <option value="medal-strokeplay">Medal Strokeplay</option>
+                    <option value="individual-stableford">Individual Stableford</option>
+                  </select>
+                </div>
+                <div className="mb-4">
+                  <label className="block mb-1 font-medium text-white" htmlFor="handicapAllowance">Competition Handicap Allowance</label>
+                  <select
+                    id="handicapAllowance"
+                    name="handicapAllowance"
+                    value={form.handicapAllowance}
+                    onChange={handleChange}
+                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
+                  >
+                    <option value="85">85%</option>
+                    <option value="90">90%</option>
+                    <option value="95">95%</option>
+                    <option value="100">100%</option>
+                  </select>
+                </div>
+                <div className="mb-4">
+                  <label className="block mb-1 font-medium text-white" htmlFor="fourballs">How many 4 Balls are playing today?</label>
+                  <input
+                    id="fourballs"
+                    name="fourballs"
+                    type="number"
+                    min="1"
+                    required
+                    value={form.fourballs}
+                    onChange={handleChange}
+                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                    placeholder="e.g. 3"
+                  />
+                </div>
+                <div className="mb-6">
+                  <label className="block mb-1 font-medium text-white" htmlFor="notes">Notes</label>
+                  <textarea
+                    id="notes"
+                    name="notes"
+                    rows={3}
+                    value={form.notes}
+                    onChange={handleChange}
+                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                    placeholder="Optional notes (e.g. special rules, sponsor etc.)"
+                  />
+                </div>
+                <button type="submit" className="w-full py-2 px-4 bg-transparent border border-white text-white font-semibold rounded-2xl hover:bg-white hover:text-black transition">Next: Assign 4 Balls</button>
+              </form>
+            )}
           </div>
-          <div className="mb-4">
-            <label className="block mb-1 font-medium" htmlFor="club">Club</label>
-            <input
-              id="club"
-              name="club"
-              type="text"
-              value={form.club}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block mb-1 font-medium" htmlFor="type">Competition Type</label>
-            <select
-              id="type"
-              name="type"
-              value={form.type}
-              onChange={handleTypeChange}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
-            >
-              <option value="4bbb-stableford">4BBB Stableford (2 Scores to Count)</option>
-              <option value="alliance">Alliance</option>
-              <option value="medal-strokeplay">Medal Strokeplay</option>
-              <option value="individual-stableford">Individual Stableford</option>
-            </select>
-          </div>
-            <div className="mb-4">
-              <label className="block mb-1 font-medium" htmlFor="handicapAllowance">Competition Handicap Allowance</label>
-              <select
-                id="handicapAllowance"
-                name="handicapAllowance"
-                value={form.handicapAllowance}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
-              >
-                <option value="85">85%</option>
-                <option value="90">90%</option>
-                <option value="95">95%</option>
-                <option value="100">100%</option>
-              </select>
-            </div>
-          <div className="mb-4">
-            <label className="block mb-1 font-medium" htmlFor="fourballs">How many 4 Balls are playing today?</label>
-            <input
-              id="fourballs"
-              name="fourballs"
-              type="number"
-              min="1"
-              required
-              value={form.fourballs}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
-              placeholder="e.g. 3"
-            />
-          </div>
-          <div className="mb-6">
-            <label className="block mb-1 font-medium" htmlFor="notes">Notes</label>
-            <textarea
-              id="notes"
-              name="notes"
-              rows={3}
-              value={form.notes}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
-              placeholder="Optional notes (e.g. special rules, sponsor etc.)"
-            />
-          </div>
-          <button type="submit" className="w-full py-2 px-4 bg-green-600 text-white font-semibold rounded hover:bg-green-700 transition">Next: Assign 4 Balls</button>
-        </form>
-      )}
-    </div>
+        </div>
+      </div>
+    </PageBackground>
   );
 }
 export default CreateCompetition;

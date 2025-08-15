@@ -22,6 +22,7 @@ function formatDate(dateStr) {
 }
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import PageBackground from './PageBackground';
 // Westlake Golf Club holes: par and stroke index
 const defaultHoles = [
   { number: 1, par: 4, index: 5 },
@@ -159,104 +160,45 @@ function Leaderboard() {
   const showThru = entries.some(e => (e.scores?.filter(s => s && s !== '').length || 0) < 18);
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-gray-50 px-4 py-8">
-      <div className="bg-white rounded shadow p-6 w-full max-w-3xl mb-8">
-        <div className="flex justify-between mb-4">
-          <button
-            onClick={() => navigate('/')}
-            className="py-2 px-4 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition mr-2"
-          >
-            Home
-          </button>
-          <button
-            onClick={() => navigate(-1)}
-            className="py-2 px-4 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
-          >
-            ← Back to Scorecard
-          </button>
-        </div>
-        <h2 className="text-2xl font-bold text-purple-700 mb-2">Leaderboard</h2>
-        {comp && <div className="text-lg font-semibold text-gray-700 mb-1">{comp.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>}
-        {date && <div className="text-md text-gray-500 mb-1">{formatDate(date)}</div>}
-        {/* Show invite code for testing */}
-        {entries[0]?.player?.code && (
-          <div className="text-xs text-gray-400 mb-4">Invite Code: <span className="font-mono">{entries[0].player.code}</span></div>
-        )}
-        {isAlliance ? (
-          <table className="min-w-full border text-center">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border px-2 py-1">Group</th>
-                <th className="border px-2 py-1">Tee Time</th>
-                <th className="border px-2 py-1">Players</th>
-                <th className="border px-2 py-1">Team Points</th>
-                <th className="border px-2 py-1">Thru</th>
-              </tr>
-            </thead>
-            <tbody>
-              {getAllianceTeams()
-                .sort((a, b) => b.teamPoints - a.teamPoints)
-                .map((team, idx) => (
-                  <tr key={idx}>
-                    <td className="border px-2 py-1 font-bold">{team.groupNum}</td>
-                    <td className="border px-2 py-1">{team.teeTime}</td>
-                    <td className="border px-2 py-1">{team.players.join(', ')}</td>
-                    <td className="border px-2 py-1 font-bold">{team.teamPoints}</td>
-                    <td className="border px-2 py-1">{team.thru === 18 ? 'F' : team.thru}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        ) : entries.length === 0 ? (
-          <div className="text-gray-500">No scores submitted yet.</div>
-        ) : (
-          <table className="min-w-full border text-center">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border px-2 py-1">Position</th>
-                <th className="border px-2 py-1">Player</th>
-                <th className="border px-2 py-1">Par</th>
-                {isMedal && <th className="border px-2 py-1">Net</th>}
-                {isMedal && <th className="border px-2 py-1">Thru</th>}
-                {isStableford && <>
-                  <th className="border px-2 py-1">Points</th>
-                  <th className="border px-2 py-1">Thru</th>
-                </>}
-              </tr>
-            </thead>
-            <tbody>
-              {entries
-                .slice()
-                .sort((a, b) => {
-                  if (isMedal) {
-                    return getNet(a) - getNet(b); // lowest net first
-                  } else if (isStableford) {
-                    return getStablefordPoints(b) - getStablefordPoints(a); // highest points first
-                  } else {
-                    return b.total - a.total; // fallback: highest gross first
-                  }
-                })
-                .map((entry, idx) => {
-                  const holesPlayed = entry.scores?.filter(s => s && s !== '').length || 0;
-                  return (
-                    <tr key={idx}>
-                      <td className="border px-2 py-1 font-bold">{idx + 1}</td>
-                      <td className="border px-2 py-1">{entry.player?.name}</td>
-                      <td className="border px-2 py-1 font-bold">{getParDiff(entry)}</td>
-                      {isMedal && <td className="border px-2 py-1">{getNet(entry)}</td>}
-                      {isMedal && <td className="border px-2 py-1 font-bold">{holesPlayed === 18 ? 'F' : holesPlayed}</td>}
-                      {isStableford && <>
-                        <td className="border px-2 py-1">{getStablefordPoints(entry)}</td>
-                        <td className="border px-2 py-1">{holesPlayed === 18 ? 'F' : holesPlayed}</td>
-                      </>}
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
-        )}
+    <PageBackground>
+      <div className="flex flex-col items-center px-4 mt-12">
+        <h2 className="text-3xl font-bold text-white mb-6 drop-shadow-lg text-center">Leaderboard</h2>
       </div>
-    </div>
+      <div className="flex flex-col items-center px-4 mt-8">
+        <div className="w-full max-w-3xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+          <div className="flex justify-between mb-4">
+            <button
+              onClick={() => navigate('/')}
+              className="py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition mr-2"
+            >
+              Home
+            </button>
+            <button
+              onClick={() => navigate(-1)}
+              className="py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition"
+            >
+              ← Back to Scorecard
+            </button>
+          </div>
+          {comp && <div className="text-lg font-semibold text-white/90 mb-1">{comp.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>}
+          {date && <div className="text-md text-white/70 mb-1">{formatDate(date)}</div>}
+          {entries[0]?.player?.code && (
+            <div className="text-xs text-white/60 mb-4">Invite Code: <span className="font-mono">{entries[0].player.code}</span></div>
+          )}
+          {isAlliance ? (
+            <table className="min-w-full border text-center">
+              {/* ...existing code... */}
+            </table>
+          ) : entries.length === 0 ? (
+            <div className="text-white/80">No scores submitted yet.</div>
+          ) : (
+            <table className="min-w-full border text-center">
+              {/* ...existing code... */}
+            </table>
+          )}
+        </div>
+      </div>
+    </PageBackground>
   );
 }
 
