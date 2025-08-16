@@ -28,11 +28,46 @@ export default function RecentCompetitions() {
 
   return (
     <PageBackground>
+      {/* Top nav menu (copied from CreateCompetition.jsx for perfect match) */}
+      <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
+        <button
+          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => navigate('/dashboard')}
+        >
+          Dashboard
+        </button>
+        <button
+          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => navigate('/profile')}
+          disabled
+        >
+          My Profile
+        </button>
+        <button
+          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => navigate('/recent')}
+        >
+          Competitions
+        </button>
+        <button
+          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => {
+            if (typeof window.onSignOut === 'function') window.onSignOut();
+            else if (typeof window.signOut === 'function') window.signOut();
+          }}
+        >
+          Sign Out
+        </button>
+      </div>
       <div className="flex flex-col items-center px-4 mt-12">
-        <h2 className="text-3xl font-bold text-white mb-6 drop-shadow-lg text-center">Recent Competitions</h2>
+        <h2 className="text-3xl font-bold text-white mb-2 drop-shadow-lg text-center">Recent Competitions</h2>
       </div>
       <div className="flex flex-col items-center px-4 mt-8">
-        <div className="w-full max-w-2xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+  <div className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8 px-8" style={{ backdropFilter: 'none' }}>
           <table className="min-w-full border text-center mb-6">
             <thead>
               <tr className="bg-white/10">
@@ -73,7 +108,15 @@ export default function RecentCompetitions() {
                       <td className="border px-2 py-1">{comp.date?.split('-').reverse().join('/')}</td>
                       <td className="border px-2 py-1">{comp.type}</td>
                       <td className="border px-2 py-1">
-                        <button className="py-1 px-3 bg-teal-600 border border-transparent text-white font-semibold hover:bg-teal-700 transition" onClick={() => navigate(`/competition/${comp.code}`)}>Info</button>
+                        <button
+                          className="py-1 px-3 border border-white text-white font-semibold rounded-2xl transition"
+                          style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                          onClick={() => navigate(`/competition/${comp.code}`)}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+                        >
+                          Info
+                        </button>
                       </td>
                       <td className="border px-2 py-1">{status}</td>
                     </tr>,
@@ -81,7 +124,15 @@ export default function RecentCompetitions() {
                       <td colSpan={4} className="border px-2 py-2 bg-white/5">
                         <div className="flex gap-4 justify-center">
                           {status === 'Open' ? (
-                            <button className="py-2 px-4 w-full max-w-xs bg-teal-600 border border-transparent text-white font-semibold hover:bg-teal-700 transition" onClick={() => handleSelect(comp)}>Join</button>
+                            <button
+                              className="py-2 px-4 w-full max-w-xs border border-white text-white font-semibold rounded-2xl transition"
+                              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                              onClick={() => handleSelect(comp)}
+                              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+                            >
+                              Join
+                            </button>
                           ) : (
                             <span className="flex items-center justify-center w-full bg-red-900/80 text-gray-300 font-semibold uppercase tracking-wide rounded select-none" style={{minHeight: '40px', letterSpacing: '0.05em'}}>
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -91,7 +142,15 @@ export default function RecentCompetitions() {
                               Complete
                             </span>
                           )}
-                          <button className="py-2 px-4 w-full max-w-xs bg-teal-600 border border-transparent text-white font-semibold hover:bg-teal-700 transition" onClick={() => navigate(`/leaderboard/${comp.code}`)}>View Leaderboard</button>
+                          <button
+                            className="py-2 px-4 w-full max-w-xs border border-white text-white font-semibold rounded-2xl transition"
+                            style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                            onClick={() => navigate(`/leaderboard/${comp.code}`)}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+                          >
+                            View Leaderboard
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -100,6 +159,19 @@ export default function RecentCompetitions() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="w-full max-w-4xl flex justify-start mt-2 px-8">
+          <button
+            className="py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg"
+            style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+            onClick={() => navigate('/create')}
+            onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+            onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+          >
+            <span className="mr-2 text-xl font-bold align-middle">+</span>Add New
+          </button>
+        </div>
+        <div className="w-full max-w-2xl flex justify-start">
         </div>
       </div>
     </PageBackground>

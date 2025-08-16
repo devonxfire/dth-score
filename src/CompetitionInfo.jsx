@@ -66,7 +66,13 @@ export default function CompetitionInfo() {
                 </table>
               </div>
             )}
-            <button className="py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition" onClick={() => navigate(-1)}>
+            <button
+              className="py-2 px-4 border border-white text-white rounded-2xl font-semibold transition"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onClick={() => navigate(-1)}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+            >
               Back
             </button>
           </div>

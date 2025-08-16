@@ -77,7 +77,7 @@ export default function FourballAssignment({ fourballs, onAssign }) {
         <h3 className="text-3xl font-bold text-white mb-6 drop-shadow-lg text-center">Assign Players to 4 Balls & Tee Times</h3>
       </div>
       <div className="flex flex-col items-center px-4 mt-8">
-        <form onSubmit={handleSubmit} className="w-full max-w-2xl rounded-2xl shadow-lg bg-transparent text-white mx-auto" style={{ backdropFilter: 'none' }}>
+  <form onSubmit={handleSubmit} className="w-full max-w-4xl rounded-2xl bg-transparent text-white mx-auto px-8" style={{ background: 'none', boxShadow: 'none' }}>
           {groups.map((group, idx) => (
             <div key={idx} className="mb-6 border-b border-white/30 pb-4">
               <div className="mb-2 font-semibold">4 Ball {idx + 1}</div>
@@ -119,7 +119,15 @@ export default function FourballAssignment({ fourballs, onAssign }) {
               ))}
             </div>
           ))}
-          <button type="submit" className="w-full py-2 px-4 bg-transparent border border-white text-white font-semibold rounded-2xl hover:bg-white hover:text-black transition">Save Groups</button>
+          <button
+            type="submit"
+            className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg"
+            style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+            onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+            onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+          >
+            Save Groups
+          </button>
         </form>
       </div>
     </PageBackground>

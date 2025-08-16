@@ -2,11 +2,14 @@
 
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
 import westlakeLogo from './assets/westlake-logo2.png';
 
+
 export default function Login({ onLogin }) {
   const [form, setForm] = useState({ name: '', password: '' });
+  const navigate = useNavigate();
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -15,6 +18,7 @@ export default function Login({ onLogin }) {
   function handleSubmit(e) {
     e.preventDefault();
     onLogin(form.name);
+    navigate('/dashboard');
   }
 
   return (
@@ -55,7 +59,19 @@ export default function Login({ onLogin }) {
               placeholder="Enter password"
               required
             />
-            <button type="submit" className="w-full py-2 px-4 bg-transparent border border-white text-white font-semibold rounded-2xl hover:bg-white hover:text-black transition text-lg">Sign In</button>
+            <button
+              type="submit"
+              className="w-full py-2 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg"
+              style={{
+                backgroundColor: '#1B3A6B', // Westlake blue
+                color: 'white',
+                boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)'
+              }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+            >
+              Sign In
+            </button>
           </form>
         </div>
       </div>

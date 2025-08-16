@@ -79,120 +79,167 @@ function CreateCompetition() {
 
   return (
     <PageBackground>
-      <div className="flex flex-col items-center min-h-screen justify-center px-4">
+      {/* Top nav menu */}
+  <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
+        <button
+          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => navigate('/dashboard')}
+        >
+          Dashboard
+        </button>
+        <button
+          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => navigate('/profile')}
+          disabled
+        >
+          My Profile
+        </button>
+        <button
+          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => navigate('/recent')}
+        >
+          Competitions
+        </button>
+        <button
+          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => {
+            if (typeof window.onSignOut === 'function') window.onSignOut();
+            else if (typeof window.signOut === 'function') window.signOut();
+          }}
+        >
+          Sign Out
+        </button>
+      </div>
+      {(!showGroups) && (
         <div className="flex flex-col items-center px-4 mt-12">
-          <h2 className="text-5xl font-bold text-white mb-1 drop-shadow-lg text-center">Create Competition</h2>
-          <p className="text-xl text-white mb-6 drop-shadow text-center">Set up a new golf competition below.</p>
+          <h2 className="text-3xl font-bold text-white mb-2 drop-shadow-lg text-center">Create Competition</h2>
         </div>
-        <div className="flex flex-col items-center px-4 mt-8 w-full">
-          <div className="w-full max-w-md rounded-2xl shadow-lg bg-transparent" style={{ backdropFilter: 'none' }}>
-            {created ? (
-              <div className="text-white text-center p-6">
-                <h3 className="text-xl font-semibold mb-2">Competition Created!</h3>
-                <p className="mb-2">Type: <span className="font-medium capitalize">{form.type}</span></p>
-                <p className="mb-2">Date: <span className="font-medium">{formatDate(form.date)}</span></p>
-                <p className="mb-2">Club: <span className="font-medium">{form.club}</span></p>
-                {form.fourballs && <p className="mb-2">4 Balls: <span className="font-medium">{form.fourballs}</span></p>}
-                {form.notes && <p className="mb-2">Notes: <span className="font-medium">{form.notes}</span></p>}
-                <p className="mt-4 text-green-200 font-bold">Share the join code: <span className="bg-white/20 px-2 py-1 rounded text-white">{joinCode}</span></p>
-                <p className="mt-2 text-white/80">Invite others to join your competition by sending them the join code above.</p>
-                <button
-                  className="mt-6 py-2 px-6 bg-transparent border border-white text-white rounded-2xl font-semibold hover:bg-white hover:text-black transition"
-                  onClick={() => navigate('/')}
-                >
-                  Back to Home
-                </button>
+      )}
+  <div className="relative z-10 flex flex-col items-center px-4 mt-8">
+  {/* Home button moved to bottom of form */}
+  <div className="w-full max-w-4xl rounded-2xl p-8 flex flex-col gap-6 px-8" style={{ background: 'none', boxShadow: 'none' }}>
+          {created ? (
+            <div className="text-white text-center p-6">
+              <h3 className="text-xl font-semibold mb-2">Competition Created!</h3>
+              <p className="mb-2">Type: <span className="font-medium capitalize">{form.type}</span></p>
+              <p className="mb-2">Date: <span className="font-medium">{formatDate(form.date)}</span></p>
+              <p className="mb-2">Club: <span className="font-medium">{form.club}</span></p>
+              {form.fourballs && <p className="mb-2">4 Balls: <span className="font-medium">{form.fourballs}</span></p>}
+              {form.notes && <p className="mb-2">Notes: <span className="font-medium">{form.notes}</span></p>}
+              <p className="mt-4 text-green-200 font-bold">Share the join code: <span className="bg-white/20 px-2 py-1 rounded text-white">{joinCode}</span></p>
+              <p className="mt-2 text-white/80">Invite others to join your competition by sending them the join code above.</p>
+              <button
+                className="mt-6 py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg"
+                style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                onClick={() => navigate('/dashboard')}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              >
+                Home
+              </button>
+            </div>
+          ) : showGroups ? (
+            <FourballAssignment
+              fourballs={parseInt(form.fourballs) || 1}
+              onAssign={handleAssign}
+            />
+          ) : (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
+              <div className="mb-4">
+                <label className="block mb-1 font-medium text-white" htmlFor="date">Date</label>
+                <input
+                  id="date"
+                  name="date"
+                  type="date"
+                  required
+                  value={form.date}
+                  onChange={handleChange}
+                  className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                />
               </div>
-            ) : showGroups ? (
-              <FourballAssignment
-                fourballs={parseInt(form.fourballs) || 1}
-                onAssign={handleAssign}
-              />
-            ) : (
-              <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
-                <div className="mb-4">
-                  <label className="block mb-1 font-medium text-white" htmlFor="date">Date</label>
-                  <input
-                    id="date"
-                    name="date"
-                    type="date"
-                    required
-                    value={form.date}
-                    onChange={handleChange}
-                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block mb-1 font-medium text-white" htmlFor="club">Club</label>
-                  <input
-                    id="club"
-                    name="club"
-                    type="text"
-                    value={form.club}
-                    onChange={handleChange}
-                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block mb-1 font-medium text-white" htmlFor="type">Competition Type</label>
-                  <select
-                    id="type"
-                    name="type"
-                    value={form.type}
-                    onChange={handleTypeChange}
-                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
-                  >
-                    <option value="4bbb-stableford">4BBB Stableford (2 Scores to Count)</option>
-                    <option value="alliance">Alliance</option>
-                    <option value="medal-strokeplay">Medal Strokeplay</option>
-                    <option value="individual-stableford">Individual Stableford</option>
-                  </select>
-                </div>
-                <div className="mb-4">
-                  <label className="block mb-1 font-medium text-white" htmlFor="handicapAllowance">Competition Handicap Allowance</label>
-                  <select
-                    id="handicapAllowance"
-                    name="handicapAllowance"
-                    value={form.handicapAllowance}
-                    onChange={handleChange}
-                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
-                  >
-                    <option value="85">85%</option>
-                    <option value="90">90%</option>
-                    <option value="95">95%</option>
-                    <option value="100">100%</option>
-                  </select>
-                </div>
-                <div className="mb-4">
-                  <label className="block mb-1 font-medium text-white" htmlFor="fourballs">How many 4 Balls are playing today?</label>
-                  <input
-                    id="fourballs"
-                    name="fourballs"
-                    type="number"
-                    min="1"
-                    required
-                    value={form.fourballs}
-                    onChange={handleChange}
-                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
-                    placeholder="e.g. 3"
-                  />
-                </div>
-                <div className="mb-6">
-                  <label className="block mb-1 font-medium text-white" htmlFor="notes">Notes</label>
-                  <textarea
-                    id="notes"
-                    name="notes"
-                    rows={3}
-                    value={form.notes}
-                    onChange={handleChange}
-                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
-                    placeholder="Optional notes (e.g. special rules, sponsor etc.)"
-                  />
-                </div>
-                <button type="submit" className="w-full py-2 px-4 bg-transparent border border-white text-white font-semibold rounded-2xl hover:bg-white hover:text-black transition">Next: Assign 4 Balls</button>
-              </form>
-            )}
-          </div>
+              <div className="mb-4">
+                <label className="block mb-1 font-medium text-white" htmlFor="club">Club</label>
+                <input
+                  id="club"
+                  name="club"
+                  type="text"
+                  value={form.club}
+                  onChange={handleChange}
+                  className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block mb-1 font-medium text-white" htmlFor="type">Competition Type</label>
+                <select
+                  id="type"
+                  name="type"
+                  value={form.type}
+                  onChange={handleTypeChange}
+                  className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
+                >
+                  <option value="4bbb-stableford">4BBB Stableford (2 Scores to Count)</option>
+                  <option value="alliance">Alliance</option>
+                  <option value="medal-strokeplay">Medal Strokeplay</option>
+                  <option value="individual-stableford">Individual Stableford</option>
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block mb-1 font-medium text-white" htmlFor="handicapAllowance">Competition Handicap Allowance</label>
+                <select
+                  id="handicapAllowance"
+                  name="handicapAllowance"
+                  value={form.handicapAllowance}
+                  onChange={handleChange}
+                  className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
+                >
+                  <option value="85">85%</option>
+                  <option value="90">90%</option>
+                  <option value="95">95%</option>
+                  <option value="100">100%</option>
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block mb-1 font-medium text-white" htmlFor="fourballs">How many 4 Balls are playing today?</label>
+                <input
+                  id="fourballs"
+                  name="fourballs"
+                  type="number"
+                  min="1"
+                  required
+                  value={form.fourballs}
+                  onChange={handleChange}
+                  className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                  placeholder="e.g. 3"
+                />
+              </div>
+              <div className="mb-6">
+                <label className="block mb-1 font-medium text-white" htmlFor="notes">Notes</label>
+                <textarea
+                  id="notes"
+                  name="notes"
+                  rows={3}
+                  value={form.notes}
+                  onChange={handleChange}
+                  className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                  placeholder="Optional notes (e.g. special rules, sponsor etc.)"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg"
+                style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              >
+                Next: Assign 4 Balls
+              </button>
+              {/* Footer menu removed, now at top */}
+            </form>
+          )}
         </div>
       </div>
     </PageBackground>
