@@ -1,7 +1,15 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import PageBackground from './PageBackground';
+
+const COMP_TYPE_DISPLAY = {
+  fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
+  alliance: 'Alliance',
+  medalStrokeplay: 'Medal Strokeplay',
+  individualStableford: 'Individual Stableford',
+};
 
 export default function RecentCompetitions() {
   const [comps, setComps] = useState([]);
@@ -108,7 +116,7 @@ export default function RecentCompetitions() {
                     ),
                     <tr key={comp.code + '-info'} className="border-t-4 border-transparent">
                       <td className="border px-2 py-1">{comp.date?.split('-').reverse().join('/')}</td>
-                      <td className="border px-2 py-1">{comp.type}</td>
+                      <td className="border px-2 py-1">{COMP_TYPE_DISPLAY[comp.type] || ''}</td>
                       <td className="border px-2 py-1">
                         <button
                           className="py-1 px-3 border border-white text-white font-semibold rounded-2xl transition"

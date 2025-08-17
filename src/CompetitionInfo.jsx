@@ -1,6 +1,14 @@
+
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PageBackground from './PageBackground';
+
+const COMP_TYPE_DISPLAY = {
+  fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
+  alliance: 'Alliance',
+  medalStrokeplay: 'Medal Strokeplay',
+  individualStableford: 'Individual Stableford',
+};
 
 export default function CompetitionInfo() {
   const location = useLocation();
@@ -73,7 +81,7 @@ export default function CompetitionInfo() {
         <div className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none' }}>
           <div className="mb-4">
               <div><span className="font-semibold">Date:</span> {comp.date}</div>
-              <div><span className="font-semibold">Type:</span> {comp.type}</div>
+              <div><span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')}</div>
               <div><span className="font-semibold">Join Code:</span> {comp.joinCode}</div>
               {comp.teeBox && <div><span className="font-semibold">Tee Box:</span> {comp.teeBox}</div>}
             </div>

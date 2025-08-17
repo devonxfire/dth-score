@@ -20,9 +20,17 @@ function formatDate(dateStr) {
   const [year, month, day] = dateStr.split('-');
   return `${day}/${month}/${year}`;
 }
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
+
+const COMP_TYPE_DISPLAY = {
+  fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
+  alliance: 'Alliance',
+  medalStrokeplay: 'Medal Strokeplay',
+  individualStableford: 'Individual Stableford',
+};
 // Westlake Golf Club holes: par and stroke index
 const defaultHoles = [
   { number: 1, par: 4, index: 5 },
@@ -180,7 +188,7 @@ function Leaderboard() {
               ← Back to Scorecard
             </button>
           </div>
-          {comp && <div className="text-lg font-semibold text-white/90 mb-1">{comp.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>}
+          {comp && <div className="text-lg font-semibold text-white/90 mb-1">{COMP_TYPE_DISPLAY[comp] || comp?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')}</div>}
           {date && <div className="text-md text-white/70 mb-1">{formatDate(date)}</div>}
           {entries[0]?.player?.code && (
             <div className="text-xs text-white/60 mb-4">Invite Code: <span className="font-mono">{entries[0].player.code}</span></div>

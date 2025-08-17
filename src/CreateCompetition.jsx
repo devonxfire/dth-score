@@ -21,7 +21,7 @@ function CreateCompetition() {
   const location = useLocation();
   const [form, setForm] = useState({
     type: 'stroke',
-    date: '',
+  date: '', // Will update this to camelCase below
     club: 'Westlake Golf Club',
     handicapAllowance: '95',
     fourballs: '',
@@ -32,10 +32,10 @@ function CreateCompetition() {
   function handleTypeChange(e) {
     const type = e.target.value;
     let allowance = '95';
-    if (type === 'alliance' || type === '4bbb-stableford') {
+    if (type === 'alliance' || type === 'fourBbbStableford') {
       allowance = '85';
     } else if (type === 'medal-strokeplay' || type === 'individual-stableford') {
-      allowance = '95';
+      allowance = '95'; 
     }
     setForm(prev => ({ ...prev, type, handicapAllowance: allowance }));
   }
@@ -182,11 +182,18 @@ function CreateCompetition() {
                   onChange={handleTypeChange}
                   className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
                 >
-                  <option value="4bbb-stableford">4BBB Stableford (2 Scores to Count)</option>
-                  <option value="alliance">Alliance</option>
-                  <option value="medal-strokeplay">Medal Strokeplay</option>
-                  <option value="individual-stableford">Individual Stableford</option>
+              <option value="fourBbbStableford">4BBB Stableford (2 Scores to Count)</option>
+              <option value="alliance">Alliance</option>
+              <option value="medalStrokeplay">Medal Strokeplay</option>
+              <option value="individualStableford">Individual Stableford</option>
                 </select>
+              <p className="mb-2">Type: <span className="font-medium">{
+                form.type === 'fourBbbStableford' ? '4BBB Stableford' :
+                form.type === 'alliance' ? 'Alliance' :
+                form.type === 'medalStrokeplay' ? 'Medal Strokeplay' :
+                form.type === 'individualStableford' ? 'Individual Stableford' :
+                form.type
+              }</span></p>
               </div>
               <div className="mb-4">
                 <label className="block mb-1 font-medium text-white" htmlFor="handicapAllowance">Competition Handicap Allowance</label>

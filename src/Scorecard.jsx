@@ -1,6 +1,14 @@
+
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
+
+const COMP_TYPE_DISPLAY = {
+  fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
+  alliance: 'Alliance',
+  medalStrokeplay: 'Medal Strokeplay',
+  individualStableford: 'Individual Stableford',
+};
 
 // Westlake Golf Club holes: par and stroke index
 
@@ -204,11 +212,7 @@ export default function Scorecard(props) {
             </button>
           </div>
           <div className="mb-2 text-white/90">
-            <span className="font-semibold">Competition:</span> {competition.type
-              ? competition.type
-                  .replace(/[-_]/g, ' ')
-                  .replace(/\b\w/g, c => c.toUpperCase())
-              : ''} <br />
+            <span className="font-semibold">Competition:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')} <br />
             <span className="font-semibold">Date:</span> {formatDate(competition.date)} <br />
             <span className="font-semibold">Tee Box:</span> {player.teebox} <br />
             <span className="font-semibold">Handicap Allowance:</span> {competition.handicapAllowance}% <br />
@@ -254,11 +258,178 @@ export default function Scorecard(props) {
             </div>
           )}
           <div className="overflow-x-auto">
-            <table className="min-w-full border text-center">
-              {/* ...existing code... */}
-              {/* Table head, body, and rows unchanged */}
-              {/* ...existing code... */}
-            </table>
+            {isAlliance ? (
+              <table className="min-w-full border text-center">
+                <thead>
+                  <tr>
+                    <th className="border px-2 py-1 bg-white/10">Player</th>
+                    {defaultHoles.map(hole => (
+                      <th key={hole.number} className="border px-2 py-1 bg-white/10">{hole.number}</th>
+                    ))}
+                    <th className="border px-2 py-1 bg-white/10">Total</th>
+                  </tr>
+                  <tr>
+                    <th className="border px-2 py-1 bg-white/5">HOLE</th>
+                    {defaultHoles.map(hole => (
+                      <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
+                    ))}
+                    <th className="border px-2 py-1 bg-white/5"></th>
+                  </tr>
+                  <tr>
+                    <th className="border px-2 py-1 bg-white/5">PAR</th>
+                    {defaultHoles.map(hole => (
+                      <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.par}</th>
+                    ))}
+                    <th className="border px-2 py-1 bg-white/5"></th>
+                  </tr>
+                  <tr>
+                    <th className="border px-2 py-1 bg-white/5">STROKE</th>
+                    {defaultHoles.map(hole => (
+                      <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
+                    ))}
+                    <th className="border px-2 py-1 bg-white/5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupPlayers.map((name, pIdx) => (
+                    <tr key={name}>
+                      <td className="border px-2 py-1 font-semibold text-left">{name}</td>
+                      {defaultHoles.map((hole, hIdx) => (
+                        <td key={hIdx} className="border px-1 py-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="20"
+                            value={scores[pIdx][hIdx]}
+                            onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
+                            className="w-12 text-center rounded bg-white/10 text-white border border-white/30 focus:outline-none"
+                          />
+                        </td>
+                      ))}
+                      <td className="border px-2 py-1 font-bold">{totalScore(pIdx)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th className="border px-2 py-1 bg-green-900/60 text-green-200">RESULT</th>
+                    {defaultHoles.map((hole, hIdx) => {
+                      // Calculate Stableford points for each player for this hole
+                      const points = groupPlayers.map((name, pIdx) => {
+                        // Try to get playing handicap for each player from scores, group, or player object
+                        let ph = null;
+                        // 1. Try from competition.groups (if available)
+                        if (isAlliance && competition.groups) {
+                          const group = competition.groups.find(g => g.players?.includes(name));
+                          if (group && group.handicaps && group.handicaps[name] !== undefined) {
+                            ph = parseInt(group.handicaps[name]);
+                          }
+                        }
+                        // 2. Try from scores array (if saved previously)
+                        if (ph === null && Array.isArray(window.scores)) {
+                          const entry = window.scores.find(e => e.player?.name === name && e.competitionType === competition.type && e.date === competition.date);
+                          if (entry && entry.player && entry.player.handicap) {
+                            ph = Math.round(parseFloat(entry.player.handicap) * (parseFloat(competition.handicapAllowance) || 100) / 100);
+                          }
+                        }
+                        // 3. Try from player object (if this is the logged-in user)
+                        if (ph === null && player && player.name === name && player.handicap) {
+                          ph = Math.round(parseFloat(player.handicap) * (parseFloat(competition.handicapAllowance) || 100) / 100);
+                        }
+                        // 4. Fallback to 0
+                        if (ph === null) ph = 0;
+                        const gross = parseInt(scores[pIdx][hIdx] || 0);
+                        if (!gross) return 0;
+                        let shots = 0;
+                        if (ph > 0) {
+                          shots = Math.floor(ph / 18);
+                          if (hole.index <= (ph % 18)) shots += 1;
+                        }
+                        const net = gross - shots;
+                        if (net === hole.par - 2) return 4;
+                        if (net === hole.par - 1) return 3;
+                        if (net === hole.par) return 2;
+                        if (net === hole.par + 1) return 1;
+                        return 0;
+                      });
+                      // Take the best 2 scores for this hole
+                      const best2 = [...points].sort((a, b) => b - a).slice(0, 2);
+                      const sum = best2.reduce((a, b) => a + b, 0);
+                      return (
+                        <th key={hIdx} className="border px-2 py-1 bg-green-900/60 text-green-200">{sum}</th>
+                      );
+                    })}
+                    <th className="border px-2 py-1 bg-green-900/60 text-green-200 font-bold">
+                      {/* Total team points: sum of all best2 sums */}
+                      {defaultHoles.reduce((total, hole, hIdx) => {
+                        const points = groupPlayers.map((name, pIdx) => {
+                          let ph = null;
+                          if (isAlliance && competition.groups) {
+                            const group = competition.groups.find(g => g.players?.includes(name));
+                            if (group && group.handicaps && group.handicaps[name] !== undefined) {
+                              ph = parseInt(group.handicaps[name]);
+                            }
+                          }
+                          if (ph === null && Array.isArray(window.scores)) {
+                            const entry = window.scores.find(e => e.player?.name === name && e.competitionType === competition.type && e.date === competition.date);
+                            if (entry && entry.player && entry.player.handicap) {
+                              ph = Math.round(parseFloat(entry.player.handicap) * (parseFloat(competition.handicapAllowance) || 100) / 100);
+                            }
+                          }
+                          if (ph === null && player && player.name === name && player.handicap) {
+                            ph = Math.round(parseFloat(player.handicap) * (parseFloat(competition.handicapAllowance) || 100) / 100);
+                          }
+                          if (ph === null) ph = 0;
+                          const gross = parseInt(scores[pIdx][hIdx] || 0);
+                          if (!gross) return 0;
+                          let shots = 0;
+                          if (ph > 0) {
+                            shots = Math.floor(ph / 18);
+                            if (hole.index <= (ph % 18)) shots += 1;
+                          }
+                          const net = gross - shots;
+                          if (net === hole.par - 2) return 4;
+                          if (net === hole.par - 1) return 3;
+                          if (net === hole.par) return 2;
+                          if (net === hole.par + 1) return 1;
+                          return 0;
+                        });
+                        const best2 = [...points].sort((a, b) => b - a).slice(0, 2);
+                        return total + best2.reduce((a, b) => a + b, 0);
+                      }, 0)}
+                    </th>
+                  </tr>
+                </tfoot>
+              </table>
+            ) : (
+              <table className="min-w-full border text-center">
+                <thead>
+                  <tr>
+                    {defaultHoles.map(hole => (
+                      <th key={hole.number} className="border px-2 py-1">{hole.number}</th>
+                    ))}
+                    <th className="border px-2 py-1">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    {defaultHoles.map((hole, idx) => (
+                      <td key={idx} className="border px-1 py-1">
+                        <input
+                          type="number"
+                          min="0"
+                          max="20"
+                          value={scores[idx]}
+                          onChange={e => handleScoreChange(idx, e.target.value)}
+                          className="w-12 text-center rounded bg-white/10 text-white border border-white/30 focus:outline-none"
+                        />
+                      </td>
+                    ))}
+                    <td className="border px-2 py-1 font-bold">{totalScore()}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
           </div>
           <button
             onClick={handleSaveScores}
@@ -267,7 +438,15 @@ export default function Scorecard(props) {
             Save Scores
           </button>
           <button
-            onClick={() => navigate('/leaderboard', { state: { date: competition.date, type: competition.type } })}
+            onClick={() => {
+              // Try to get comp code from competition object or player
+              const compCode = competition.code || competition.joinCode || (player && player.code) || '';
+              if (compCode) {
+                navigate(`/leaderboard/${compCode}`, { state: { date: competition.date, type: competition.type } });
+              } else {
+                alert('Competition code not found.');
+              }
+            }}
             className="mt-3 w-full py-2 px-4 bg-yellow-500 text-white font-semibold rounded-2xl hover:bg-yellow-600 transition"
           >
             View Leaderboard

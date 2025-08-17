@@ -36,12 +36,34 @@ export default function JoinCompetition() {
             <h3 className="text-xl font-semibold mb-2">Joined Competition!</h3>
             <p className="mb-2">Welcome, <span className="font-medium">{form.name}</span>!</p>
             <p className="mb-2">Competition: <span className="font-medium">{form.competitionCode}</span></p>
-            <button
-              className="mt-6 py-2 px-6 bg-transparent border border-white text-white rounded-2xl font-semibold hover:bg-white hover:text-black transition"
-              onClick={() => navigate('/')}
-            >
-              Back to Home
-            </button>
+            <div className="flex flex-col gap-4 mt-6">
+              <button
+                className="py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg shadow"
+                style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                onClick={() => {
+                  const comp = JSON.parse(localStorage.getItem(`comp_${form.competitionCode}`));
+                  navigate(`/scorecard/${form.competitionCode}`, {
+                    state: {
+                      player: { name: form.name, handicap: form.handicap, teebox: form.teebox, code: form.competitionCode },
+                      competition: comp
+                    }
+                  });
+                }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              >
+                View Scorecard
+              </button>
+              <button
+                className="py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg shadow"
+                style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                onClick={() => navigate('/')}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              >
+                Back to Home
+              </button>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="w-full max-w-md rounded-2xl shadow-lg bg-transparent" style={{ backdropFilter: 'none' }}>
