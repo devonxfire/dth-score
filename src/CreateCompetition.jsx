@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import PageBackground from './PageBackground';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import FourballAssignment from './FourballAssignment';
 
 // Format date as DD/MM/YYYY
@@ -18,6 +18,7 @@ function generateJoinCode() {
 
 
 function CreateCompetition() {
+  const location = useLocation();
   const [form, setForm] = useState({
     type: 'stroke',
     date: '',
@@ -80,25 +81,25 @@ function CreateCompetition() {
   return (
     <PageBackground>
       {/* Top nav menu */}
-  <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
+      <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
         <button
-          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
-          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
+          style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
           onClick={() => navigate('/dashboard')}
         >
           Dashboard
         </button>
         <button
-          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
-          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/profile' ? 'border-b-4' : ''}`}
+          style={location.pathname === '/profile' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
           onClick={() => navigate('/profile')}
           disabled
         >
           My Profile
         </button>
         <button
-          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
-          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
+          style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
           onClick={() => navigate('/recent')}
         >
           Competitions

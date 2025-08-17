@@ -30,14 +30,48 @@ export default function CompetitionInfo() {
 
   return (
     <PageBackground>
-      <div className="flex flex-col items-center min-h-screen justify-center px-4">
-        <div className="flex flex-col items-center px-4 mt-12">
-          <h2 className="text-5xl font-bold text-white mb-1 drop-shadow-lg text-center">Competition Info</h2>
-          <p className="text-xl text-white mb-6 drop-shadow text-center">Details for this golf competition.</p>
-        </div>
-        <div className="flex flex-col items-center px-4 mt-8 w-full">
-          <div className="w-full max-w-md rounded-2xl shadow-lg bg-transparent text-white mb-8 p-6" style={{ backdropFilter: 'none' }}>
-            <div className="mb-4">
+      {/* Top nav menu */}
+      <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
+        <button
+          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
+          style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => navigate('/dashboard')}
+        >
+          Dashboard
+        </button>
+        <button
+          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/profile' ? 'border-b-4' : ''}`}
+          style={location.pathname === '/profile' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => navigate('/profile')}
+          disabled
+        >
+          My Profile
+        </button>
+        <button
+          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
+          style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => navigate('/recent')}
+        >
+          Competitions
+        </button>
+        <button
+          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
+          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+          onClick={() => {
+            if (typeof window.onSignOut === 'function') window.onSignOut();
+            else if (typeof window.signOut === 'function') window.signOut();
+          }}
+        >
+          Sign Out
+        </button>
+      </div>
+      <div className="flex flex-col items-center px-4 mt-12">
+        <h2 className="text-3xl font-bold text-white mb-2 drop-shadow-lg text-center">Competition Info</h2>
+        <p className="text-xl text-white mb-6 drop-shadow text-center">Details for this golf competition.</p>
+      </div>
+      <div className="flex flex-col items-center px-4 mt-8">
+        <div className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none' }}>
+          <div className="mb-4">
               <div><span className="font-semibold">Date:</span> {comp.date}</div>
               <div><span className="font-semibold">Type:</span> {comp.type}</div>
               <div><span className="font-semibold">Join Code:</span> {comp.joinCode}</div>
@@ -76,8 +110,7 @@ export default function CompetitionInfo() {
               Back
             </button>
           </div>
-        </div>
-      </div>
-    </PageBackground>
+    </div>
+  </PageBackground>
   );
 }
