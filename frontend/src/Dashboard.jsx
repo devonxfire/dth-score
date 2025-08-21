@@ -66,7 +66,7 @@ export default function Dashboard({ user, onSignOut }) {
           className="mb-8 max-h-48 w-auto"
           style={{ objectFit: 'contain' }}
         />
-        <h1 className="text-5xl font-bold text-white mb-1 drop-shadow-lg text-center">Welcome, {user}!</h1>
+  <h1 className="text-5xl font-bold text-white mb-1 drop-shadow-lg text-center">Welcome, {user?.name || ''}!</h1>
         <p className="text-xl text-white mb-6 drop-shadow text-center">What would you like to do today?</p>
       </div>
       <div className="relative z-10 flex flex-col items-center px-4 mt-2">

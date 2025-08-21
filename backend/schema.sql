@@ -1,36 +1,27 @@
--- Users (Players)
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(100) NOT NULL
-);
-
--- Competitions
+-- Competitions table
 CREATE TABLE competitions (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     date DATE NOT NULL,
     type VARCHAR(50) NOT NULL,
+    club VARCHAR(100),
+    handicapAllowance VARCHAR(10),
+    joinCode VARCHAR(20),
+    code VARCHAR(20),
+    notes TEXT,
+    groups JSONB,
     course_id INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Teams
+-- Teams table
 CREATE TABLE teams (
     id SERIAL PRIMARY KEY,
     competition_id INTEGER REFERENCES competitions(id) ON DELETE CASCADE,
     name VARCHAR(100)
 );
 
--- Team Members
-CREATE TABLE team_members (
-    id SERIAL PRIMARY KEY,
-    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
-);
-
--- Holes
+-- Holes table
 CREATE TABLE holes (
     id SERIAL PRIMARY KEY,
     competition_id INTEGER REFERENCES competitions(id) ON DELETE CASCADE,
@@ -39,7 +30,7 @@ CREATE TABLE holes (
     stroke_index INTEGER NOT NULL
 );
 
--- Scores
+-- Scores table
 CREATE TABLE scores (
     id SERIAL PRIMARY KEY,
     competition_id INTEGER REFERENCES competitions(id) ON DELETE CASCADE,

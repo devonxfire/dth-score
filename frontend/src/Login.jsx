@@ -7,18 +7,35 @@ import PageBackground from './PageBackground';
 import westlakeLogo from './assets/westlake-logo2.png';
 
 
+
 export default function Login({ onLogin }) {
-  const [form, setForm] = useState({ name: '', password: '' });
+  const [form, setForm] = useState({ username: '', password: '' });
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    onLogin(form.name);
-    navigate('/dashboard');
+    setError('');
+    try {
+      const res = await fetch('http://localhost:5050/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: form.username, password: form.password })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        onLogin(data.user);
+        navigate('/dashboard');
+      } else {
+        setError(data.error || 'Login failed');
+      }
+    } catch (err) {
+      setError('Network error');
+    }
   }
 
   return (
@@ -39,13 +56,13 @@ export default function Login({ onLogin }) {
         <div className="w-full max-w-md rounded-2xl shadow-lg bg-transparent" style={{ backdropFilter: 'none' }}>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
             <input
-              id="name"
-              name="name"
+              id="username"
+              name="username"
               type="text"
-              value={form.name}
+              value={form.username}
               onChange={handleChange}
               className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
-              placeholder="Enter your name"
+              placeholder="Enter your username"
               autoComplete="off"
               required
             />
@@ -59,6 +76,9 @@ export default function Login({ onLogin }) {
               placeholder="Enter password"
               required
             />
+            {error && (
+              <div className="text-red-400 text-center text-sm">{error}</div>
+            )}
             <button
               type="submit"
               className="w-full py-2 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg"

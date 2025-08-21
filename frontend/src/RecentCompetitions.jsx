@@ -1,3 +1,12 @@
+// Format date as DD/MM/YYYY
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -17,19 +26,13 @@ export default function RecentCompetitions() {
   const location = useLocation();
 
   useEffect(() => {
-    const all = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key.startsWith('comp_')) {
-        try {
-          const comp = JSON.parse(localStorage.getItem(key));
-          all.push(comp);
-        } catch {}
-      }
-    }
-    // Sort by date descending
-    all.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    setComps(all);
+    fetch('http://localhost:5050/api/competitions')
+      .then(res => res.json())
+      .then(data => {
+        data.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        setComps(data);
+      })
+      .catch(() => setComps([]));
   }, []);
 
   function handleSelect(comp) {
@@ -115,7 +118,7 @@ export default function RecentCompetitions() {
                       </tr>
                     ),
                     <tr key={comp.code + '-info'} className="border-t-4 border-transparent">
-                      <td className="border px-2 py-1">{comp.date?.split('-').reverse().join('/')}</td>
+                      <td className="border px-2 py-1">{formatDate(comp.date)}</td>
                       <td className="border px-2 py-1">{COMP_TYPE_DISPLAY[comp.type] || ''}</td>
                       <td className="border px-2 py-1">
                         <button
