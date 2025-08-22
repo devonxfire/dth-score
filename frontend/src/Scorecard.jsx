@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
 
@@ -33,426 +33,253 @@ const defaultHoles = [
   { number: 18, par: 4, index: 8 },
 ];
 
+
 export default function Scorecard(props) {
   const location = useLocation();
-  const player = location.state?.player || { name: 'Player', handicap: '', teebox: '', code: '' };
-  // Use competition from location.state if present, else fallback
-  const competition = location.state?.competition || {
-    type: '4BBB Stableford (2 Scores to Count)',
-    date: '2025-08-13',
-    handicapAllowance: '95',
-    fourballs: '4',
-    notes: 'Example notes',
-  };
-  // Alliance logic: get group members if Alliance comp
-  const isAlliance = competition.type?.toLowerCase().includes('alliance');
-  let groupPlayers = [player.name];
-  if (isAlliance) {
-    // Try to get group from comp data in localStorage
-    try {
-      const compData = JSON.parse(localStorage.getItem(`comp_${player.code}`));
-      const group = compData?.groups?.find(g => g.players?.includes(player.name));
-      if (group) groupPlayers = group.players;
-    } catch {}
-  }
   const navigate = useNavigate();
-  // Calculate playing handicap (adjusted)
-  const fullHandicap = player.handicap || '';
-  const allowance = competition.handicapAllowance ? parseFloat(competition.handicapAllowance) : 100;
-  const playingHandicap = fullHandicap ? Math.round((parseFloat(fullHandicap) * allowance) / 100) : '';
-  // Format date as DD/MM/YYYY
-  function formatDate(dateStr) {
-    if (!dateStr) return '';
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
-  }
-  // For Alliance: scores is 2D array [playerIdx][holeIdx]
-  const [scores, setScores] = useState(
-    isAlliance
-      ? Array(groupPlayers.length).fill(0).map(() => Array(18).fill(''))
-      : Array(18).fill('')
-  );
+  // Modal state for tee/handicap
+  const [showTeeModal, setShowTeeModal] = useState(false);
+  const [selectedTee, setSelectedTee] = useState('');
+  const [inputHandicap, setInputHandicap] = useState('');
+  const [savingTee, setSavingTee] = useState(false);
+  const [teeError, setTeeError] = useState('');
 
-  function handleScoreChange(idx, value, playerIdx = 0) {
-    if (isAlliance) {
-      const newScores = scores.map(arr => [...arr]);
-      newScores[playerIdx][idx] = value;
-      setScores(newScores);
-    } else {
-      const newScores = [...scores];
-      newScores[idx] = value;
-      setScores(newScores);
+  // Prefer location.state, fallback to props
+  const initialCompetition = location.state?.competition || props.competition || null;
+  const initialPlayer = location.state?.player || props.player || null;
+  const [competition, setCompetition] = useState(initialCompetition);
+  const [player, setPlayer] = useState(initialPlayer);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Show modal if player is present but missing teebox or course_handicap
+  useEffect(() => {
+    if (player && (!player.teebox || !player.course_handicap)) {
+      setShowTeeModal(true);
+      setSelectedTee(player.teebox || '');
+      setInputHandicap(player.course_handicap || '');
     }
+  }, [player]);
+  const isAlliance = competition && competition.type?.toLowerCase().includes('alliance');
+  let groupPlayers = [player && player.name].filter(Boolean);
+  if (isAlliance && competition && competition.groups && player) {
+    const foundGroup = competition.groups.find(g => g.players?.includes(player.name));
+    if (foundGroup) groupPlayers = foundGroup.players;
   }
-
-
-  function totalScore(playerIdx = 0) {
-    if (isAlliance) {
-      return scores[playerIdx].reduce((sum, val) => sum + (parseInt(val) || 0), 0);
-    }
-    return scores.reduce((sum, val) => sum + (parseInt(val) || 0), 0);
-  }
-
-  // Calculate playing handicap (shots to allocate)
-  function getPlayingHandicap() {
-    return playingHandicap ? parseInt(playingHandicap) : 0;
-  }
-
-  // Determine comp type
-  const isMedal = competition.type?.toLowerCase().includes('medal');
-  const isStableford = competition.type?.toLowerCase().includes('stableford');
-
-  // Calculate Stableford points per hole (for Stableford only)
-  function getPointsPerHole(playerIdx = 0) {
-    if (!isStableford && !isAlliance) return [];
-    // For Alliance, calculate for each player
-    const getPoints = (gross, ph, hole) => {
-      if (!gross) return '';
-      let shots = 0;
-      if (ph > 0) {
-        shots = Math.floor(ph / 18);
-        if (hole.index <= (ph % 18)) shots += 1;
-      }
-      const net = gross - shots;
-      const par = hole.par;
-      if (net === par - 2) return 4;
-      if (net === par - 1) return 3;
-      if (net === par) return 2;
-      if (net === par + 1) return 1;
-      return 0;
-    };
-    if (isAlliance) {
-      // Return 2D array: [playerIdx][holeIdx]
-      return scores.map((playerScores, pIdx) =>
-        playerScores.map((score, hIdx) => {
-          // Get handicap for this player
-          // For now, assume all group members have same handicap as entered (can be improved)
-          const ph = getPlayingHandicap();
-          return getPoints(parseInt(score || 0), ph, defaultHoles[hIdx]);
-        })
-      );
-    } else {
-      const ph = getPlayingHandicap();
-      return defaultHoles.map((hole, i) => getPoints(parseInt(scores[i] || 0), ph, hole));
-    }
-  }
-
-  function totalPoints(playerIdx = 0) {
-    if (isAlliance) {
-      return getPointsPerHole()[playerIdx].reduce((sum, val) => sum + (parseInt(val) || 0), 0);
-    }
-    return getPointsPerHole().reduce((sum, val) => sum + (parseInt(val) || 0), 0);
-  }
-
-  // Medal: Net per hole and total
-  function getNetPerHole() {
-    if (!isMedal) return [];
-    const ph = getPlayingHandicap();
-    // Allocate shots per hole
-    let shotsPerHole = Array(18).fill(Math.floor(ph / 18));
-    for (let i = 0; i < ph % 18; i++) {
-      // Find hole with index == i+1
-      const idx = defaultHoles.findIndex(h => h.index === i + 1);
-      if (idx !== -1) shotsPerHole[idx] += 1;
-    }
-    return scores.map((score, idx) => {
-      if (!score) return '';
-      return parseInt(score) - shotsPerHole[idx];
-    });
-  }
-  function totalNet() {
-    return getNetPerHole().reduce((sum, val) => sum + (parseInt(val) || 0), 0);
-  }
-
-  function handleSaveScores() {
-    let entries = [];
-    if (isAlliance) {
-      // Save one entry per group member, with their scores
-      entries = groupPlayers.map((name, idx) => ({
-        player: { ...player, name },
-        scores: scores[idx],
-        total: totalScore(idx),
-        date: competition.date,
-        competitionType: competition.type,
-      }));
-    } else {
-      entries = [{
-        player,
-        scores,
-        total: totalScore(),
-        date: competition.date,
-        competitionType: competition.type,
-      }];
-    }
-    const prev = JSON.parse(localStorage.getItem('scores') || '[]');
-    localStorage.setItem('scores', JSON.stringify([...prev, ...entries]));
-    alert('Scores saved!');
-  }
-
+  const scores = groupPlayers.map(() => Array(18).fill(''));
+  const playingHandicap = player && player.handicap ? player.handicap : '';
+  function handleScoreChange() {}
+  function totalScore() { return 0; }
+  function handleSaveScores() {}
 
   return (
     <PageBackground>
-      <div className="flex flex-col items-center px-4 mt-12">
-        <h2 className="text-3xl font-bold text-white mb-6 drop-shadow-lg text-center">
-          {isAlliance
-            ? `${groupPlayers.join(', ')}'s Scorecard`
-            : player.name
-              ? `${player.name}'s Scorecard`
-              : 'Scorecard'}
-        </h2>
-      </div>
-      <div className="flex flex-col items-center px-4 mt-8">
-        <div className="w-full max-w-3xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
-          <div className="flex justify-between mb-2">
-            <button
-              onClick={() => navigate('/')}
-              className="py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition mr-2"
+      {/* Tee/Handicap Modal */}
+      {showTeeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="w-full max-w-sm flex flex-col items-center rounded-2xl shadow-lg border border-white bg-transparent p-8" style={{background: 'rgba(0,0,0,0.35)'}}>
+            <h2 className="text-2xl font-bold mb-4 text-white drop-shadow">Set Your Tee & Handicap</h2>
+            <label className="mb-2 w-full text-left text-white font-semibold">Tee Box</label>
+            <select
+              className="mb-4 w-full p-2 border border-white bg-transparent text-white rounded focus:outline-none"
+              value={selectedTee}
+              onChange={e => setSelectedTee(e.target.value)}
             >
-              Home
+              <option value="">Select Tee</option>
+              <option value="White">White</option>
+              <option value="Yellow">Yellow</option>
+              <option value="Red">Red</option>
+            </select>
+            <label className="mb-2 w-full text-left text-white font-semibold">FULL Course Handicap</label>
+            <input
+              type="number"
+              className="mb-4 w-full p-2 border border-white bg-transparent text-white rounded focus:outline-none"
+              value={inputHandicap}
+              onChange={e => setInputHandicap(e.target.value)}
+              min="0"
+              max="54"
+            />
+            {teeError && <div className="text-red-300 mb-2 font-semibold">{teeError}</div>}
+            <button
+              className="w-full py-2 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              disabled={savingTee}
+              onClick={async () => {
+                setTeeError('');
+                if (!selectedTee || !inputHandicap) {
+                  setTeeError('Please select a tee and enter your handicap.');
+                  return;
+                }
+                setSavingTee(true);
+                try {
+                  // PATCH to backend
+                  const teamId = player.team_id || player.teamId || player.group_id || player.groupId;
+                  const userId = player.id || player.user_id || player.userId;
+                  const res = await fetch(`/api/teams/${teamId}/users/${userId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ teebox: selectedTee, course_handicap: inputHandicap })
+                  });
+                  if (!res.ok) throw new Error('Failed to save');
+                  // Update player state
+                  setPlayer(p => ({ ...p, teebox: selectedTee, course_handicap: inputHandicap }));
+                  setShowTeeModal(false);
+                } catch (e) {
+                  setTeeError('Failed to save. Please try again.');
+                } finally {
+                  setSavingTee(false);
+                }
+              }}
+            >
+              {savingTee ? 'Saving...' : 'Save & Continue'}
+            </button>
+            <button
+              className="w-full mt-2 py-2 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg bg-transparent hover:bg-white hover:text-[#1B3A6B]"
+              onClick={() => navigate('/dashboard')}
+            >
+              Cancel
             </button>
           </div>
-          <div className="mb-2 text-white/90">
-            <span className="font-semibold">Competition:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')} <br />
-            <span className="font-semibold">Date:</span> {formatDate(competition.date)} <br />
-            <span className="font-semibold">Tee Box:</span> {player.teebox} <br />
-            <span className="font-semibold">Handicap Allowance:</span> {competition.handicapAllowance}% <br />
-            <span className="font-semibold">4 Balls:</span> {competition.fourballs} <br />
-            {competition.notes && <><span className="font-semibold">Notes from Captain:</span> {competition.notes} <br /></>}
+        </div>
+      )}
+      {!competition || !player ? (
+        <div className="text-white p-8">No competition or player data found.</div>
+      ) : !showTeeModal && (
+        <>
+          <div className="flex flex-col items-center px-4 mt-12">
+            <h2 className="text-3xl font-bold text-white mb-6 drop-shadow-lg text-center">
+              {isAlliance
+                ? `${groupPlayers.join(', ')}'s Scorecard`
+                : player.name
+                  ? `${player.name}'s Scorecard`
+                  : 'Scorecard'}
+            </h2>
           </div>
-          {isAlliance && (
-            <div className="mb-4">
-              <div className="font-semibold mb-1">Group Members:</div>
-              <ul className="mb-2">
-                {groupPlayers.map((name, idx) => {
-                  if (name === player.name) {
-                    return (
-                      <li key={name} className="mb-1">
-                        <span className="font-semibold">{name}</span>
-                        <span className="ml-2 text-green-200">Playing Handicap: {playingHandicap}</span>
-                      </li>
-                    );
-                  }
-                  let joined = null;
-                  try {
-                    const allScores = JSON.parse(localStorage.getItem('scores') || '[]');
-                    joined = allScores.find(e => e.player?.name === name && e.competitionType === competition.type && e.date === competition.date);
-                  } catch {}
-                  let ph = '';
-                  if (joined) {
-                    const full = parseFloat(joined.player?.handicap || 0);
-                    const allowance = competition.handicapAllowance ? parseFloat(competition.handicapAllowance) : 100;
-                    ph = full ? Math.round((full * allowance) / 100) : '';
-                  }
-                  return (
-                    <li key={name} className="mb-1">
-                      <span className="font-semibold">{name}</span>
-                      {joined ? (
-                        <span className="ml-2 text-green-200">Playing Handicap: {ph}</span>
-                      ) : (
-                        <span className="ml-2 text-red-200">NOT JOINED YET</span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-          <div className="overflow-x-auto">
-            {isAlliance ? (
-              <table className="min-w-full border text-center">
-                <thead>
-                  <tr>
-                    <th className="border px-2 py-1 bg-white/10">Player</th>
-                    {defaultHoles.map(hole => (
-                      <th key={hole.number} className="border px-2 py-1 bg-white/10">{hole.number}</th>
-                    ))}
-                    <th className="border px-2 py-1 bg-white/10">Total</th>
-                  </tr>
-                  <tr>
-                    <th className="border px-2 py-1 bg-white/5">HOLE</th>
-                    {defaultHoles.map(hole => (
-                      <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
-                    ))}
-                    <th className="border px-2 py-1 bg-white/5"></th>
-                  </tr>
-                  <tr>
-                    <th className="border px-2 py-1 bg-white/5">PAR</th>
-                    {defaultHoles.map(hole => (
-                      <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.par}</th>
-                    ))}
-                    <th className="border px-2 py-1 bg-white/5"></th>
-                  </tr>
-                  <tr>
-                    <th className="border px-2 py-1 bg-white/5">STROKE</th>
-                    {defaultHoles.map(hole => (
-                      <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
-                    ))}
-                    <th className="border px-2 py-1 bg-white/5"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupPlayers.map((name, pIdx) => (
-                    <tr key={name}>
-                      <td className="border px-2 py-1 font-semibold text-left">{name}</td>
-                      {defaultHoles.map((hole, hIdx) => (
-                        <td key={hIdx} className="border px-1 py-1">
-                          <input
-                            type="number"
-                            min="0"
-                            max="20"
-                            value={scores[pIdx][hIdx]}
-                            onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
-                            className="w-12 text-center rounded bg-white/10 text-white border border-white/30 focus:outline-none"
-                          />
-                        </td>
-                      ))}
-                      <td className="border px-2 py-1 font-bold">{totalScore(pIdx)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <th className="border px-2 py-1 bg-green-900/60 text-green-200">RESULT</th>
-                    {defaultHoles.map((hole, hIdx) => {
-                      // Calculate Stableford points for each player for this hole
-                      const points = groupPlayers.map((name, pIdx) => {
-                        // Try to get playing handicap for each player from scores, group, or player object
-                        let ph = null;
-                        // 1. Try from competition.groups (if available)
-                        if (isAlliance && competition.groups) {
-                          const group = competition.groups.find(g => g.players?.includes(name));
-                          if (group && group.handicaps && group.handicaps[name] !== undefined) {
-                            ph = parseInt(group.handicaps[name]);
-                          }
+          <div className="flex flex-col items-center px-4 mt-8">
+            <div className="w-full max-w-3xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+              <div className="flex justify-between mb-2">
+                <button
+                  onClick={() => navigate('/')}
+                  className="py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition mr-2"
+                >
+                  Home
+                </button>
+              </div>
+              <div className="mb-2 text-white/90">
+                <span className="font-semibold">Competition:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')} <br />
+                <span className="font-semibold">Date:</span> {competition.date} <br />
+                <span className="font-semibold">Tee Box:</span> {player.teebox} <br />
+                <span className="font-semibold">Handicap Allowance:</span> {competition.handicapAllowance ? competition.handicapAllowance + '%' : 'N/A'} <br />
+                <span className="font-semibold">4 Balls:</span> {competition.fourballs} <br />
+                {competition.notes && <><span className="font-semibold">Notes from Captain:</span> {competition.notes} <br /></>}
+              </div>
+              {isAlliance && (
+                <div className="mb-4">
+                  <div className="font-semibold mb-1">Group Members:</div>
+                  <ul className="mb-2">
+                    {groupPlayers.map((name, idx) => {
+                      let ph = '';
+                      if (name === player.name && player.handicap) {
+                        ph = playingHandicap;
+                      } else if (competition.groups) {
+                        const group = competition.groups.find(g => g.players?.includes(name));
+                        if (group && group.handicaps && group.handicaps[name] !== undefined) {
+                          ph = group.handicaps[name];
                         }
-                        // 2. Try from scores array (if saved previously)
-                        if (ph === null && Array.isArray(window.scores)) {
-                          const entry = window.scores.find(e => e.player?.name === name && e.competitionType === competition.type && e.date === competition.date);
-                          if (entry && entry.player && entry.player.handicap) {
-                            ph = Math.round(parseFloat(entry.player.handicap) * (parseFloat(competition.handicapAllowance) || 100) / 100);
-                          }
-                        }
-                        // 3. Try from player object (if this is the logged-in user)
-                        if (ph === null && player && player.name === name && player.handicap) {
-                          ph = Math.round(parseFloat(player.handicap) * (parseFloat(competition.handicapAllowance) || 100) / 100);
-                        }
-                        // 4. Fallback to 0
-                        if (ph === null) ph = 0;
-                        const gross = parseInt(scores[pIdx][hIdx] || 0);
-                        if (!gross) return 0;
-                        let shots = 0;
-                        if (ph > 0) {
-                          shots = Math.floor(ph / 18);
-                          if (hole.index <= (ph % 18)) shots += 1;
-                        }
-                        const net = gross - shots;
-                        if (net === hole.par - 2) return 4;
-                        if (net === hole.par - 1) return 3;
-                        if (net === hole.par) return 2;
-                        if (net === hole.par + 1) return 1;
-                        return 0;
-                      });
-                      // Take the best 2 scores for this hole
-                      const best2 = [...points].sort((a, b) => b - a).slice(0, 2);
-                      const sum = best2.reduce((a, b) => a + b, 0);
+                      }
                       return (
-                        <th key={hIdx} className="border px-2 py-1 bg-green-900/60 text-green-200">{sum}</th>
+                        <li key={name} className="mb-1">
+                          <span className="font-semibold">{name}</span>
+                          {ph !== '' ? (
+                            <span className="ml-2 text-green-200">Playing Handicap: {ph}</span>
+                          ) : (
+                            <span className="ml-2 text-red-200">No Handicap</span>
+                          )}
+                        </li>
                       );
                     })}
-                    <th className="border px-2 py-1 bg-green-900/60 text-green-200 font-bold">
-                      {/* Total team points: sum of all best2 sums */}
-                      {defaultHoles.reduce((total, hole, hIdx) => {
-                        const points = groupPlayers.map((name, pIdx) => {
-                          let ph = null;
-                          if (isAlliance && competition.groups) {
-                            const group = competition.groups.find(g => g.players?.includes(name));
-                            if (group && group.handicaps && group.handicaps[name] !== undefined) {
-                              ph = parseInt(group.handicaps[name]);
-                            }
-                          }
-                          if (ph === null && Array.isArray(window.scores)) {
-                            const entry = window.scores.find(e => e.player?.name === name && e.competitionType === competition.type && e.date === competition.date);
-                            if (entry && entry.player && entry.player.handicap) {
-                              ph = Math.round(parseFloat(entry.player.handicap) * (parseFloat(competition.handicapAllowance) || 100) / 100);
-                            }
-                          }
-                          if (ph === null && player && player.name === name && player.handicap) {
-                            ph = Math.round(parseFloat(player.handicap) * (parseFloat(competition.handicapAllowance) || 100) / 100);
-                          }
-                          if (ph === null) ph = 0;
-                          const gross = parseInt(scores[pIdx][hIdx] || 0);
-                          if (!gross) return 0;
-                          let shots = 0;
-                          if (ph > 0) {
-                            shots = Math.floor(ph / 18);
-                            if (hole.index <= (ph % 18)) shots += 1;
-                          }
-                          const net = gross - shots;
-                          if (net === hole.par - 2) return 4;
-                          if (net === hole.par - 1) return 3;
-                          if (net === hole.par) return 2;
-                          if (net === hole.par + 1) return 1;
-                          return 0;
-                        });
-                        const best2 = [...points].sort((a, b) => b - a).slice(0, 2);
-                        return total + best2.reduce((a, b) => a + b, 0);
-                      }, 0)}
-                    </th>
-                  </tr>
-                </tfoot>
-              </table>
-            ) : (
-              <table className="min-w-full border text-center">
-                <thead>
-                  <tr>
-                    {defaultHoles.map(hole => (
-                      <th key={hole.number} className="border px-2 py-1">{hole.number}</th>
+                  </ul>
+                </div>
+              )}
+              <div className="overflow-x-auto">
+                <table className="min-w-full border text-center">
+                  <thead>
+                    <tr>
+                      {groupPlayers.length > 1 && <th className="border px-2 py-1 bg-white/10">Player</th>}
+                      {defaultHoles.map(hole => (
+                        <th key={hole.number} className="border px-2 py-1 bg-white/10">{hole.number}</th>
+                      ))}
+                      <th className="border px-2 py-1 bg-white/10">Total</th>
+                    </tr>
+                    <tr>
+                      {groupPlayers.length > 1 && <th className="border px-2 py-1 bg-white/5">HOLE</th>}
+                      {defaultHoles.map(hole => (
+                        <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
+                      ))}
+                      <th className="border px-2 py-1 bg-white/5"></th>
+                    </tr>
+                    <tr>
+                      {groupPlayers.length > 1 && <th className="border px-2 py-1 bg-white/5">PAR</th>}
+                      {defaultHoles.map(hole => (
+                        <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.par}</th>
+                      ))}
+                      <th className="border px-2 py-1 bg-white/5"></th>
+                    </tr>
+                    <tr>
+                      {groupPlayers.length > 1 && <th className="border px-2 py-1 bg-white/5">STROKE</th>}
+                      {defaultHoles.map(hole => (
+                        <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
+                      ))}
+                      <th className="border px-2 py-1 bg-white/5"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupPlayers.map((name, pIdx) => (
+                      <tr key={name}>
+                        {groupPlayers.length > 1 && <td className="border px-2 py-1 font-semibold text-left">{name}</td>}
+                        {defaultHoles.map((hole, hIdx) => (
+                          <td key={hIdx} className="border px-1 py-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="20"
+                              value={scores[pIdx][hIdx]}
+                              onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
+                              className="w-12 text-center rounded bg-white/10 text-white border border-white/30 focus:outline-none"
+                            />
+                          </td>
+                        ))}
+                        <td className="border px-2 py-1 font-bold">{totalScore(pIdx)}</td>
+                      </tr>
                     ))}
-                    <th className="border px-2 py-1">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    {defaultHoles.map((hole, idx) => (
-                      <td key={idx} className="border px-1 py-1">
-                        <input
-                          type="number"
-                          min="0"
-                          max="20"
-                          value={scores[idx]}
-                          onChange={e => handleScoreChange(idx, e.target.value)}
-                          className="w-12 text-center rounded bg-white/10 text-white border border-white/30 focus:outline-none"
-                        />
-                      </td>
-                    ))}
-                    <td className="border px-2 py-1 font-bold">{totalScore()}</td>
-                  </tr>
-                </tbody>
-              </table>
-            )}
+                  </tbody>
+                </table>
+              </div>
+              <button
+                onClick={handleSaveScores}
+                className="mt-6 w-full py-2 px-4 bg-transparent border border-white text-white font-semibold rounded-2xl hover:bg-white hover:text-black transition"
+              >
+                Save Scores
+              </button>
+              <button
+                onClick={() => {
+                  const compJoinCode = competition.joinCode || competition.joincode || (player && (player.joinCode || player.joincode)) || '';
+                  if (compJoinCode) {
+                    navigate(`/leaderboard/${compJoinCode}`, { state: { date: competition.date, type: competition.type } });
+                  } else {
+                    alert('Competition join code not found.');
+                  }
+                }}
+                className="mt-3 w-full py-2 px-4 bg-yellow-500 text-white font-semibold rounded-2xl hover:bg-yellow-600 transition"
+              >
+                View Leaderboard
+              </button>
+            </div>
           </div>
-          <button
-            onClick={handleSaveScores}
-            className="mt-6 w-full py-2 px-4 bg-transparent border border-white text-white font-semibold rounded-2xl hover:bg-white hover:text-black transition"
-          >
-            Save Scores
-          </button>
-          <button
-            onClick={() => {
-              // Try to get comp code from competition object or player
-              const compCode = competition.code || competition.joinCode || (player && player.code) || '';
-              if (compCode) {
-                navigate(`/leaderboard/${compCode}`, { state: { date: competition.date, type: competition.type } });
-              } else {
-                alert('Competition code not found.');
-              }
-            }}
-            className="mt-3 w-full py-2 px-4 bg-yellow-500 text-white font-semibold rounded-2xl hover:bg-yellow-600 transition"
-          >
-            View Leaderboard
-          </button>
-        </div>
-      </div>
+        </>
+      )}
     </PageBackground>
   );
 }

@@ -1,0 +1,12 @@
+@keyframes pulse-red {
+  0%, 100% {
+    background-color: #b91c1c; /* red-700 */
+  }
+  50% {
+    background-color: #ef4444; /* red-500 */
+  }
+}
+
+.scorecard-pulse {
+  animation: pulse-red 1.2s infinite;
+}

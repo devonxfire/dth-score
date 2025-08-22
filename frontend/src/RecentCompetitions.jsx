@@ -8,10 +8,16 @@ function formatDate(dateStr) {
   return `${day}/${month}/${year}`;
 }
 
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import PageBackground from './PageBackground';
+
+// Helper: check if user is admin
+function isAdmin(user) {
+  return user && (user.role === 'admin' || user.isAdmin || user.isadmin);
+}
 
 const COMP_TYPE_DISPLAY = {
   fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
@@ -20,29 +26,45 @@ const COMP_TYPE_DISPLAY = {
   individualStableford: 'Individual Stableford',
 };
 
-export default function RecentCompetitions() {
+
+export default function RecentCompetitions({ user }) {
+  const location = useLocation();
   const [comps, setComps] = useState([]);
   const navigate = useNavigate();
-  const location = useLocation();
+  
 
+  // Fetch competitions
   useEffect(() => {
-    fetch('http://localhost:5050/api/competitions')
+    fetch('/api/competitions')
       .then(res => res.json())
-      .then(data => {
-        data.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        setComps(data);
-      })
+      .then(data => setComps(Array.isArray(data) ? data : []))
       .catch(() => setComps([]));
   }, []);
 
-  function handleSelect(comp) {
-    navigate('/join', { state: { code: comp.code } });
-  }
+  // Delete competition handler
+  const handleDelete = async (compId) => {
+    if (!window.confirm('Are you sure you want to delete this competition?')) return;
+    // Get admin secret from VITE_ADMIN_SECRET only
+    const adminSecret = import.meta.env.VITE_ADMIN_SECRET;
+    if (!adminSecret) {
+      alert('Admin secret not set in frontend .env.');
+      return;
+    }
+    const res = await fetch(`/api/competitions/${compId}`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-Secret': adminSecret },
+    });
+    if (res.ok) {
+      setComps(comps => comps.filter(c => c.id !== compId));
+    } else {
+      alert('Failed to delete competition.');
+    }
+  };
 
   return (
     <PageBackground>
-      {/* Top nav menu (copied from CreateCompetition.jsx for perfect match) */}
-      <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
+      {/* Top nav menu */}
+      <div className="flex flex-wrap justify-between items-center mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
         <button
           className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
           style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
@@ -51,20 +73,18 @@ export default function RecentCompetitions() {
           Dashboard
         </button>
         <button
-          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/profile' ? 'border-b-4' : ''}`}
-          style={location.pathname === '/profile' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => navigate('/profile')}
-          disabled
-        >
-          My Profile
-        </button>
-        <button
           className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
           style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
           onClick={() => navigate('/recent')}
         >
           Competitions
         </button>
+        <span
+          className="text-sm text-white font-semibold opacity-80 bg-transparent border-none outline-none px-2 py-1 cursor-default select-none"
+          style={{ background: 'none', border: 'none', boxShadow: 'none', lineHeight: '2.25rem' }}
+        >
+          Welcome, {(user?.name?.split(' ')[0]) || 'Player'}!
+        </span>
         <button
           className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
           style={{ background: 'none', border: 'none', boxShadow: 'none' }}
@@ -76,11 +96,9 @@ export default function RecentCompetitions() {
           Sign Out
         </button>
       </div>
-      <div className="flex flex-col items-center px-4 mt-12">
-        <h2 className="text-3xl font-bold text-white mb-2 drop-shadow-lg text-center">Recent Competitions</h2>
-      </div>
       <div className="flex flex-col items-center px-4 mt-8">
-  <div className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8 px-8" style={{ backdropFilter: 'none' }}>
+        <h1 className="text-3xl font-bold mb-6 text-white drop-shadow-lg">Recent Competitions</h1>
+        <div className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8 px-8" style={{ backdropFilter: 'none' }}>
           <table className="min-w-full border text-center mb-6">
             <thead>
               <tr className="bg-white/10">
@@ -95,96 +113,86 @@ export default function RecentCompetitions() {
                 <tr>
                   <td colSpan={4} className="border px-2 py-4 text-white/80">No competitions found.</td>
                 </tr>
-              ) : (
-                comps.flatMap((comp, idx) => {
-                  let status = 'Open';
-                  if (comp.date) {
-                    const today = new Date();
-                    const compDate = new Date(comp.date);
-                    if (compDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
-                      status = 'Closed';
-                    }
+              ) : comps.flatMap((comp, idx) => {
+                const keyBase = comp.id || comp.joinCode || comp.joincode || idx;
+                let status = 'Open';
+                if (comp.date) {
+                  const today = new Date();
+                  const compDate = new Date(comp.date);
+                  if (compDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+                    status = 'Closed';
                   }
-                  return [
-                    <tr key={comp.code + '-spacer'}>
-                      <td colSpan={4} style={{ height: idx === 0 ? 0 : 32, background: 'transparent', border: 'none', padding: 0 }}></td>
-                    </tr>,
-                    idx !== 0 && (
-                      <tr key={comp.code + '-headings'} className="bg-white/10">
-                        <th className="border px-2 py-1">Date</th>
-                        <th className="border px-2 py-1">Type</th>
-                        <th className="border px-2 py-1">Info</th>
-                        <th className="border px-2 py-1">Status</th>
-                      </tr>
-                    ),
-                    <tr key={comp.code + '-info'} className="border-t-4 border-transparent">
-                      <td className="border px-2 py-1">{formatDate(comp.date)}</td>
-                      <td className="border px-2 py-1">{COMP_TYPE_DISPLAY[comp.type] || ''}</td>
-                      <td className="border px-2 py-1">
+                }
+                return [
+                  <tr key={keyBase + '-spacer'}>
+                    <td colSpan={4} style={{ height: idx === 0 ? 0 : 32, background: 'transparent', border: 'none', padding: 0 }}></td>
+                  </tr>,
+                  <tr key={keyBase + '-info'} className="border-t-4 border-transparent">
+                    <td className="border px-2 py-1">{formatDate(comp.date)}</td>
+                    <td className="border px-2 py-1">{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</td>
+                    <td className="border px-2 py-1">{comp.club || comp.joinCode || comp.joincode || '-'}</td>
+                    <td className="border px-2 py-1">{status}</td>
+                  </tr>,
+                  <tr key={keyBase + '-actions'}>
+                    <td colSpan={4} className="border px-2 py-2 bg-white/5">
+                      <div className="flex gap-4 justify-center">
                         <button
                           className="py-1 px-3 border border-white text-white font-semibold rounded-2xl transition"
                           style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                          onClick={() => navigate(`/competition/${comp.code}`, { state: { comp } })}
+                          onClick={() => navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}`, { state: { comp } })}
                           onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
                           onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
                         >
                           Info
                         </button>
-                      </td>
-                      <td className="border px-2 py-1">{status}</td>
-                    </tr>,
-                    <tr key={comp.code + '-actions'}>
-                      <td colSpan={4} className="border px-2 py-2 bg-white/5">
-                        <div className="flex gap-4 justify-center">
-                          {status === 'Open' ? (
-                            <button
-                              className="py-2 px-4 w-full max-w-xs border border-white text-white font-semibold rounded-2xl transition"
-                              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                              onClick={() => handleSelect(comp)}
-                              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-                              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-                            >
-                              Join
-                            </button>
-                          ) : (
-                            <span className="flex items-center justify-center w-full bg-red-900/80 text-gray-300 font-semibold uppercase tracking-wide rounded select-none" style={{minHeight: '40px', letterSpacing: '0.05em'}}>
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="#fff0" />
-                                <line x1="7" y1="7" x2="17" y2="17" stroke="currentColor" strokeWidth="2" />
-                              </svg>
-                              Complete
-                            </span>
-                          )}
+                        {status === 'Open' && user && Array.isArray(comp.groups) && comp.groups.some(g => Array.isArray(g.players) && g.players.includes(user.name)) ? (
                           <button
                             className="py-2 px-4 w-full max-w-xs border border-white text-white font-semibold rounded-2xl transition"
                             style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                            onClick={() => navigate(`/leaderboard/${comp.code}`)}
+                            onClick={() => handleSelect && handleSelect(comp)}
                             onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
                             onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
                           >
-                            View Leaderboard
+                            Join
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ];
-                })
-              )}
+                        ) : status === 'Open' ? (
+                          <span className="flex items-center justify-center w-full bg-yellow-900/80 text-gray-300 font-semibold uppercase tracking-wide rounded select-none" style={{minHeight: '40px', letterSpacing: '0.05em'}}>
+                            YOU AREN'T PLAYING
+                          </span>
+                        ) : (
+                          <span className="flex items-center justify-center w-full bg-red-900/80 text-gray-300 font-semibold uppercase tracking-wide rounded select-none" style={{minHeight: '40px', letterSpacing: '0.05em'}}>
+                            Closed
+                          </span>
+                        )}
+                        {isAdmin(user) && (
+                          <button
+                            className="py-1 px-3 border border-red-400 text-red-300 font-semibold rounded-2xl transition ml-2 hover:bg-red-900/80"
+                            style={{ boxShadow: '0 2px 8px 0 rgba(255,0,0,0.10)' }}
+                            onClick={() => handleDelete(comp.id)}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ];
+              })}
             </tbody>
           </table>
-        </div>
-        <div className="w-full max-w-4xl flex justify-start mt-2 px-8">
-          <button
-            className="py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg"
-            style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-            onClick={() => navigate('/create')}
-            onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-            onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-          >
-            <span className="mr-2 text-xl font-bold align-middle">+</span>Add New
-          </button>
-        </div>
-        <div className="w-full max-w-2xl flex justify-start">
+          <div className="w-full max-w-4xl flex justify-start mt-2 px-8">
+            <button
+              className="py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onClick={() => navigate('/create')}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+            >
+              <span className="mr-2 text-xl font-bold align-middle">+</span>Add New
+            </button>
+          </div>
+          <div className="w-full max-w-2xl flex justify-start">
+          </div>
         </div>
       </div>
     </PageBackground>

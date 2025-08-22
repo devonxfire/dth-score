@@ -28,6 +28,7 @@ export default function Login({ onLogin }) {
       });
       const data = await res.json();
       if (res.ok && data.success) {
+        localStorage.setItem('user', JSON.stringify(data.user));
         onLogin(data.user);
         navigate('/dashboard');
       } else {

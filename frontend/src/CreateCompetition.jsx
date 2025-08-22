@@ -1,3 +1,14 @@
+// Display mapping for all comp types
+const COMP_TYPE_DISPLAY = {
+  fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
+  '4bbb stableford': '4BBB Stableford (2 Scores to Count)',
+  alliance: 'Alliance',
+  medalStrokeplay: 'Medal Strokeplay',
+  'medal strokeplay': 'Medal Strokeplay',
+  stroke: 'Medal Strokeplay',
+  individualStableford: 'Individual Stableford',
+  'individual stableford': 'Individual Stableford',
+};
 
 import { useState } from 'react';
 import PageBackground from './PageBackground';
@@ -17,11 +28,11 @@ function generateJoinCode() {
 }
 
 
-function CreateCompetition() {
+function CreateCompetition({ user }) {
   const location = useLocation();
   const [form, setForm] = useState({
-    type: 'stroke',
-  date: '', // Will update this to camelCase below
+    type: 'fourBbbStableford',
+    date: '',
     club: 'Westlake Golf Club',
     handicapAllowance: '95',
     fourballs: '',
@@ -41,6 +52,7 @@ function CreateCompetition() {
   }
   const [created, setCreated] = useState(false);
   const [joinCode, setJoinCode] = useState('');
+  const [compId, setCompId] = useState(null);
   const [showGroups, setShowGroups] = useState(false);
   const [groups, setGroups] = useState([]);
   const navigate = useNavigate();
@@ -49,39 +61,72 @@ function CreateCompetition() {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    // If fourballs entered, show group assignment
+    // If fourballs entered, create comp in backend and then show group assignment
     if (form.fourballs && !showGroups) {
-      setShowGroups(true);
+      try {
+        const res = await fetch('http://localhost:5050/api/competitions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...form })
+        });
+        if (!res.ok) throw new Error('Failed to create competition');
+        const data = await res.json();
+        // Store backend id and joinCode
+        if (data.competition) {
+          setCompId(data.competition.id);
+          setJoinCode(data.competition.joinCode || data.competition.joincode || '');
+        }
+        setShowGroups(true);
+      } catch (err) {
+        alert('Error creating competition: ' + err.message);
+      }
       return;
     }
-    // Otherwise, finalize comp creation
-    const code = generateJoinCode();
-    setJoinCode(code);
-    localStorage.setItem(
-      `comp_${code}`,
-      JSON.stringify({ ...form, joinCode: code, code, groups })
-    );
-    setCreated(true);
+    // Otherwise, finalize comp creation (no fourballs)
+    try {
+      const res = await fetch('http://localhost:5050/api/competitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form })
+      });
+      if (!res.ok) throw new Error('Failed to create competition');
+      const data = await res.json();
+      if (data.competition) {
+        setCompId(data.competition.id);
+        setJoinCode(data.competition.joinCode || data.competition.joincode || '');
+      }
+      setCreated(true);
+    } catch (err) {
+      alert('Error creating competition: ' + err.message);
+    }
   }
 
-  function handleAssign(groupsData) {
+  async function handleAssign(groupsData) {
     setGroups(groupsData);
-    // Save comp with groups immediately
-    const code = generateJoinCode();
-    setJoinCode(code);
-    localStorage.setItem(
-      `comp_${code}`,
-      JSON.stringify({ ...form, joinCode: code, code, groups: groupsData })
-    );
-    setCreated(true);
+    // Save comp with groups to backend using numeric id
+    if (!compId) {
+      alert('Competition join code not found. Please create the competition first.');
+      return;
+    }
+    try {
+      const res = await fetch(`http://localhost:5050/api/competitions/${compId}/groups`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groups: groupsData })
+      });
+      if (!res.ok) throw new Error('Failed to save groups');
+      setCreated(true);
+    } catch (err) {
+      alert('Error saving groups: ' + err.message);
+    }
   }
 
   return (
     <PageBackground>
       {/* Top nav menu */}
-      <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
+      <div className="flex flex-wrap justify-between items-center mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
         <button
           className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
           style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
@@ -90,20 +135,18 @@ function CreateCompetition() {
           Dashboard
         </button>
         <button
-          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/profile' ? 'border-b-4' : ''}`}
-          style={location.pathname === '/profile' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => navigate('/profile')}
-          disabled
-        >
-          My Profile
-        </button>
-        <button
           className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
           style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
           onClick={() => navigate('/recent')}
         >
           Competitions
         </button>
+        <span
+          className="text-sm text-white font-semibold opacity-80 bg-transparent border-none outline-none px-2 py-1 cursor-default select-none"
+          style={{ background: 'none', border: 'none', boxShadow: 'none', lineHeight: '2.25rem' }}
+        >
+          Welcome, {(user?.name?.split(' ')[0]) || 'Player'}
+        </span>
         <button
           className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
           style={{ background: 'none', border: 'none', boxShadow: 'none' }}
@@ -126,12 +169,15 @@ function CreateCompetition() {
           {created ? (
             <div className="text-white text-center p-6">
               <h3 className="text-xl font-semibold mb-2">Competition Created!</h3>
-              <p className="mb-2">Type: <span className="font-medium capitalize">{form.type}</span></p>
+              <p className="mb-2">Type: <span className="font-medium">{
+                COMP_TYPE_DISPLAY[form.type] || form.type
+              }</span></p>
               <p className="mb-2">Date: <span className="font-medium">{formatDate(form.date)}</span></p>
               <p className="mb-2">Club: <span className="font-medium">{form.club}</span></p>
               {form.fourballs && <p className="mb-2">4 Balls: <span className="font-medium">{form.fourballs}</span></p>}
               {form.notes && <p className="mb-2">Notes: <span className="font-medium">{form.notes}</span></p>}
-              <p className="mt-4 text-green-200 font-bold">Share the join code: <span className="bg-white/20 px-2 py-1 rounded text-white">{joinCode}</span></p>
+              <p className="mb-2">Join Code: <span className="font-medium">{joinCode || '-'}</span></p>
+              <p className="mt-4 text-green-200 font-bold">Share the join code: <span className="bg-white/20 px-2 py-1 rounded text-white">{joinCode || '-'}</span></p>
               <p className="mt-2 text-white/80">Invite others to join your competition by sending them the join code above.</p>
               <button
                 className="mt-6 py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg"
@@ -187,13 +233,6 @@ function CreateCompetition() {
               <option value="medalStrokeplay">Medal Strokeplay</option>
               <option value="individualStableford">Individual Stableford</option>
                 </select>
-              <p className="mb-2">Type: <span className="font-medium">{
-                form.type === 'fourBbbStableford' ? '4BBB Stableford' :
-                form.type === 'alliance' ? 'Alliance' :
-                form.type === 'medalStrokeplay' ? 'Medal Strokeplay' :
-                form.type === 'individualStableford' ? 'Individual Stableford' :
-                form.type
-              }</span></p>
               </div>
               <div className="mb-4">
                 <label className="block mb-1 font-medium text-white" htmlFor="handicapAllowance">Competition Handicap Allowance</label>

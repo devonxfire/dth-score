@@ -80,7 +80,7 @@ function Leaderboard() {
     // Get groups from comp data (from CreateCompetition)
     let groups = [];
     try {
-      const compData = JSON.parse(localStorage.getItem(`comp_${entries[0]?.player?.code}`));
+  const compData = JSON.parse(localStorage.getItem(`comp_${entries[0]?.player?.joinCode || entries[0]?.player?.joincode}`));
       groups = compData?.groups || [];
     } catch {}
     // Map group: { players: [names], teeTime }
@@ -190,8 +190,8 @@ function Leaderboard() {
           </div>
           {comp && <div className="text-lg font-semibold text-white/90 mb-1">{COMP_TYPE_DISPLAY[comp] || comp?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')}</div>}
           {date && <div className="text-md text-white/70 mb-1">{formatDate(date)}</div>}
-          {entries[0]?.player?.code && (
-            <div className="text-xs text-white/60 mb-4">Invite Code: <span className="font-mono">{entries[0].player.code}</span></div>
+          {(entries[0]?.player?.joinCode || entries[0]?.player?.joincode) && (
+            <div className="text-xs text-white/60 mb-4">Invite Code: <span className="font-mono">{entries[0].player.joinCode || entries[0].player.joincode}</span></div>
           )}
           {isAlliance ? (
             <table className="min-w-full border text-center">

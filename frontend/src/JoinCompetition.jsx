@@ -8,7 +8,7 @@ export default function JoinCompetition() {
   const location = useLocation();
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    competitionCode: location.state?.code || '',
+  competitionCode: location.state?.joinCode || location.state?.joincode || '',
     name: '',
     handicap: '',
     teebox: 'Yellow',
@@ -44,7 +44,7 @@ export default function JoinCompetition() {
                   const comp = JSON.parse(localStorage.getItem(`comp_${form.competitionCode}`));
                   navigate(`/scorecard/${form.competitionCode}`, {
                     state: {
-                      player: { name: form.name, handicap: form.handicap, teebox: form.teebox, code: form.competitionCode },
+                      player: { name: form.name, handicap: form.handicap, teebox: form.teebox, joinCode: form.competitionCode },
                       competition: comp
                     }
                   });

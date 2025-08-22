@@ -1,6 +1,4 @@
 
-// ...existing code...
-
 
 require('dotenv').config();
 const express = require('express');
@@ -17,6 +15,28 @@ const pool = new Pool({
 
 app.get('/', (req, res) => {
   res.send('Backend is running!');
+});
+
+// Update groups for a competition
+app.patch('/api/competitions/:id/groups', async (req, res) => {
+  const { id } = req.params;
+  const { groups } = req.body;
+  if (!groups) {
+    return res.status(400).json({ error: 'Groups data required' });
+  }
+  try {
+    const result = await pool.query(
+      'UPDATE competitions SET groups = $1 WHERE id = $2 RETURNING *',
+      [JSON.stringify(groups), id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Competition not found' });
+    }
+    res.json({ success: true, competition: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating groups:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 app.get('/api/health', (req, res) => {
@@ -60,6 +80,26 @@ app.get('/api/competitions/:id', async (req, res) => {
   }
 });
 
+// Delete competition by ID
+// Simple admin check: require X-Admin-Secret header to match env var ADMIN_SECRET
+app.delete('/api/competitions/:id', async (req, res) => {
+  const { id } = req.params;
+  const adminSecret = req.headers['x-admin-secret'];
+  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: 'Admin authorization required' });
+  }
+  try {
+    const result = await pool.query('DELETE FROM competitions WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Competition not found' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting competition:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Login endpoint: authenticate user by username and password
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
@@ -79,6 +119,46 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Update a player's tee and course handicap for a team
+app.patch('/api/teams/:teamId/users/:userId', async (req, res) => {
+  const { teamId, userId } = req.params;
+  const { teebox, course_handicap } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE team_members
+       SET teebox = $1, course_handicap = $2
+       WHERE team_id = $3 AND user_id = $4
+       RETURNING *`,
+      [teebox, course_handicap, teamId, userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating team_members:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Fetch a player's tee and course handicap for a team
+app.get('/api/teams/:teamId/users/:userId', async (req, res) => {
+  const { teamId, userId } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT teebox, course_handicap FROM team_members WHERE team_id = $1 AND user_id = $2`,
+      [teamId, userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error fetching team_members:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+// Helper to generate a 6-character alphanumeric join code
+function generateJoinCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
@@ -87,19 +167,25 @@ app.listen(PORT, () => {
 
 // Create Competition endpoint
 app.post('/api/competitions', async (req, res) => {
-  const { name, date, type, club, handicapAllowance, joinCode, code, notes, groups } = req.body;
-  if (!name || !date || !type) {
+  console.log('POST /api/competitions body:', req.body);
+  let { date, type, club, handicapAllowance, joinCode, notes, groups } = req.body;
+  if (!date || !type) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
+  // Always generate a unique join code if not provided or empty
+  if (!joinCode) joinCode = generateJoinCode();
   try {
     const result = await pool.query(
       `INSERT INTO competitions 
-        (name, date, type, club, handicapAllowance, joinCode, code, notes, groups, course_id, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL, NOW())
+        (date, type, club, handicapAllowance, joinCode, notes, groups, course_id, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NOW())
         RETURNING *`,
-      [name, date, type, club, handicapAllowance, joinCode, code, notes, groups ? JSON.stringify(groups) : null]
+      [date, type, club, handicapAllowance, joinCode, notes, groups ? JSON.stringify(groups) : null]
     );
-    res.status(201).json({ success: true, competition: result.rows[0] });
+    const comp = result.rows[0];
+    // Defensive: if joinCode is missing from DB row, add it from variable
+    if (!comp.joincode && joinCode) comp.joincode = joinCode;
+    res.status(201).json({ success: true, competition: comp });
   } catch (err) {
     console.error('Error creating competition:', err);
     res.status(500).json({ error: 'Database error' });

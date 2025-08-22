@@ -1,3 +1,12 @@
+// Format date as DD/MM/YYYY
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
 
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -5,12 +14,16 @@ import PageBackground from './PageBackground';
 
 const COMP_TYPE_DISPLAY = {
   fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
+  '4bbb stableford': '4BBB Stableford (2 Scores to Count)',
   alliance: 'Alliance',
   medalStrokeplay: 'Medal Strokeplay',
+  'medal strokeplay': 'Medal Strokeplay',
+  stroke: 'Medal Strokeplay',
   individualStableford: 'Individual Stableford',
+  'individual stableford': 'Individual Stableford',
 };
 
-export default function CompetitionInfo() {
+export default function CompetitionInfo({ user }) {
   const location = useLocation();
   const navigate = useNavigate();
   const comp = location.state?.comp;
@@ -39,7 +52,7 @@ export default function CompetitionInfo() {
   return (
     <PageBackground>
       {/* Top nav menu */}
-      <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
+        <div className="flex flex-wrap justify-between items-center mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
         <button
           className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
           style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
@@ -48,20 +61,18 @@ export default function CompetitionInfo() {
           Dashboard
         </button>
         <button
-          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/profile' ? 'border-b-4' : ''}`}
-          style={location.pathname === '/profile' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => navigate('/profile')}
-          disabled
-        >
-          My Profile
-        </button>
-        <button
           className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
           style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
           onClick={() => navigate('/recent')}
         >
           Competitions
         </button>
+          <span
+            className="text-sm text-white font-semibold opacity-80 bg-transparent border-none outline-none px-2 py-1 cursor-default select-none"
+            style={{ background: 'none', border: 'none', boxShadow: 'none', lineHeight: '2.25rem' }}
+          >
+            Welcome, {(user?.name?.split(' ')[0]) || 'Player'}
+          </span>
         <button
           className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
           style={{ background: 'none', border: 'none', boxShadow: 'none' }}
@@ -80,9 +91,9 @@ export default function CompetitionInfo() {
       <div className="flex flex-col items-center px-4 mt-8">
         <div className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none' }}>
           <div className="mb-4">
-              <div><span className="font-semibold">Date:</span> {comp.date}</div>
-              <div><span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')}</div>
-              <div><span className="font-semibold">Join Code:</span> {comp.joinCode}</div>
+              <div><span className="font-semibold">Date:</span> {formatDate(comp.date)}</div>
+              <div><span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</div>
+              <div><span className="font-semibold">Join Code:</span> {comp.joinCode || comp.joincode || '-'}</div>
               {comp.teeBox && <div><span className="font-semibold">Tee Box:</span> {comp.teeBox}</div>}
             </div>
             {comp.groups && Array.isArray(comp.groups) && (

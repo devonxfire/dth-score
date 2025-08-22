@@ -1,6 +1,5 @@
 
-import { useState } from 'react';
-import { DTH_PLAYERS } from './dthPlayers';
+import { useState, useEffect } from 'react';
 import PageBackground from './PageBackground';
 
 export default function FourballAssignment({ fourballs, onAssign }) {
@@ -9,7 +8,22 @@ export default function FourballAssignment({ fourballs, onAssign }) {
   const [groups, setGroups] = useState(
     Array.from({ length: fourballs }, () => ({ players: Array(4).fill(''), teeTime: '' }))
   );
-  const [available, setAvailable] = useState(DTH_PLAYERS);
+  const [available, setAvailable] = useState([]);
+  useEffect(() => {
+    async function fetchUsers() {
+      try {
+        const res = await fetch('http://localhost:5050/api/users');
+        if (!res.ok) throw new Error('Failed to fetch users');
+        const users = await res.json();
+        // Use username or name field, fallback to id if needed
+        const names = users.map(u => u.name || u.username || u.id);
+        setAvailable([...names, 'GUEST']);
+      } catch (err) {
+        setAvailable(['GUEST']); // fallback to just GUEST if error
+      }
+    }
+    fetchUsers();
+  }, []);
   // Track guest names for each group/player slot
   const [guestNames, setGuestNames] = useState(
     Array.from({ length: fourballs }, () => Array(4).fill(''))
@@ -35,7 +49,7 @@ export default function FourballAssignment({ fourballs, onAssign }) {
     setGroups(newGroups);
     // Remove from available if selected, add back if deselected
     const selected = newGroups.flatMap(g => g.players).filter(Boolean);
-    setAvailable(DTH_PLAYERS.filter(name => !selected.includes(name)));
+  setAvailable(prevAvailable => prevAvailable.filter(name => !selected.includes(name)));
   }
 
   function handleGuestNameChange(groupIdx, playerIdx, value) {

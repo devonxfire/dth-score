@@ -56,10 +56,18 @@ function AppRoutes({ user, setUser }) {
 }
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem('user');
+    return stored ? JSON.parse(stored) : null;
+  });
+  // When user logs out, clear localStorage
+  const handleSetUser = (u) => {
+    setUser(u);
+    if (!u) localStorage.removeItem('user');
+  };
   return (
     <Router>
-      <AppRoutes user={user} setUser={setUser} />
+      <AppRoutes user={user} setUser={handleSetUser} />
     </Router>
   );
 }
