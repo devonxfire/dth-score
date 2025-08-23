@@ -1,3 +1,10 @@
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { useState } from 'react';
+import PageBackground from './PageBackground';
+import { useNavigate, useLocation } from 'react-router-dom';
+import FourballAssignment from './FourballAssignment';
+
 // Display mapping for all comp types
 const COMP_TYPE_DISPLAY = {
   fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
@@ -10,16 +17,21 @@ const COMP_TYPE_DISPLAY = {
   'individual stableford': 'Individual Stableford',
 };
 
-import { useState } from 'react';
-import PageBackground from './PageBackground';
-import { useNavigate, useLocation } from 'react-router-dom';
-import FourballAssignment from './FourballAssignment';
 
 // Format date as DD/MM/YYYY
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const [year, month, day] = dateStr.split('-');
-  return `${day}/${month}/${year}`;
+function formatDate(dateVal) {
+  if (!dateVal) return '';
+  if (dateVal instanceof Date) {
+    const day = String(dateVal.getDate()).padStart(2, '0');
+    const month = String(dateVal.getMonth() + 1).padStart(2, '0');
+    const year = dateVal.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  if (typeof dateVal === 'string') {
+    const [year, month, day] = dateVal.split('-');
+    return `${day}/${month}/${year}`;
+  }
+  return '';
 }
 
 function generateJoinCode() {
@@ -32,7 +44,7 @@ function CreateCompetition({ user }) {
   const location = useLocation();
   const [form, setForm] = useState({
     type: 'fourBbbStableford',
-    date: '',
+    date: null,
     club: 'Westlake Golf Club',
     handicapAllowance: '95',
     fourballs: '',
@@ -198,15 +210,47 @@ function CreateCompetition({ user }) {
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
               <div className="mb-4">
                 <label className="block mb-1 font-medium text-white" htmlFor="date">Date</label>
-                <input
-                  id="date"
-                  name="date"
-                  type="date"
-                  required
-                  value={form.date}
-                  onChange={handleChange}
-                  className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
-                />
+                <div className="relative">
+                  <DatePicker
+                    id="date"
+                    name="date"
+                    selected={form.date}
+                    onChange={date => setForm(f => ({ ...f, date }))}
+                    dateFormat="dd/MM/yyyy"
+                    placeholderText="dd/mm/yyyy"
+                    className="w-full border border-white bg-transparent text-white rounded px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/90"
+                    calendarClassName="bg-[#18181b] text-white border border-white"
+                    dayClassName={() => 'text-white'}
+                    wrapperClassName="w-full"
+                    required
+                  />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none"
+                    width="22" height="22" fill="white" viewBox="0 0 24 24"
+                  >
+                    <path d="M7 10h2v2H7v-2zm4 0h2v2h-2v-2zm4 0h2v2h-2v-2z"/>
+                    <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zm0-13H5V6h14v1z"/>
+                  </svg>
+                  <style>{`
+                    .react-datepicker__input-container input::placeholder {
+                      color: rgba(255,255,255,0.9);
+                      opacity: 1;
+                    }
+                    .react-datepicker__input-container input {
+                      color: #fff;
+                    }
+                    .react-datepicker__header, .react-datepicker__current-month, .react-datepicker__day-name {
+                      background: #18181b;
+                      color: #fff;
+                      border-bottom: 1px solid #fff;
+                    }
+                    .react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
+                      background: #fff;
+                      color: #18181b;
+                    }
+                  `}</style>
+                </div>
               </div>
               <div className="mb-4">
                 <label className="block mb-1 font-medium text-white" htmlFor="club">Club</label>

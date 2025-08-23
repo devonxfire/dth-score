@@ -1,5 +1,35 @@
+  // Define a color array for up to 4 players (A, B, C, D)
+  const playerColors = [
+    'bg-blue-100 text-blue-900',
+    'bg-green-100 text-green-900',
+    'bg-yellow-100 text-yellow-900',
+    'bg-pink-100 text-pink-900'
+  ];
+// Format date as dd/mm/yyyy
+function formatDate(dateVal) {
+  if (!dateVal) return '';
+  let dateObj;
+  if (dateVal instanceof Date) {
+    dateObj = dateVal;
+  } else if (typeof dateVal === 'string') {
+    // Handles ISO string with or without time
+    dateObj = new Date(dateVal);
+    if (isNaN(dateObj)) {
+      // fallback: try to parse as yyyy-mm-dd
+      const [year, month, day] = dateVal.split('-');
+      if (year && month && day) return `${day}/${month}/${year}`;
+      return dateVal;
+    }
+  } else {
+    return '';
+  }
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const year = dateObj.getFullYear();
+  return `${day}/${month}/${year}`;
+}
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
 
@@ -35,6 +65,16 @@ const defaultHoles = [
 
 
 export default function Scorecard(props) {
+  // Helper to find groupForPlayer from competition and player
+  function getGroupForPlayer(competition, player) {
+    if (competition && competition.groups && competition.groups.length > 0) {
+      let group = competition.groups.find(g => Array.isArray(g.players) && g.players.includes(player?.name));
+      if (!group) group = competition.groups[0];
+      return group;
+    }
+    return null;
+  }
+
   const location = useLocation();
   const navigate = useNavigate();
   // Modal state for tee/handicap
@@ -52,25 +92,152 @@ export default function Scorecard(props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Show modal if player is present but missing teebox or course_handicap
+  // Always fetch latest competition data on mount if competition.id exists
   useEffect(() => {
-    if (player && (!player.teebox || !player.course_handicap)) {
-      setShowTeeModal(true);
-      setSelectedTee(player.teebox || '');
-      setInputHandicap(player.course_handicap || '');
+    async function fetchCompetition() {
+      if (initialCompetition && initialCompetition.id) {
+        setLoading(true);
+        try {
+          const res = await fetch(`/api/competitions/${initialCompetition.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            setCompetition(data);
+          }
+        } catch (e) {
+          // ignore
+        } finally {
+          setLoading(false);
+        }
+      }
     }
-  }, [player]);
-  const isAlliance = competition && competition.type?.toLowerCase().includes('alliance');
-  let groupPlayers = [player && player.name].filter(Boolean);
-  if (isAlliance && competition && competition.groups && player) {
-    const foundGroup = competition.groups.find(g => g.players?.includes(player.name));
-    if (foundGroup) groupPlayers = foundGroup.players;
+    fetchCompetition();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- Move groupForPlayer, groupPlayers, groupTeamId above the modal useEffect ---
+  let groupPlayers = [];
+  let groupForPlayer = null;
+  let groupTeamId = null;
+  if (competition && competition.groups && competition.groups.length > 0) {
+    // Find the group that contains the logged-in player
+    groupForPlayer = competition.groups.find(g => Array.isArray(g.players) && g.players.includes(player?.name));
+    if (!groupForPlayer) {
+      // fallback to first group if not found
+      groupForPlayer = competition.groups[0];
+    }
+    groupPlayers = groupForPlayer.players || [];
+    groupTeamId = groupForPlayer.teamId;
+  } else if (player && player.name) {
+    groupPlayers = [player.name];
   }
-  const scores = groupPlayers.map(() => Array(18).fill(''));
+
+  // Now the modal useEffect can safely reference groupForPlayer
+  useEffect(() => {
+    if (player && groupForPlayer) {
+      const backendTee = groupForPlayer.teeboxes?.[player.name];
+      const backendHandi = groupForPlayer.handicaps?.[player.name];
+      if (!backendTee && !backendHandi) {
+        setShowTeeModal(true);
+        setSelectedTee('');
+        setInputHandicap('');
+      } else {
+        setShowTeeModal(false);
+      }
+    }
+  }, [player, groupForPlayer]);
+  const isAlliance = competition && competition.type?.toLowerCase().includes('alliance');
+  // Scores state: [playerIdx][holeIdx] = value
+  const [scores, setScores] = useState(() => groupPlayers.map(() => Array(18).fill('')));
+  // Track loading state for scores
+  const [scoresLoading, setScoresLoading] = useState(false);
   const playingHandicap = player && player.handicap ? player.handicap : '';
-  function handleScoreChange() {}
-  function totalScore() { return 0; }
-  function handleSaveScores() {}
+
+  // Fetch scores for all players on mount or when groupPlayers changes
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchAllScores() {
+      if (!competition || !competition.id || !groupTeamId) return;
+      setScoresLoading(true);
+      const newScores = await Promise.all(groupPlayers.map(async (name, idx) => {
+        // Find userId for this player
+        let userId = null;
+        if (competition.users) {
+          const user = competition.users.find(u => u.name === name);
+          if (user) userId = user.id || user.user_id || user.userId;
+        }
+        const url = `/api/teams/${groupTeamId}/users/${userId}/scores?competitionId=${competition.id}`;
+        console.log('GET scores URL:', url);
+        if (!userId) return Array(18).fill('');
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            console.log('GET scores failed:', res.status);
+            return Array(18).fill('');
+          }
+          const data = await res.json();
+          console.log('GET scores response:', data);
+          return Array.isArray(data.scores) && data.scores.length === 18 ? data.scores.map(v => v == null ? '' : v) : Array(18).fill('');
+        } catch (err) {
+          console.log('GET scores error:', err);
+          return Array(18).fill('');
+        }
+      }));
+      console.log('setScores with:', newScores);
+      if (!cancelled) setScores(newScores);
+      setScoresLoading(false);
+    }
+    fetchAllScores();
+    return () => { cancelled = true; };
+  }, [groupPlayers.length, competition?.id, groupTeamId]);
+
+  async function handleScoreChange(holeIdx, value, playerIdx) {
+    setScores(prev => {
+      const updated = prev.map(row => [...row]);
+      updated[playerIdx][holeIdx] = value;
+      return updated;
+    });
+    // Save scores for this player
+    if (!competition || !competition.id || !groupTeamId) return;
+    // Find userId for this player
+    let userId = null;
+    if (competition.users) {
+      const user = competition.users.find(u => u.name === groupPlayers[playerIdx]);
+      if (user) userId = user.id || user.user_id || user.userId;
+    }
+    if (!userId) {
+      console.log('No userId found for player', groupPlayers[playerIdx]);
+      return;
+    }
+    // Prepare scores array for this player
+    const playerScores = scores[playerIdx].map((v, idx) => idx === holeIdx ? value : v);
+    const patchUrl = `/api/teams/${groupTeamId}/users/${userId}/scores`;
+    const patchBody = { competitionId: competition.id, scores: playerScores.map(v => v === '' ? null : Number(v)) };
+    console.log('PATCH URL:', patchUrl);
+    console.log('PATCH BODY:', patchBody);
+    try {
+      const res = await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchBody)
+      });
+      const result = await res.json();
+      console.log('PATCH response:', result);
+    } catch (err) {
+      console.error('PATCH error:', err);
+    }
+  }
+
+  function totalScore(playerIdx) {
+    return scores[playerIdx].reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
+  }
+  async function handleSaveScores() {
+    // Optionally, you could save all players' scores here, but for now just reload all scores from backend
+    if (typeof fetchAllScores === 'function') {
+      setScoresLoading(true);
+      await fetchAllScores();
+      setScoresLoading(false);
+    }
+  }
 
   return (
     <PageBackground>
@@ -95,6 +262,7 @@ export default function Scorecard(props) {
               type="number"
               className="mb-4 w-full p-2 border border-white bg-transparent text-white rounded focus:outline-none"
               value={inputHandicap}
+    // (removed duplicate/misplaced useEffect for modal logic)
               onChange={e => setInputHandicap(e.target.value)}
               min="0"
               max="54"
@@ -114,20 +282,66 @@ export default function Scorecard(props) {
                 }
                 setSavingTee(true);
                 try {
-                  // PATCH to backend
-                  const teamId = player.team_id || player.teamId || player.group_id || player.groupId;
+                  // Debug logs to help diagnose missing teamId
+                  console.log('DEBUG: player.name:', player?.name);
+                  console.log('DEBUG: competition.groups:', competition?.groups);
+                  console.log('DEBUG: groupForPlayer:', groupForPlayer);
+                  console.log('DEBUG: groupTeamId:', groupTeamId);
+                  // PATCH to backend using groupTeamId
+                  const teamId = groupTeamId;
                   const userId = player.id || player.user_id || player.userId;
-                  const res = await fetch(`/api/teams/${teamId}/users/${userId}`, {
+                  if (!teamId) {
+                    setTeeError('Team ID not found for your group.');
+                    setSavingTee(false);
+                    return;
+                  }
+                  const patchUrl = `/api/teams/${teamId}/users/${userId}`;
+                  const patchBody = { teebox: selectedTee, course_handicap: inputHandicap };
+                  console.log('PATCH URL:', patchUrl);
+                  console.log('PATCH BODY:', patchBody);
+                  const res = await fetch(patchUrl, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ teebox: selectedTee, course_handicap: inputHandicap })
+                    body: JSON.stringify(patchBody)
                   });
                   if (!res.ok) throw new Error('Failed to save');
                   // Update player state
                   setPlayer(p => ({ ...p, teebox: selectedTee, course_handicap: inputHandicap }));
+                  // Re-fetch competition data to update mini table
+                  if (competition && competition.id) {
+                    setLoading(true);
+                    try {
+                      const compRes = await fetch(`/api/competitions/${competition.id}`);
+                      if (compRes.ok) {
+                        const compData = await compRes.json();
+                        console.log('Fetched competition after PATCH:', compData);
+                        setCompetition(compData);
+                      }
+                    } catch (e) {
+                      // ignore
+                    } finally {
+                      setLoading(false);
+                    }
+                  }
                   setShowTeeModal(false);
                 } catch (e) {
                   setTeeError('Failed to save. Please try again.');
+
+                  // Show modal ONLY if player is present and BOTH teebox AND course_handicap are missing in backend data
+                  useEffect(() => {
+                    if (player && competition) {
+                      const groupForPlayer = getGroupForPlayer(competition, player);
+                      const backendTee = groupForPlayer?.teeboxes?.[player.name];
+                      const backendHandi = groupForPlayer?.handicaps?.[player.name];
+                      if (!backendTee && !backendHandi) {
+                        setShowTeeModal(true);
+                        setSelectedTee('');
+                        setInputHandicap('');
+                      } else {
+                        setShowTeeModal(false);
+                      }
+                    }
+                  }, [player, competition]);
                 } finally {
                   setSavingTee(false);
                 }
@@ -149,30 +363,68 @@ export default function Scorecard(props) {
       ) : !showTeeModal && (
         <>
           <div className="flex flex-col items-center px-4 mt-12">
-            <h2 className="text-3xl font-bold text-white mb-6 drop-shadow-lg text-center">
-              {isAlliance
-                ? `${groupPlayers.join(', ')}'s Scorecard`
-                : player.name
-                  ? `${player.name}'s Scorecard`
-                  : 'Scorecard'}
-            </h2>
+            <div className="mb-6">
+              <h2 className="text-3xl font-bold text-white drop-shadow-lg text-center">
+                {competition.fourballs ? `4 BALL #${competition.fourballs}'s Scorecard` : 'Scorecard'}
+              </h2>
+              <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
+            </div>
           </div>
           <div className="flex flex-col items-center px-4 mt-8">
-            <div className="w-full max-w-3xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
-              <div className="flex justify-between mb-2">
-                <button
-                  onClick={() => navigate('/')}
-                  className="py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition mr-2"
-                >
-                  Home
-                </button>
-              </div>
+            <div className="w-full max-w-7xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+              {/* Home button moved to bottom */}
               <div className="mb-2 text-white/90">
                 <span className="font-semibold">Competition:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')} <br />
-                <span className="font-semibold">Date:</span> {competition.date} <br />
-                <span className="font-semibold">Tee Box:</span> {player.teebox} <br />
-                <span className="font-semibold">Handicap Allowance:</span> {competition.handicapAllowance ? competition.handicapAllowance + '%' : 'N/A'} <br />
-                <span className="font-semibold">4 Balls:</span> {competition.fourballs} <br />
+                <span className="font-semibold">Date:</span> {formatDate(competition.date)} <br />
+                {/* Tee Box removed as per user request */}
+                <span className="font-semibold">Handicap Allowance:</span> {
+                  competition.handicapallowance && competition.handicapallowance !== 'N/A'
+                    ? competition.handicapallowance + '%'
+                    : 'N/A'
+                } <br />
+                {/* 4 Ball number removed as per user request */}
+                {groupPlayers.length >= 2 && (
+                  <div className="my-2">
+                    <table className="min-w-[300px] border border-white/30 text-white text-sm rounded mb-2">
+                      <thead>
+                        <tr>
+                          <th className="border px-2 py-1 bg-white/10">Player</th>
+                          <th className="border px-2 py-1 bg-white/10">Tee Box</th>
+                          <th className="border px-2 py-1 bg-white/10">Full Handicap</th>
+                          <th className="border px-2 py-1 bg-white/10">Playing Handicap</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupPlayers.map((name, idx) => {
+                          // Try to get full and adjusted handicap from the correct group structure
+                          let fullHandicap = '';
+                          let adjHandicap = '';
+                          let teebox = '';
+                          if (groupForPlayer) {
+                            if (groupForPlayer.handicaps) {
+                              fullHandicap = groupForPlayer.handicaps[name] || '';
+                            }
+                            if (groupForPlayer.teeboxes) {
+                              teebox = groupForPlayer.teeboxes[name] || '';
+                            }
+                          }
+                          // Calculate adjusted handicap if allowance is set
+                          if (fullHandicap && competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+                            adjHandicap = Math.round(Number(fullHandicap) * Number(competition.handicapallowance) / 100);
+                          }
+                          return (
+                            <tr key={name}>
+                              <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>PLAYER {String.fromCharCode(65+idx)}: {name}</td>
+                              <td className="border px-2 py-1 text-center">{teebox !== '' ? teebox : '-'}</td>
+                              <td className="border px-2 py-1 text-center">{fullHandicap !== '' ? fullHandicap : '-'}</td>
+                              <td className="border px-2 py-1 text-center">{adjHandicap !== '' ? adjHandicap : '-'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
                 {competition.notes && <><span className="font-semibold">Notes from Captain:</span> {competition.notes} <br /></>}
               </div>
               {isAlliance && (
@@ -207,28 +459,24 @@ export default function Scorecard(props) {
                 <table className="min-w-full border text-center">
                   <thead>
                     <tr>
-                      {groupPlayers.length > 1 && <th className="border px-2 py-1 bg-white/10">Player</th>}
-                      {defaultHoles.map(hole => (
-                        <th key={hole.number} className="border px-2 py-1 bg-white/10">{hole.number}</th>
-                      ))}
-                      <th className="border px-2 py-1 bg-white/10">Total</th>
-                    </tr>
-                    <tr>
-                      {groupPlayers.length > 1 && <th className="border px-2 py-1 bg-white/5">HOLE</th>}
+                      <th className="border px-2 py-1 bg-white/5"></th>
+                      <th className="border px-2 py-1 bg-white/5">HOLE</th>
                       {defaultHoles.map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
                       ))}
                       <th className="border px-2 py-1 bg-white/5"></th>
                     </tr>
                     <tr>
-                      {groupPlayers.length > 1 && <th className="border px-2 py-1 bg-white/5">PAR</th>}
+                      <th className="border px-2 py-1 bg-white/5"></th>
+                      <th className="border px-2 py-1 bg-white/5">PAR</th>
                       {defaultHoles.map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.par}</th>
                       ))}
                       <th className="border px-2 py-1 bg-white/5"></th>
                     </tr>
                     <tr>
-                      {groupPlayers.length > 1 && <th className="border px-2 py-1 bg-white/5">STROKE</th>}
+                      <th className="border px-2 py-1 bg-white/5"></th>
+                      <th className="border px-2 py-1 bg-white/5">STROKE</th>
                       {defaultHoles.map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
                       ))}
@@ -237,22 +485,60 @@ export default function Scorecard(props) {
                   </thead>
                   <tbody>
                     {groupPlayers.map((name, pIdx) => (
-                      <tr key={name}>
-                        {groupPlayers.length > 1 && <td className="border px-2 py-1 font-semibold text-left">{name}</td>}
-                        {defaultHoles.map((hole, hIdx) => (
-                          <td key={hIdx} className="border px-1 py-1">
-                            <input
-                              type="number"
-                              min="0"
-                              max="20"
-                              value={scores[pIdx][hIdx]}
-                              onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
-                              className="w-12 text-center rounded bg-white/10 text-white border border-white/30 focus:outline-none"
-                            />
+                      <React.Fragment key={name + '-rows'}>
+                        {/* Gross row */}
+                        <tr key={name + '-gross'}>
+                          {/* Player label column, spans both rows */}
+                          <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pIdx % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
+                            {String.fromCharCode(65 + pIdx)}
                           </td>
-                        ))}
-                        <td className="border px-2 py-1 font-bold">{totalScore(pIdx)}</td>
-                      </tr>
+                          {/* Gross/Net label column */}
+                          <td className="border px-2 py-1 text-xs font-semibold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
+                          {defaultHoles.map((hole, hIdx) => (
+                            <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                value={scores[pIdx][hIdx]}
+                                onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
+                                className="w-12 text-center text-white focus:outline-none block mx-auto font-bold text-base"
+                              />
+                            </td>
+                          ))}
+                          <td className="border px-2 py-1 font-bold text-base">{totalScore(pIdx)}</td>
+                        </tr>
+                        {/* Net row (no player label cell) */}
+                        <tr key={name + '-net'}>
+                          <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle py-1" style={{ minWidth: 40, verticalAlign: 'middle' }}>Net</td>
+                          {defaultHoles.map((hole, hIdx) => {
+                            // Calculate strokes received for this hole
+                            let handicap = 0;
+                            if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
+                              handicap = parseInt(groupForPlayer.handicaps[name], 10) || 0;
+                            }
+                            const strokeIdx = hole.index;
+                            let strokesReceived = 0;
+                            if (handicap > 0) {
+                              if (handicap >= 18) {
+                                strokesReceived = 1;
+                                if (handicap - 18 >= strokeIdx) strokesReceived = 2;
+                                else if (strokeIdx <= (handicap % 18)) strokesReceived = 2;
+                              } else if (strokeIdx <= handicap) {
+                                strokesReceived = 1;
+                              }
+                            }
+                            const gross = parseInt(scores[pIdx][hIdx], 10) || 0;
+                            const net = gross - strokesReceived;
+                            return (
+                              <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle' }}>
+                                {gross ? net : ''}
+                              </td>
+                            );
+                          })}
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-sm font-semibold py-1" style={{ verticalAlign: 'middle' }}></td>
+                        </tr>
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -275,6 +561,12 @@ export default function Scorecard(props) {
                 className="mt-3 w-full py-2 px-4 bg-yellow-500 text-white font-semibold rounded-2xl hover:bg-yellow-600 transition"
               >
                 View Leaderboard
+              </button>
+              <button
+                onClick={() => navigate('/')}
+                className="mt-3 w-full py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition"
+              >
+                Home
               </button>
             </div>
           </div>
