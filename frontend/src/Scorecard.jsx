@@ -395,7 +395,7 @@ export default function Scorecard(props) {
           <div className="flex flex-col items-center px-4 mt-12">
             <div className="mb-6">
               <h2 className="text-3xl font-bold text-white drop-shadow-lg text-center">
-                {competition.fourballs ? `4 BALL #${competition.fourballs}'s Scorecard` : 'Scorecard'}
+                {competition.fourballs ? `4 BALL # ${competition.fourballs}'s Scorecard` : 'Scorecard'}
               </h2>
               <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
             </div>
@@ -507,7 +507,7 @@ export default function Scorecard(props) {
                 <h3 className="text-lg font-bold text-center mb-2 text-white">Front 9</h3>
                 <table className="min-w-full border text-center mb-8">
                   <thead>
-                    <tr>
+                    <tr className="bg-gray-800/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">HOLE</th>
                       {defaultHoles.slice(0,9).map(hole => (
@@ -515,15 +515,15 @@ export default function Scorecard(props) {
                       ))}
                       <th className="border px-2 py-1 bg-white/5 font-bold">Out</th>
                     </tr>
-                    <tr>
+                    <tr className="bg-blue-900/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">PAR</th>
                       {defaultHoles.slice(0,9).map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.par}</th>
                       ))}
-                      <th className="border px-2 py-1 bg-white/5"></th>
+                      <th className="border px-2 py-1 bg-white/5 font-bold">36</th>
                     </tr>
-                    <tr>
+                    <tr className="bg-gray-900/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">STROKE</th>
                       {defaultHoles.slice(0,9).map(hole => (
@@ -603,7 +603,7 @@ export default function Scorecard(props) {
                 <h3 className="text-lg font-bold text-center mb-2 text-white">Back 9</h3>
                 <table className="min-w-full border text-center">
                   <thead>
-                    <tr>
+                    <tr className="bg-gray-800/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">HOLE</th>
                       {defaultHoles.slice(9,18).map(hole => (
@@ -612,16 +612,16 @@ export default function Scorecard(props) {
                       <th className="border px-2 py-1 bg-white/5 font-bold">In</th>
                       <th className="border px-2 py-1 bg-white/5 font-bold">TOTAL</th>
                     </tr>
-                    <tr>
+                    <tr className="bg-blue-900/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">PAR</th>
-                      {defaultHoles.slice(9,18).map(hole => (
+                      {defaultHoles.slice(0,9).map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.par}</th>
                       ))}
                       <th className="border px-2 py-1 bg-white/5 font-bold">36</th>
                       <th className="border px-2 py-1 bg-white/5 font-bold">72</th>
                     </tr>
-                    <tr>
+                    <tr className="bg-gray-900/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">STROKE</th>
                       {defaultHoles.slice(9,18).map(hole => (
