@@ -228,10 +228,21 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
     });
     for (let i = 0; i < 18; i++) {
       const strokes = scores[i];
-      if (strokes == null || strokes === '') continue;
       const hole = holes[i];
       if (!hole) {
         console.log(`Skipping hole index ${i}: no hole found`);
+        continue;
+      }
+      if (strokes == null || strokes === '') {
+        // Delete score record if exists
+        await prisma.scores.deleteMany({
+          where: {
+            competition_id: Number(competitionId),
+            team_id: Number(teamId),
+            user_id: Number(userId),
+            hole_id: hole.id
+          }
+        });
         continue;
       }
       const upsertData = {

@@ -1,10 +1,11 @@
-  // Define a color array for up to 4 players (A, B, C, D)
-  const playerColors = [
-    'bg-blue-100 text-blue-900',
-    'bg-green-100 text-green-900',
-    'bg-yellow-100 text-yellow-900',
-    'bg-pink-100 text-pink-900'
-  ];
+
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import PageBackground from './PageBackground';
+
+// Modal state for reset confirmation
+// (restored below imports)
+
 // Format date as dd/mm/yyyy
 function formatDate(dateVal) {
   if (!dateVal) return '';
@@ -29,9 +30,13 @@ function formatDate(dateVal) {
   return `${day}/${month}/${year}`;
 }
 
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import PageBackground from './PageBackground';
+// Define a color array for up to 4 players (A, B, C, D)
+const playerColors = [
+  'bg-blue-100 text-blue-900',
+  'bg-green-100 text-green-900',
+  'bg-yellow-100 text-yellow-900',
+  'bg-pink-100 text-pink-900'
+];
 
 const COMP_TYPE_DISPLAY = {
   fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
@@ -65,6 +70,31 @@ const defaultHoles = [
 
 
 export default function Scorecard(props) {
+  // Handler to reset all gross scores (local and backend)
+  const handleResetScorecard = async () => {
+    setScores(groupPlayers.map(() => Array(18).fill('')));
+    if (!competition || !competition.id || !groupTeamId) return;
+    for (let pIdx = 0; pIdx < groupPlayers.length; pIdx++) {
+      let userId = null;
+      if (competition.users) {
+        const user = competition.users.find(u => u.name === groupPlayers[pIdx]);
+        if (user) userId = user.id || user.user_id || user.userId;
+      }
+      if (!userId) continue;
+      const url = `/api/teams/${groupTeamId}/users/${userId}/scores`;
+      try {
+        await fetch(url, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ competitionId: competition.id, scores: Array(18).fill('') })
+        });
+      } catch (err) {
+        console.log('Failed to reset scores for', groupPlayers[pIdx], err);
+      }
+    }
+  };
+  // Modal state for reset confirmation
+  const [showResetModal, setShowResetModal] = useState(false);
   // Helper to find groupForPlayer from competition and player
   function getGroupForPlayer(competition, player) {
     if (competition && competition.groups && competition.groups.length > 0) {
@@ -693,6 +723,43 @@ export default function Scorecard(props) {
               >
                 Home
               </button>
+              <button
+                onClick={() => setShowResetModal(true)}
+                className="mt-3 w-full py-2 px-4 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 transition"
+              >
+                Reset Scorecard
+              </button>
+              {showResetModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                  <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-red-200">
+                    <div className="flex flex-col items-center mb-4">
+                      <span className="text-5xl mb-2" role="img" aria-label="Warning">⚠️</span>
+                      <h2 className="text-2xl font-extrabold mb-2 drop-shadow" style={{ color: '#1B3A6B' }}>Reset Scorecard?</h2>
+                    </div>
+                    <p className="mb-6 text-gray-700 text-center text-base font-medium">This will <span className='font-bold' style={{ color: '#1B3A6B' }}>permanently clear all gross scores for all players</span> in this group.<br/>This action cannot be undone.<br/><br/>Are you sure you want to reset?</p>
+                    <div className="flex gap-4 w-full justify-center">
+                      <button
+                        className="px-5 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold shadow"
+                        onClick={() => setShowResetModal(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="px-5 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+                        style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                        onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                        onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+                        onClick={async () => {
+                          await handleResetScorecard();
+                          setShowResetModal(false);
+                        }}
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </>
