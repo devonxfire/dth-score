@@ -456,20 +456,22 @@ export default function Scorecard(props) {
                 </div>
               )}
               <div className="overflow-x-auto">
-                <table className="min-w-full border text-center">
+                {/* Front 9 Table */}
+                <h3 className="text-lg font-bold text-center mb-2 text-white">Front 9</h3>
+                <table className="min-w-full border text-center mb-8">
                   <thead>
                     <tr>
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">HOLE</th>
-                      {defaultHoles.map(hole => (
+                      {defaultHoles.slice(0,9).map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
                       ))}
-                      <th className="border px-2 py-1 bg-white/5"></th>
+                      <th className="border px-2 py-1 bg-white/5 font-bold">Out</th>
                     </tr>
                     <tr>
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">PAR</th>
-                      {defaultHoles.map(hole => (
+                      {defaultHoles.slice(0,9).map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.par}</th>
                       ))}
                       <th className="border px-2 py-1 bg-white/5"></th>
@@ -477,7 +479,7 @@ export default function Scorecard(props) {
                     <tr>
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">STROKE</th>
-                      {defaultHoles.map(hole => (
+                      {defaultHoles.slice(0,9).map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
                       ))}
                       <th className="border px-2 py-1 bg-white/5"></th>
@@ -485,16 +487,14 @@ export default function Scorecard(props) {
                   </thead>
                   <tbody>
                     {groupPlayers.map((name, pIdx) => (
-                      <React.Fragment key={name + '-rows'}>
+                      <React.Fragment key={name + '-rows-front'}>
                         {/* Gross row */}
-                        <tr key={name + '-gross'}>
-                          {/* Player label column, spans both rows */}
+                        <tr key={name + '-gross-front'}>
                           <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pIdx % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
                             {String.fromCharCode(65 + pIdx)}
                           </td>
-                          {/* Gross/Net label column */}
                           <td className="border px-2 py-1 text-xs font-semibold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
-                          {defaultHoles.map((hole, hIdx) => (
+                          {defaultHoles.slice(0,9).map((hole, hIdx) => (
                             <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                               <input
                                 type="number"
@@ -506,13 +506,12 @@ export default function Scorecard(props) {
                               />
                             </td>
                           ))}
-                          <td className="border px-2 py-1 font-bold text-base">{totalScore(pIdx)}</td>
+                          <td className="border px-2 py-1 font-bold text-base">{scores[pIdx].slice(0,9).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0)}</td>
                         </tr>
                         {/* Net row (no player label cell) */}
-                        <tr key={name + '-net'}>
+                        <tr key={name + '-net-front'}>
                           <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle py-1" style={{ minWidth: 40, verticalAlign: 'middle' }}>Net</td>
-                          {defaultHoles.map((hole, hIdx) => {
-                            // Calculate strokes received for this hole
+                          {defaultHoles.slice(0,9).map((hole, hIdx) => {
                             let handicap = 0;
                             if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
                               handicap = parseInt(groupForPlayer.handicaps[name], 10) || 0;
@@ -529,6 +528,95 @@ export default function Scorecard(props) {
                               }
                             }
                             const gross = parseInt(scores[pIdx][hIdx], 10) || 0;
+                            const net = gross - strokesReceived;
+                            return (
+                              <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle' }}>
+                                {gross ? net : ''}
+                              </td>
+                            );
+                          })}
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-sm font-semibold py-1" style={{ verticalAlign: 'middle' }}></td>
+                        </tr>
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Back 9 Table */}
+                <h3 className="text-lg font-bold text-center mb-2 text-white">Back 9</h3>
+                <table className="min-w-full border text-center">
+                  <thead>
+                    <tr>
+                      <th className="border px-2 py-1 bg-white/5"></th>
+                      <th className="border px-2 py-1 bg-white/5">HOLE</th>
+                      {defaultHoles.slice(9,18).map(hole => (
+                        <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
+                      ))}
+                      <th className="border px-2 py-1 bg-white/5 font-bold">In</th>
+                      <th className="border px-2 py-1 bg-white/5 font-bold">TOTAL</th>
+                    </tr>
+                    <tr>
+                      <th className="border px-2 py-1 bg-white/5"></th>
+                      <th className="border px-2 py-1 bg-white/5">PAR</th>
+                      {defaultHoles.slice(9,18).map(hole => (
+                        <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.par}</th>
+                      ))}
+                      <th className="border px-2 py-1 bg-white/5 font-bold">36</th>
+                      <th className="border px-2 py-1 bg-white/5 font-bold">72</th>
+                    </tr>
+                    <tr>
+                      <th className="border px-2 py-1 bg-white/5"></th>
+                      <th className="border px-2 py-1 bg-white/5">STROKE</th>
+                      {defaultHoles.slice(9,18).map(hole => (
+                        <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
+                      ))}
+                      <th className="border px-2 py-1 bg-white/5"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupPlayers.map((name, pIdx) => (
+                      <React.Fragment key={name + '-rows-back'}>
+                        {/* Gross row */}
+                        <tr key={name + '-gross-back'}>
+                          <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pIdx % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
+                            {String.fromCharCode(65 + pIdx)}
+                          </td>
+                          <td className="border px-2 py-1 text-xs font-semibold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
+                          {defaultHoles.slice(9,18).map((hole, hIdx) => (
+                            <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                value={scores[pIdx][hIdx+9]}
+                                onChange={e => handleScoreChange(hIdx+9, e.target.value, pIdx)}
+                                className="w-12 text-center text-white focus:outline-none block mx-auto font-bold text-base"
+                              />
+                            </td>
+                          ))}
+                          <td className="border px-2 py-1 font-bold text-base">{scores[pIdx].slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0)}</td>
+                          <td className="border px-2 py-1 font-bold text-base">{scores[pIdx].reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0)}</td>
+                        </tr>
+                        {/* Net row (no player label cell) */}
+                        <tr key={name + '-net-back'}>
+                          <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle py-1" style={{ minWidth: 40, verticalAlign: 'middle' }}>Net</td>
+                          {defaultHoles.slice(9,18).map((hole, hIdx) => {
+                            let handicap = 0;
+                            if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
+                              handicap = parseInt(groupForPlayer.handicaps[name], 10) || 0;
+                            }
+                            const strokeIdx = hole.index;
+                            let strokesReceived = 0;
+                            if (handicap > 0) {
+                              if (handicap >= 18) {
+                                strokesReceived = 1;
+                                if (handicap - 18 >= strokeIdx) strokesReceived = 2;
+                                else if (strokeIdx <= (handicap % 18)) strokesReceived = 2;
+                              } else if (strokeIdx <= handicap) {
+                                strokesReceived = 1;
+                              }
+                            }
+                            const gross = parseInt(scores[pIdx][hIdx+9], 10) || 0;
                             const net = gross - strokesReceived;
                             return (
                               <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle' }}>
