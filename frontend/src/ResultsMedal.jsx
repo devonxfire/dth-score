@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+// Helper: check if user is admin
+function isAdmin(user) {
+  return user && (user.role === 'admin' || user.isAdmin || user.isadmin);
+}
 import PageBackground from './PageBackground';
 
 // Medal Results Page UI (fetches real data)
@@ -10,6 +14,14 @@ export default function ResultsMedal() {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Get current user from localStorage
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem('user');
+    if (stored) try { return JSON.parse(stored); } catch (e) { return null; }
+    return null;
+  });
+  // Fines state: { [playerName]: number }
+  const [fines, setFines] = useState({});
 
   useEffect(() => {
     async function fetchResults() {
@@ -91,7 +103,7 @@ export default function ResultsMedal() {
           <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
         </div>
         {/* Action buttons stacked vertically at top right, copied from Scorecard */}
-        <div className="flex flex-col items-end space-y-2 ml-8 mt-2 w-full max-w-4xl" style={{alignItems:'flex-end'}}>
+  <div className="flex flex-col items-end space-y-2 ml-8 mt-2 w-full max-w-4xl" style={{alignItems:'flex-end'}}>
           <button
             onClick={() => navigate('/dashboard')}
             className="py-2 px-4 w-44 bg-[#1B3A6B] text-white rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
@@ -107,6 +119,13 @@ export default function ResultsMedal() {
             className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
           >
             Back to Scorecard
+          </button>
+          <button
+            disabled
+            className="py-2 px-4 w-44 bg-gray-400 text-white font-semibold rounded-2xl border border-white transition opacity-60 cursor-not-allowed mt-2"
+            title="PDF export coming soon!"
+          >
+            Export to PDF
           </button>
         </div>
       </div>
@@ -142,7 +161,24 @@ export default function ResultsMedal() {
                     <td className="border px-2 py-1"></td>
                     <td className="border px-2 py-1"></td>
                     <td className="border px-2 py-1"></td>
-                    <td className="border px-2 py-1"></td>
+                    <td className="border px-2 py-1">
+                      {isAdmin(user) ? (
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-16 text-center text-white bg-transparent rounded mx-auto block"
+                          value={fines[p.name] || ''}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setFines(f => ({ ...f, [p.name]: val === '' ? '' : Math.max(0, parseInt(val, 10) || 0) }));
+                          }}
+                          placeholder="0"
+                          style={{ color: 'white' }}
+                        />
+                      ) : (
+                        fines[p.name] || ''
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
