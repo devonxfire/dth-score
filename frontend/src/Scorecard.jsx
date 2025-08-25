@@ -464,9 +464,9 @@ export default function Scorecard(props) {
         <div className="text-white p-8">No competition or player data found.</div>
       ) : !showTeeModal && (
         <>
-          <div className="flex flex-col items-center px-4 mt-12">
+          <div className="flex flex-col items-center px-4">
             <div className="mb-6">
-              <h2 className="text-3xl font-bold text-white drop-shadow-lg text-center">
+              <h2 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-2 leading-tight">
                 {competition.fourballs ? `4 BALL # ${competition.fourballs}'s Scorecard` : 'Scorecard'}
               </h2>
               <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>

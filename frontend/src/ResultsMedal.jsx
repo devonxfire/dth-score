@@ -6,6 +6,7 @@ function isAdmin(user) {
   return user && (user.role === 'admin' || user.isAdmin || user.isadmin);
 }
 import PageBackground from './PageBackground';
+import TopMenu from './TopMenu';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -163,42 +164,12 @@ export default function ResultsMedal() {
     }
   };
 
+  // Determine if user is a player in this competition
+  const isPlayerInComp = competition && user && competition.groups && competition.groups.some(g => Array.isArray(g.players) && g.players.includes(user.name));
   return (
     <PageBackground>
       {/* Top nav menu for UI consistency */}
-      <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
-        <button
-          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
-          style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => navigate('/dashboard')}
-        >
-          Dashboard
-        </button>
-        <button
-          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
-          style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => navigate('/recent')}
-        >
-          Competitions
-        </button>
-        <span
-          className="text-sm text-white font-semibold opacity-80 bg-transparent border-none outline-none px-2 py-1 cursor-default select-none"
-          style={{ background: 'none', border: 'none', boxShadow: 'none', lineHeight: '2.25rem' }}
-        >
-          Welcome, {(user?.name?.split(' ')[0]) || 'Player'}!
-        </span>
-        <button
-          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
-          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => {
-            // Remove user from localStorage and reload
-            localStorage.removeItem('user');
-            window.location.href = '/';
-          }}
-        >
-          Sign Out
-        </button>
-      </div>
+      <TopMenu user={user} userComp={isPlayerInComp ? competition : null} />
       <div className="flex flex-col items-center px-4 w-full">
   <div className="w-full max-w-4xl" ref={exportRef} id="export-section">
         {/* Hidden plain export table for PDF generation only */}
@@ -263,7 +234,7 @@ export default function ResultsMedal() {
           })()}
         </div>
           <div className="mb-6 mt-12">
-            <h1 className="text-3xl font-bold text-white drop-shadow-lg text-center">Medal Results</h1>
+            <h1 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-2 leading-tight">Medal Results</h1>
             <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
           {/* ...existing code... */}
           <div className="flex flex-row items-start mt-4 justify-between">

@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import OpenCompModal from './OpenCompModal';
+import { PlusIcon } from '@heroicons/react/24/solid';
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import PageBackground from './PageBackground';
+import TopMenu from './TopMenu';
 
 
 // Format date as DD/MM/YYYY
@@ -21,6 +23,18 @@ function isAdmin(user) {
 }
 
 function RecentCompetitions({ user = {}, comps = [] }) {
+  // All useState declarations must come first
+  const [competitionList, setCompetitionList] = useState([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteCompId, setDeleteCompId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [openComps, setOpenComps] = useState([]);
+  const [showOpenCompModal, setShowOpenCompModal] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // useEffect for debug logging can be removed
+
   // Helper to fetch competitions and update state
   async function fetchCompetitions() {
     try {
@@ -34,15 +48,15 @@ function RecentCompetitions({ user = {}, comps = [] }) {
       setOpenComps([]);
     }
   }
-  const [competitionList, setCompetitionList] = useState([]);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteCompId, setDeleteCompId] = useState(null);
-  const [deleting, setDeleting] = useState(false);
-  const [openComps, setOpenComps] = useState([]);
-  const [showOpenCompModal, setShowOpenCompModal] = useState(false);
   useEffect(() => {
-  fetchCompetitions();
+    fetchCompetitions();
   }, []);
+
+  // Check if user is a player in any competition (must be after competitionList is declared)
+  const isPlayerInComp = competitionList.some(comp => {
+    if (!user?.name || !comp?.users) return false;
+    return comp.users.some(u => u.name === user.name);
+  });
 
   // Actually delete competition from DB
   async function handleDelete(id) {
@@ -92,65 +106,37 @@ function RecentCompetitions({ user = {}, comps = [] }) {
     individual_stableford: 'Individual Stableford',
     ...((typeof window !== 'undefined' && window.COMP_TYPE_DISPLAY) || {})
   };
-  const navigate = useNavigate();
-  const location = useLocation();
+  // (removed duplicate navigate and location)
   return (
     <PageBackground>
       <div>
         {/* Top nav menu */}
-        <div className="flex flex-wrap justify-between items-center mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
-          <button
-            className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
-            style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-            onClick={() => navigate('/dashboard')}
-          >
-            Dashboard
-          </button>
-          <button
-            className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
-            style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-            onClick={() => navigate('/recent')}
-          >
-            Competitions
-          </button>
-          <span
-            className="text-sm text-white font-semibold opacity-80 bg-transparent border-none outline-none px-2 py-1 cursor-default select-none"
-            style={{ background: 'none', border: 'none', boxShadow: 'none', lineHeight: '2.25rem' }}
-          >
-            Welcome, {(user?.name?.split(' ')[0]) || 'Player'}!
-          </span>
-          <button
-            className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
-            style={{ background: 'none', border: 'none', boxShadow: 'none' }}
-            onClick={() => {
-              if (typeof window.onSignOut === 'function') window.onSignOut();
-              else if (typeof window.signOut === 'function') window.signOut();
-            }}
-          >
-            Sign Out
-          </button>
-        </div>
+        <TopMenu user={user} isPlayerInComp={isPlayerInComp} competitionList={competitionList} />
         <div className="flex flex-col items-center px-4 mt-8">
-          {isAdmin(user) && (
-            <>
-              <button
-                className="mb-6 py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg bg-[#1B3A6B] hover:bg-white hover:text-[#1B3A6B]"
-                style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                onClick={() => {
-                  if (openComps.length > 0) {
-                    setShowOpenCompModal(true);
-                  } else {
-                    navigate('/create');
-                  }
-                }}
-              >
-                Add New Competition
-              </button>
-              <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
-            </>
-          )}
-          <h1 className="text-3xl font-bold mb-6 text-white drop-shadow-lg">Recent Competitions</h1>
-        <div className="w-full max-w-4xl bg-transparent text-white mb-8 px-8" style={{ backdropFilter: 'none' }}>
+          <div className="mb-10">
+            <h1 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-2 leading-tight" style={{ letterSpacing: '0.01em', textShadow: '0 2px 8px rgba(0,0,0,0.10)' }}>Recent Competitions</h1>
+            <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
+          </div>
+          <div className="w-full max-w-4xl bg-transparent text-white mb-8 px-8" style={{ backdropFilter: 'none' }}>
+            {isAdmin(user) && (
+              <div className="mb-4">
+                <button
+                  className="flex flex-row items-center gap-2 py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg bg-[#1B3A6B] hover:bg-white hover:text-[#1B3A6B]"
+                  style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                  onClick={() => {
+                    if (openComps.length > 0) {
+                      setShowOpenCompModal(true);
+                    } else {
+                      navigate('/create');
+                    }
+                  }}
+                >
+                  <PlusIcon className="h-5 w-5 mr-1" />
+                  Create New Competition
+                </button>
+                <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
+              </div>
+            )}
           <table className="min-w-full border text-center mb-6">
             <thead>
               <tr className="bg-white/10">

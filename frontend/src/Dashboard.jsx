@@ -17,6 +17,7 @@ import './scorecardPulse.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import westlakeLogo from './assets/westlake-logo2.png';
+import TopMenu from './TopMenu';
 
 export default function Dashboard({ user, onSignOut }) {
   const navigate = useNavigate();
@@ -57,35 +58,7 @@ export default function Dashboard({ user, onSignOut }) {
   return (
     <PageBackground>
       {/* Top nav menu */}
-      <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
-        <button
-          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
-          style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => navigate('/dashboard')}
-        >
-          Dashboard
-        </button>
-        <button
-          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
-          style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => navigate('/recent')}
-        >
-          Competitions
-        </button>
-          <span
-            className="text-sm text-white font-semibold opacity-80 bg-transparent border-none outline-none px-2 py-1 cursor-default select-none"
-            style={{ background: 'none', border: 'none', boxShadow: 'none', lineHeight: '2.25rem' }}
-          >
-            Welcome, {(user?.name?.split(' ')[0]) || 'Player'}!
-          </span>
-        <button
-          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
-          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={onSignOut}
-        >
-          Sign Out
-        </button>
-      </div>
+      <TopMenu user={user} userComp={userComp} onSignOut={onSignOut} />
       <div className="relative z-10 flex flex-col items-center px-4 mt-12">
         <img
           src={westlakeLogo}
@@ -93,11 +66,10 @@ export default function Dashboard({ user, onSignOut }) {
           className="mb-8 max-h-48 w-auto"
           style={{ objectFit: 'contain' }}
         />
-  <h1 className="text-5xl font-bold text-white mb-1 drop-shadow-lg text-center">Welcome, {user?.name || ''}!</h1>
-     
+        <h1 className="text-5xl font-bold text-white mb-1 drop-shadow-lg text-center">Welcome, {user?.name || ''}!</h1>
       </div>
       <div className="relative z-10 flex flex-col items-center px-4 mt-2">
-  <div className="w-full max-w-md rounded-2xl shadow-lg p-8 flex flex-col gap-6" style={{ background: 'none' }}>
+        <div className="w-full max-w-md rounded-2xl shadow-lg p-8 flex flex-col gap-6" style={{ background: 'none' }}>
           {userComp && (
             <button
               className="w-full py-3 px-4 border border-red-400 text-white font-semibold rounded-2xl text-lg flex items-center justify-center gap-2 scorecard-pulse"
@@ -138,26 +110,26 @@ export default function Dashboard({ user, onSignOut }) {
             <button
               className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg flex items-center justify-center gap-2"
               style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-              onClick={() => navigate('/create')}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-            >
-              <PlusIcon className="h-6 w-6 text-white" aria-hidden="true" />
-              Create New Competition
-            </button>
-          )}
-          <button
-            className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg flex items-center justify-center gap-2"
-            style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-            onClick={() => navigate('/recent')}
-            onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-            onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-          >
-            <EyeIcon className="h-6 w-6 text-white" aria-hidden="true" />
-            View All Competitions
-          </button>
-        </div>
-      </div>
+                                onClick={() => navigate('/create')}
+                                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+                              >
+                                <PlusIcon className="h-6 w-6 text-white" aria-hidden="true" />
+                                Create New Competition
+                              </button>
+                            )}
+                            <button
+                              className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg flex items-center justify-center gap-2"
+                              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                              onClick={() => navigate('/recent')}
+                              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+                            >
+                              <EyeIcon className="h-6 w-6 text-white" aria-hidden="true" />
+                              View All Competitions
+                            </button>
+                          </div>
+                        </div>
     </PageBackground>
   );
 }
