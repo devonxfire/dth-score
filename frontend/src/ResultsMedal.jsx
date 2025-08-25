@@ -70,8 +70,10 @@ export default function ResultsMedal() {
               const dthNet = gross - ch;
               // Calculate 'Thru' as the number of holes with a non-empty score
               let thru = scores.filter(v => v !== null && v !== '' && !isNaN(v)).length;
-              // If no scores, default to 4 ball's tee time start if available
-              if (thru === 0 && group.teeTime) {
+              // If completed all 18 holes, show 'F' for Finished
+              if (thru === 18) {
+                thru = 'F';
+              } else if (thru === 0 && group.teeTime) {
                 thru = group.teeTime; // e.g., '8:10 AM'
               }
               playerRows.push({
@@ -87,11 +89,14 @@ export default function ResultsMedal() {
             }
           }
         }
-        // 7. Sort: players with scores (thru is number) by net, then those with no scores (thru is string/teeTime) at bottom
+        // 7. Sort: players with scores (thru is number) by holes completed (desc), then net (asc), then those with no scores (thru is string/teeTime) at bottom
         playerRows.sort((a, b) => {
           const aStarted = typeof a.thru === 'number' && a.thru > 0;
           const bStarted = typeof b.thru === 'number' && b.thru > 0;
-          if (aStarted && bStarted) return a.net - b.net;
+          if (aStarted && bStarted) {
+            if (b.thru !== a.thru) return b.thru - a.thru; // more holes completed first
+            return a.net - b.net; // then by net
+          }
           if (aStarted) return -1;
           if (bStarted) return 1;
           return 0;
@@ -109,97 +114,106 @@ export default function ResultsMedal() {
 
   return (
     <PageBackground>
-      <div className="flex flex-col items-center px-4 mt-12">
-        <div className="mb-6">
-          <h2 className="text-3xl font-bold text-white drop-shadow-lg text-center">
-            {competition?.name || 'Medal Results'}
-          </h2>
-          <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
-        </div>
-        {/* Action buttons stacked vertically at top right, copied from Scorecard */}
-  <div className="flex flex-col items-end space-y-2 ml-8 mt-2 w-full max-w-4xl" style={{alignItems:'flex-end'}}>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="py-2 px-4 w-44 bg-[#1B3A6B] text-white rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
-          >
-            Dashboard
-          </button>
-          <button
-            onClick={() => {
-              const compId = competition?.id || competition?._id || competition?.joinCode || competition?.joincode || id;
-              console.log('Navigating to Scorecard with compId:', compId, 'competition:', competition);
-              navigate(`/scorecard/${compId}`, { state: { competition } });
-            }}
-            className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
-          >
-            Back to Scorecard
-          </button>
-          <button
-            disabled
-            className="py-2 px-4 w-44 bg-gray-400 text-white font-semibold rounded-2xl border border-white transition opacity-60 cursor-not-allowed mt-2"
-            title="PDF export coming soon!"
-          >
-            Export to PDF
-          </button>
-        </div>
-      </div>
-      <div className="flex flex-col items-center px-4 mt-8">
-        <div className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
-          {loading ? (
-            <div className="text-center text-white py-8">Loading results...</div>
-          ) : error ? (
-            <div className="text-center text-red-400 py-8">{error}</div>
-          ) : (
-            <table className="min-w-full border text-center mb-8">
-              <thead>
-                <tr className="bg-blue-900/90">
-                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Pos</th>
-                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Name</th>
-                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Thru</th>
-                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Gross</th>
-                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Net</th>
-                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>DTH Net</th>
-                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Dog</th>
-                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Waters</th>
-                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>2 Clubs</th>
-                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Fines</th>
-                </tr>
-              </thead>
-              <tbody>
-                {players.map((p, idx) => (
-                  <tr key={p.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
-                    <td className="border px-2 py-1 font-bold">{p.position}</td>
-                    <td className="border px-2 py-1 text-left">{p.name}</td>
-                    <td className="border px-2 py-1">{p.thru}</td>
-                    <td className="border px-2 py-1">{p.gross}</td>
-                    <td className="border px-2 py-1">{p.net}</td>
-                    <td className="border px-2 py-1">{p.dthNet}</td>
-                    <td className="border px-2 py-1"></td>
-                    <td className="border px-2 py-1"></td>
-                    <td className="border px-2 py-1"></td>
-                    <td className="border px-2 py-1">
-                      {isAdmin(user) ? (
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-16 text-center text-white bg-transparent rounded mx-auto block"
-                          value={fines[p.name] || ''}
-                          onChange={e => {
-                            const val = e.target.value;
-                            setFines(f => ({ ...f, [p.name]: val === '' ? '' : Math.max(0, parseInt(val, 10) || 0) }));
-                          }}
-                          placeholder="0"
-                          style={{ color: 'white' }}
-                        />
-                      ) : (
-                        fines[p.name] || ''
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+      <div className="flex flex-col items-center px-4 w-full">
+        <div className="w-full max-w-4xl">
+          <div className="mb-6 mt-12">
+            <h1 className="text-3xl font-bold text-white drop-shadow-lg text-center">Medal Results</h1>
+            <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
+          </div>
+          <div className="flex flex-row items-start mt-4 justify-between">
+            {/* Competition info section */}
+            {competition && (
+              <div className="text-white/90 text-base" style={{minWidth: 260, textAlign: 'left'}}>
+                <span className="font-semibold">Competition Type:</span> {competition.type ? (competition.type.replace(/(^|_|-)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')) : '-'} <br />
+                <span className="font-semibold">Date:</span> {competition.date ? (new Date(competition.date).toLocaleDateString('en-GB')) : '-'} <br />
+                <span className="font-semibold">Handicap Allowance:</span> {competition.handicapallowance && competition.handicapallowance !== 'N/A' ? competition.handicapallowance + '%' : 'N/A'}
+              </div>
+            )}
+            <div className="flex flex-col items-end space-y-2 ml-8" style={{alignItems:'flex-end', marginTop: 0}}>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="py-2 px-4 w-44 bg-[#1B3A6B] text-white rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => {
+                  const compId = competition?.id || competition?._id || competition?.joinCode || competition?.joincode || id;
+                  console.log('Navigating to Scorecard with compId:', compId, 'competition:', competition);
+                  navigate(`/scorecard/${compId}`, { state: { competition } });
+                }}
+                className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
+              >
+                Back to Scorecard
+              </button>
+              <button
+                disabled
+                className="py-2 px-4 w-44 bg-gray-400 text-white font-semibold rounded-2xl border border-white transition opacity-60 cursor-not-allowed mt-2"
+                title="PDF export coming soon!"
+              >
+                Export to PDF
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col mt-2">
+            <div className="w-full rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+              {loading ? (
+                <div className="text-center text-white py-8">Loading results...</div>
+              ) : error ? (
+                <div className="text-center text-red-400 py-8">{error}</div>
+              ) : (
+                <table className="min-w-full border text-center mb-8">
+                  <thead>
+                    <tr className="bg-blue-900/90">
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Pos</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Name</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Thru</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Gross</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Net</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>DTH Net</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Dog</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Waters</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>2 Clubs</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Fines</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {players.map((p, idx) => (
+                      <tr key={p.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
+                        <td className="border px-2 py-1 font-bold">{p.position}</td>
+                        <td className="border px-2 py-1 text-left">{p.name}</td>
+                        <td className="border px-2 py-1">{p.thru}</td>
+                        <td className="border px-2 py-1">{p.gross}</td>
+                        <td className="border px-2 py-1">{p.net}</td>
+                        <td className="border px-2 py-1">{p.dthNet}</td>
+                        <td className="border px-2 py-1"></td>
+                        <td className="border px-2 py-1"></td>
+                        <td className="border px-2 py-1"></td>
+                        <td className="border px-2 py-1">
+                          {isAdmin(user) ? (
+                            <input
+                              type="number"
+                              min="0"
+                              className="w-16 text-center text-white bg-transparent rounded mx-auto block"
+                              value={fines[p.name] || ''}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setFines(f => ({ ...f, [p.name]: val === '' ? '' : Math.max(0, parseInt(val, 10) || 0) }));
+                              }}
+                              placeholder="0"
+                              style={{ color: 'white' }}
+                            />
+                          ) : (
+                            fines[p.name] || ''
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </PageBackground>
