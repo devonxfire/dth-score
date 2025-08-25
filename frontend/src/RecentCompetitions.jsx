@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import OpenCompModal from './OpenCompModal';
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import PageBackground from './PageBackground';
@@ -20,15 +21,27 @@ function isAdmin(user) {
 }
 
 function RecentCompetitions({ user = {}, comps = [] }) {
+  // Helper to fetch competitions and update state
+  async function fetchCompetitions() {
+    try {
+      const res = await fetch('/api/competitions');
+      const data = await res.json();
+      setCompetitionList(data);
+      const open = (data || []).filter(c => c.status === 'Open');
+      setOpenComps(open);
+    } catch {
+      setCompetitionList([]);
+      setOpenComps([]);
+    }
+  }
   const [competitionList, setCompetitionList] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteCompId, setDeleteCompId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [openComps, setOpenComps] = useState([]);
+  const [showOpenCompModal, setShowOpenCompModal] = useState(false);
   useEffect(() => {
-    fetch('/api/competitions')
-      .then(res => res.json())
-      .then(data => setCompetitionList(data))
-      .catch(() => setCompetitionList([]));
+  fetchCompetitions();
   }, []);
 
   // Actually delete competition from DB
@@ -36,8 +49,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
     if (!id) return;
     setDeleting(true);
     try {
-      // Use correct API URL for local/prod
-      const apiUrl = window.location.hostname === 'localhost' ? `http://localhost:5050/api/competitions/${id}` : `/api/competitions/${id}`;
+  // Always use relative URL so Vite proxy works in dev
+  const apiUrl = `/api/competitions/${id}`;
   // IMPORTANT: Set REACT_APP_ADMIN_SECRET in your .env file (must start with REACT_APP_)
   // and restart the frontend. Vite exposes these as import.meta.env.VITE_*
   const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
@@ -118,6 +131,24 @@ function RecentCompetitions({ user = {}, comps = [] }) {
           </button>
         </div>
         <div className="flex flex-col items-center px-4 mt-8">
+          {isAdmin(user) && (
+            <>
+              <button
+                className="mb-6 py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg bg-[#1B3A6B] hover:bg-white hover:text-[#1B3A6B]"
+                style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                onClick={() => {
+                  if (openComps.length > 0) {
+                    setShowOpenCompModal(true);
+                  } else {
+                    navigate('/create');
+                  }
+                }}
+              >
+                Add New Competition
+              </button>
+              <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
+            </>
+          )}
           <h1 className="text-3xl font-bold mb-6 text-white drop-shadow-lg">Recent Competitions</h1>
         <div className="w-full max-w-4xl bg-transparent text-white mb-8 px-8" style={{ backdropFilter: 'none' }}>
           <table className="min-w-full border text-center mb-6">
@@ -125,7 +156,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
               <tr className="bg-white/10">
                 <th className="border px-2 py-1">Date</th>
                 <th className="border px-2 py-1">Type</th>
-                <th className="border px-2 py-1">Info</th>
+                <th className="border px-2 py-1">Course</th>
                 <th className="border px-2 py-1">Status</th>
                 {isAdmin(user) && <th className="border px-2 py-1">Action</th>}
               </tr>
@@ -137,12 +168,18 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 </tr>
               ) : competitionList.map((comp, idx) => {
                 const keyBase = comp.id || comp.joinCode || comp.joincode || idx;
-                let status = 'Open';
-                if (comp.date) {
-                  const today = new Date();
-                  const compDate = new Date(comp.date);
-                  if (compDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+                // Use status from DB if present, otherwise fallback to old logic
+                let status = comp.status;
+                if (!status) {
+                  status = 'Open';
+                  if (comp._forceClosed) {
                     status = 'Closed';
+                  } else if (comp.date) {
+                    const today = new Date();
+                    const compDate = new Date(comp.date);
+                    if (compDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+                      status = 'Closed';
+                    }
                   }
                 }
                 return (
@@ -169,6 +206,53 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                             >
                               Edit
                             </button>
+                            {isAdmin(user) && (
+                              <button
+                                className="py-1 px-3 bg-yellow-400 text-[#1B3A6B] font-bold rounded-2xl border border-white transition hover:bg-yellow-500 shadow"
+                                style={{ boxShadow: '0 2px 8px 0 rgba(255,193,7,0.10)' }}
+                                onClick={async () => {
+                                  // Toggle comp status between Open and Closed
+                                  const newStatus = status === 'Open' ? 'Closed' : 'Open';
+                                  const apiUrl = `/api/competitions/${comp.id}`;
+                                  const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+                                  if (!adminSecret) {
+                                    alert('Admin secret missing. Set REACT_APP_ADMIN_SECRET in your .env file.');
+                                    return;
+                                  }
+                                  try {
+                                    const res = await fetch(apiUrl, {
+                                      method: 'PATCH',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-Admin-Secret': adminSecret
+                                      },
+                                      body: JSON.stringify({ status: newStatus })
+                                    });
+                                    const responseText = await res.text();
+                                    if (!res.ok) {
+                                      console.error('PATCH error:', res.status, responseText);
+                                      alert(`Failed to update competition status: [${res.status}] ${responseText}`);
+                                      return;
+                                    }
+                                    let updated;
+                                    try {
+                                      updated = JSON.parse(responseText);
+                                    } catch (e) {
+                                      updated = null;
+                                    }
+                                    console.log('PATCH success:', updated);
+                                    // After successful toggle, re-fetch competitions to update openComps
+                                    await fetchCompetitions();
+                                  } catch (err) {
+                                    console.error('PATCH exception:', err);
+                                    alert('Error updating competition status: ' + (err?.message || err));
+                                  }
+                                }}
+                                disabled={deleting}
+                              >
+                                {status === 'Open' ? 'End Comp' : 'Reopen'}
+                              </button>
+                            )}
                             <button
                               className="py-1 px-3 bg-red-600 text-white font-bold rounded-2xl border border-white transition hover:bg-red-700 shadow"
                               style={{ boxShadow: '0 2px 8px 0 rgba(255,0,0,0.10)' }}

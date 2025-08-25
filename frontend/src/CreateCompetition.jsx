@@ -1,7 +1,12 @@
+// Helper: check if user is admin
+function isAdmin(user) {
+  return user && (user.role === 'admin' || user.isAdmin || user.isadmin);
+}
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PageBackground from './PageBackground';
+import OpenCompModal from './OpenCompModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import FourballAssignment from './FourballAssignment';
 
@@ -67,7 +72,21 @@ function CreateCompetition({ user }) {
   const [compId, setCompId] = useState(null);
   const [showGroups, setShowGroups] = useState(false);
   const [groups, setGroups] = useState([]);
+  const [openComps, setOpenComps] = useState([]);
+  const [showOpenCompModal, setShowOpenCompModal] = useState(false);
   const navigate = useNavigate();
+
+  // Fetch open competitions on mount
+  useEffect(() => {
+    fetch('/api/competitions')
+      .then(res => res.json())
+      .then(data => {
+        // Open = status is 'Open'
+        const open = (data || []).filter(c => c.status === 'Open');
+        setOpenComps(open);
+      })
+      .catch(() => setOpenComps([]));
+  }, []);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -75,10 +94,15 @@ function CreateCompetition({ user }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    // Only admins/captains are blocked
+    if (isAdmin(user) && openComps.length > 0) {
+      setShowOpenCompModal(true);
+      return;
+    }
     // If fourballs entered, create comp in backend and then show group assignment
     if (form.fourballs && !showGroups) {
       try {
-        const res = await fetch('http://localhost:5050/api/competitions', {
+        const res = await fetch('/api/competitions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...form })
@@ -98,7 +122,7 @@ function CreateCompetition({ user }) {
     }
     // Otherwise, finalize comp creation (no fourballs)
     try {
-      const res = await fetch('http://localhost:5050/api/competitions', {
+      const res = await fetch('/api/competitions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form })
@@ -123,7 +147,7 @@ function CreateCompetition({ user }) {
       return;
     }
     try {
-      const res = await fetch(`http://localhost:5050/api/competitions/${compId}/groups`, {
+      const res = await fetch(`/api/competitions/${compId}/groups`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ groups: groupsData })
@@ -137,6 +161,7 @@ function CreateCompetition({ user }) {
 
   return (
     <PageBackground>
+      <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
       {/* Top nav menu */}
       <div className="flex flex-wrap justify-between items-center mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
         <button

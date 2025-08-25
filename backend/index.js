@@ -277,6 +277,32 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
 // Delete competition by ID
 // Simple admin check: require X-Admin-Secret header to match env var ADMIN_SECRET
 app.delete('/api/competitions/:id', async (req, res) => {
+// Update competition status by ID (admin only)
+app.patch('/api/competitions/:id', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const adminSecret = req.header('X-Admin-Secret');
+  console.log(`[PATCH /api/competitions/${id}] Requested status:`, status);
+  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+    console.log('Admin secret invalid or missing');
+    return res.status(403).json({ error: 'Forbidden: invalid admin secret' });
+  }
+  if (!status || (status !== 'Open' && status !== 'Closed')) {
+    console.log('Invalid status value:', status);
+    return res.status(400).json({ error: 'Status must be "Open" or "Closed"' });
+  }
+  try {
+    const updated = await prisma.competitions.update({
+      where: { id: Number(id) },
+      data: { status },
+    });
+    console.log(`[PATCH /api/competitions/${id}] Updated competition:`, updated);
+    res.json({ success: true, competition: updated });
+  } catch (err) {
+    console.error('Error updating competition status:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
   const { id } = req.params;
   const adminSecret = req.headers['x-admin-secret'];
   if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
