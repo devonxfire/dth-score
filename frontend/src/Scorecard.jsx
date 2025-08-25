@@ -478,16 +478,10 @@ export default function Scorecard(props) {
                 {/* Action buttons stacked vertically at top right */}
                 <div className="flex flex-col items-end space-y-2 ml-8 mt-2">
                   <button
-                    onClick={() => navigate('/')}
+                    onClick={() => navigate('/dashboard')}
                     className="py-2 px-4 w-44 bg-[#1B3A6B] text-white rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
                   >
-                    Home
-                  </button>
-                  <button
-                    onClick={handleSaveScores}
-                    className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
-                  >
-                    Save Scores
+                    Dashboard
                   </button>
                   <button
                     onClick={() => {
@@ -501,6 +495,12 @@ export default function Scorecard(props) {
                     className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
                   >
                     View Leaderboard
+                  </button>
+                  <button
+                    onClick={handleSaveScores}
+                    className="py-2 px-4 w-44 bg-green-600 text-white font-semibold rounded-2xl hover:bg-white hover:text-green-700 border border-white transition"
+                  >
+                    Sign Scorecard
                   </button>
                   <button
                     onClick={() => setShowResetModal(true)}
@@ -552,12 +552,12 @@ export default function Scorecard(props) {
                       <th className="border px-2 py-1 bg-white/5 font-bold">Out</th>
                     </tr>
                     <tr className="bg-blue-900/90">
-                      <th className="border px-2 py-1 bg-white/5"></th>
-                      <th className="border px-2 py-1 bg-white/5">PAR</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}></th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>PAR</th>
                       {defaultHoles.slice(0,9).map(hole => (
-                        <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.par}</th>
+                        <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
                       ))}
-                      <th className="border px-2 py-1 bg-white/5 font-bold">36</th>
+                      <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
                     </tr>
                     <tr className="bg-gray-900/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
@@ -649,13 +649,13 @@ export default function Scorecard(props) {
                       <th className="border px-2 py-1 bg-white/5 font-bold">TOTAL</th>
                     </tr>
                     <tr className="bg-blue-900/90">
-                      <th className="border px-2 py-1 bg-white/5"></th>
-                      <th className="border px-2 py-1 bg-white/5">PAR</th>
-                      {defaultHoles.slice(0,9).map(hole => (
-                        <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.par}</th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}></th>
+                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>PAR</th>
+                      {defaultHoles.slice(9,18).map(hole => (
+                        <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
                       ))}
-                      <th className="border px-2 py-1 bg-white/5 font-bold">36</th>
-                      <th className="border px-2 py-1 bg-white/5 font-bold">72</th>
+                      <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
+                      <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>72</th>
                     </tr>
                     <tr className="bg-gray-900/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
