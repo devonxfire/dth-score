@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import './pdfExportPlain.css';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 // Helper: check if user is admin
 function isAdmin(user) {
   return user && (user.role === 'admin' || user.isAdmin || user.isadmin);
 }
 import PageBackground from './PageBackground';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // Medal Results Page UI (fetches real data)
 export default function ResultsMedal() {
@@ -112,14 +115,108 @@ export default function ResultsMedal() {
     fetchResults();
   }, [id]);
 
+  // Ref for the section to export
+  const exportRef = useRef();
+  const plainExportRef = useRef();
+
+  // Export to PDF handler
+  const handleExportPDF = async () => {
+    if (!plainExportRef.current) {
+      alert('Plain export ref not set');
+      return;
+    }
+    const element = plainExportRef.current;
+    element.style.display = 'block'; // Show for export
+    try {
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#fff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const imgWidth = pageWidth - 40;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 20, 20, imgWidth, imgHeight);
+      // Build filename: YYYY-MM-DD_<type>_results.pdf
+      let dateStr = '';
+      let typeStr = 'results';
+      if (competition) {
+        if (competition.date) {
+          const d = new Date(competition.date);
+          if (!isNaN(d)) {
+            dateStr = d.toISOString().slice(0,10); // YYYY-MM-DD
+          }
+        }
+        if (competition.type) {
+          typeStr = competition.type
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/[_\-]+/g, ' ')
+            .toLowerCase()
+            .replace(/\s+/g, '_');
+        }
+      }
+      const filename = `${dateStr ? dateStr + '_' : ''}${typeStr}_results.pdf`;
+      pdf.save(filename);
+    } catch (err) {
+      alert('Error generating PDF: ' + err.message);
+    } finally {
+      element.style.display = 'none'; // Hide after export
+    }
+  };
+
   return (
     <PageBackground>
       <div className="flex flex-col items-center px-4 w-full">
-        <div className="w-full max-w-4xl">
+  <div className="w-full max-w-4xl" ref={exportRef} id="export-section">
+        {/* Hidden plain export table for PDF generation only */}
+        <div
+          ref={plainExportRef}
+          style={{ display: 'none', background: '#fff', color: '#111', padding: 24, fontFamily: 'sans-serif', maxWidth: 900, margin: '0 auto', borderRadius: 8 }}
+        >
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 28, marginBottom: 8 }}>Medal Results</div>
+          <div style={{ height: 2, width: 340, background: '#222', opacity: 0.2, borderRadius: 2, margin: '0 auto 18px auto' }}></div>
+          {competition && (
+            <div style={{ marginBottom: 18, fontSize: 16 }}>
+              <span style={{ fontWeight: 'bold' }}>Competition Type:</span> {competition.type ? (competition.type.replace(/(^|_|-)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')) : '-'}<br />
+              <span style={{ fontWeight: 'bold' }}>Date:</span> {competition.date ? (new Date(competition.date).toLocaleDateString('en-GB')) : '-'}<br />
+              <span style={{ fontWeight: 'bold' }}>Handicap Allowance:</span> {competition.handicapallowance && competition.handicapallowance !== 'N/A' ? competition.handicapallowance + '%' : 'N/A'}
+            </div>
+          )}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
+            <thead>
+              <tr style={{ background: '#eee' }}>
+                <th style={{ border: '1px solid #222', padding: 4 }}>Pos</th>
+                <th style={{ border: '1px solid #222', padding: 4 }}>Name</th>
+                <th style={{ border: '1px solid #222', padding: 4 }}>Thru</th>
+                <th style={{ border: '1px solid #222', padding: 4 }}>Gross</th>
+                <th style={{ border: '1px solid #222', padding: 4 }}>Net</th>
+                <th style={{ border: '1px solid #222', padding: 4 }}>DTH Net</th>
+                <th style={{ border: '1px solid #222', padding: 4 }}>Dog</th>
+                <th style={{ border: '1px solid #222', padding: 4 }}>Waters</th>
+                <th style={{ border: '1px solid #222', padding: 4 }}>2 Clubs</th>
+                <th style={{ border: '1px solid #222', padding: 4 }}>Fines</th>
+              </tr>
+            </thead>
+            <tbody>
+              {players.map((p, idx) => (
+                <tr key={p.name} style={{ background: idx % 2 === 0 ? '#f7f7f7' : '#fff' }}>
+                  <td style={{ border: '1px solid #222', padding: 4, fontWeight: 'bold', textAlign: 'center' }}>{p.position}</td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.name}</td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.thru}</td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.gross}</td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.net}</td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.dthNet}</td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}></td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}></td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}></td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.fines || ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
           <div className="mb-6 mt-12">
             <h1 className="text-3xl font-bold text-white drop-shadow-lg text-center">Medal Results</h1>
             <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
-          </div>
+          {/* ...existing code... */}
           <div className="flex flex-row items-start mt-4 justify-between">
             {/* Competition info section */}
             {competition && (
@@ -147,75 +244,92 @@ export default function ResultsMedal() {
                 Back to Scorecard
               </button>
               <button
-                disabled
-                className="py-2 px-4 w-44 bg-gray-400 text-white font-semibold rounded-2xl border border-white transition opacity-60 cursor-not-allowed mt-2"
-                title="PDF export coming soon!"
+                onClick={handleExportPDF}
+                className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B] mt-2"
+                title="Export this page to PDF"
               >
                 Export to PDF
               </button>
             </div>
           </div>
-          <div className="flex flex-col mt-2">
+          <div className="flex flex-col mt-12">
             <div className="w-full rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
               {loading ? (
                 <div className="text-center text-white py-8">Loading results...</div>
               ) : error ? (
                 <div className="text-center text-red-400 py-8">{error}</div>
               ) : (
-                <table className="min-w-full border text-center mb-8">
-                  <thead>
-                    <tr className="bg-blue-900/90">
-                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Pos</th>
-                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Name</th>
-                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Thru</th>
-                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Gross</th>
-                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Net</th>
-                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>DTH Net</th>
-                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Dog</th>
-                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Waters</th>
-                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>2 Clubs</th>
-                      <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Fines</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {players.map((p, idx) => (
-                      <tr key={p.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
-                        <td className="border px-2 py-1 font-bold">{p.position}</td>
-                        <td className="border px-2 py-1 text-left">{p.name}</td>
-                        <td className="border px-2 py-1">{p.thru}</td>
-                        <td className="border px-2 py-1">{p.gross}</td>
-                        <td className="border px-2 py-1">{p.net}</td>
-                        <td className="border px-2 py-1">{p.dthNet}</td>
-                        <td className="border px-2 py-1"></td>
-                        <td className="border px-2 py-1"></td>
-                        <td className="border px-2 py-1"></td>
-                        <td className="border px-2 py-1">
-                          {isAdmin(user) ? (
-                            <input
-                              type="number"
-                              min="0"
-                              className="w-16 text-center text-white bg-transparent rounded mx-auto block"
-                              value={fines[p.name] || ''}
-                              onChange={e => {
-                                const val = e.target.value;
-                                setFines(f => ({ ...f, [p.name]: val === '' ? '' : Math.max(0, parseInt(val, 10) || 0) }));
-                              }}
-                              placeholder="0"
-                              style={{ color: 'white' }}
-                            />
-                          ) : (
-                            fines[p.name] || ''
-                          )}
-                        </td>
+                <React.Fragment>
+                  <table className="min-w-full border text-center mb-8">
+                    <thead>
+                      <tr className="bg-blue-900/90">
+                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Pos</th>
+                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Name</th>
+                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Thru</th>
+                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Gross</th>
+                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Net</th>
+                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>DTH Net</th>
+                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Dog</th>
+                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Waters</th>
+                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>2 Clubs</th>
+                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Fines</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {players.map((p, idx) => (
+                        <tr key={p.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
+                          <td className="border px-2 py-1 font-bold">{p.position}</td>
+                          <td className="border px-2 py-1 text-left">{p.name}</td>
+                          <td className="border px-2 py-1">{p.thru}</td>
+                          <td className="border px-2 py-1">{p.gross}</td>
+                          <td className="border px-2 py-1">{p.net}</td>
+                          <td className="border px-2 py-1">{p.dthNet}</td>
+                          <td className="border px-2 py-1"></td>
+                          <td className="border px-2 py-1"></td>
+                          <td className="border px-2 py-1"></td>
+                          <td className="border px-2 py-1">
+                            {isAdmin(user) ? (
+                              <input
+                                type="number"
+                                min="0"
+                                className="w-16 text-center text-white bg-transparent rounded mx-auto block"
+                                value={fines[p.name] || ''}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setFines(f => ({ ...f, [p.name]: val === '' ? '' : Math.max(0, parseInt(val, 10) || 0) }));
+                                }}
+                                placeholder="0"
+                                style={{ color: 'white' }}
+                              />
+                            ) : (
+                              fines[p.name] || ''
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {/* Good Scores section - directly below the results table */}
+                  {(() => {
+                    const goodScores = players.filter(p => typeof p.dthNet === 'number' && p.dthNet < 70 && p.thru === 'F');
+                    return (
+                      <div className="mt-2 mb-8 text-white text-base font-semibold" style={{maxWidth: '100%', textAlign: 'left'}}>
+                        <div style={{marginBottom: 4, marginLeft: 0, textDecoration: 'underline', textUnderlineOffset: 3}}>Good Scores</div>
+                        {goodScores.length === 0
+                          ? <div style={{marginLeft: 0}}>No one. Everyone shit.</div>
+                          : goodScores.map(p => (
+                              <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{p.name}: Net {p.dthNet}</div>
+                            ))}
+                      </div>
+                    );
+                  })()}
+                </React.Fragment>
               )}
             </div>
           </div>
         </div>
       </div>
-    </PageBackground>
+    </div>
+  </PageBackground>
   );
 }

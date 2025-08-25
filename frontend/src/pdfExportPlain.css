@@ -1,0 +1,14 @@
+.pdf-export-plain {
+  background: #fff !important;
+  color: #111 !important;
+}
+.pdf-export-plain table,
+.pdf-export-plain th,
+.pdf-export-plain td {
+  background: #fff !important;
+  color: #111 !important;
+  border: 1px solid #222 !important;
+}
+.pdf-export-plain th {
+  font-weight: bold !important;
+}
