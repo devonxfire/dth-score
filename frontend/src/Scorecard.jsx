@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageBackground from './PageBackground';
 
 // Modal state for reset confirmation
@@ -114,21 +114,48 @@ export default function Scorecard(props) {
   const [savingTee, setSavingTee] = useState(false);
   const [teeError, setTeeError] = useState('');
 
-  // Prefer location.state, fallback to props
+  // Prefer location.state, fallback to props, fallback to fetch by id from URL
+  const { id: urlId } = useParams();
   const initialCompetition = location.state?.competition || props.competition || null;
   const initialPlayer = location.state?.player || props.player || null;
   const [competition, setCompetition] = useState(initialCompetition);
-  const [player, setPlayer] = useState(initialPlayer);
+  // Always set player to the logged-in user if not provided
+  const [player, setPlayer] = useState(() => {
+    if (initialPlayer) return initialPlayer;
+    // Try to find the logged-in user from localStorage
+    const stored = localStorage.getItem('user');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) { return null; }
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Always fetch latest competition data on mount if competition.id exists
+  // Always fetch latest competition data on mount if competition.id exists, or fetch by URL id if not present
   useEffect(() => {
     async function fetchCompetition() {
       if (initialCompetition && initialCompetition.id) {
         setLoading(true);
         try {
+          console.log('Fetching competition by initialCompetition.id:', initialCompetition.id);
           const res = await fetch(`/api/competitions/${initialCompetition.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            setCompetition(data);
+          }
+        } catch (e) {
+          // ignore
+        } finally {
+          setLoading(false);
+        }
+      } else if (urlId) {
+        setLoading(true);
+        try {
+          console.log('Fetching competition by urlId:', urlId);
+          const res = await fetch(`/api/competitions/${urlId}`);
           if (res.ok) {
             const data = await res.json();
             setCompetition(data);
@@ -140,6 +167,7 @@ export default function Scorecard(props) {
         }
       }
     }
+    console.log('Scorecard useEffect: urlId =', urlId, 'initialCompetition =', initialCompetition);
     fetchCompetition();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

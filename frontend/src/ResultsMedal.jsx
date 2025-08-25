@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
 
 // Medal Results Page UI (fetches real data)
 export default function ResultsMedal() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [competition, setCompetition] = useState(null);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +89,25 @@ export default function ResultsMedal() {
             {competition?.name || 'Medal Results'}
           </h2>
           <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
+        </div>
+        {/* Action buttons stacked vertically at top right, copied from Scorecard */}
+        <div className="flex flex-col items-end space-y-2 ml-8 mt-2 w-full max-w-4xl" style={{alignItems:'flex-end'}}>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="py-2 px-4 w-44 bg-[#1B3A6B] text-white rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
+          >
+            Dashboard
+          </button>
+          <button
+            onClick={() => {
+              const compId = competition?.id || competition?._id || competition?.joinCode || competition?.joincode || id;
+              console.log('Navigating to Scorecard with compId:', compId, 'competition:', competition);
+              navigate(`/scorecard/${compId}`, { state: { competition } });
+            }}
+            className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
+          >
+            Back to Scorecard
+          </button>
         </div>
       </div>
       <div className="flex flex-col items-center px-4 mt-8">
