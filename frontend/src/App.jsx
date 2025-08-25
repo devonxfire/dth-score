@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import CreateCompetition from './CreateCompetition';
@@ -9,11 +8,7 @@ import Scorecard from './Scorecard';
 import Leaderboard from './Leaderboard';
 import Login from './Login';
 import Dashboard from './Dashboard';
-
-
-
-
-
+import ResultsMedal from './ResultsMedal';
 
 function AppRoutes({ user, setUser }) {
   const navigate = useNavigate();
@@ -48,6 +43,7 @@ function AppRoutes({ user, setUser }) {
           <Route path="/competition/:id" element={<CompetitionInfo user={user} />} />
           <Route path="/scorecard/:id" element={<Scorecard user={user} />} />
           <Route path="/leaderboard/:id" element={<Leaderboard user={user} />} />
+          <Route path="/results/:id" element={<ResultsMedal />} />
           <Route path="/profile" element={<div className="p-8">User Profile (coming soon)</div>} />
         </>
       )}

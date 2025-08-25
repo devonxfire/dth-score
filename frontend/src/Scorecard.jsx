@@ -485,16 +485,16 @@ export default function Scorecard(props) {
                   </button>
                   <button
                     onClick={() => {
-                      const compJoinCode = competition.joinCode || competition.joincode || (player && (player.joinCode || player.joincode)) || '';
-                      if (compJoinCode) {
-                        navigate(`/leaderboard/${compJoinCode}`, { state: { date: competition.date, type: competition.type } });
+                      if (competition && (competition.id || competition._id || competition.joinCode || competition.joincode)) {
+                        const compId = competition.id || competition._id || competition.joinCode || competition.joincode;
+                        navigate(`/results/${compId}`);
                       } else {
-                        alert('Competition join code not found.');
+                        alert('Competition ID not found.');
                       }
                     }}
                     className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
                   >
-                    View Leaderboard
+                    View Results
                   </button>
                   <button
                     onClick={handleSaveScores}
@@ -733,40 +733,6 @@ export default function Scorecard(props) {
                     ))}
                   </tbody>
                 </table>
-              </div>
-              {/* Top-right action buttons inside container */}
-              <div className="flex flex-row justify-end items-start w-full mb-6 space-x-2">
-                <button
-                  onClick={handleSaveScores}
-                  className="py-2 px-4 bg-transparent border border-white text-white font-semibold rounded-2xl hover:bg-white hover:text-black transition w-auto min-w-[140px]"
-                >
-                  Save Scores
-                </button>
-                <button
-                  onClick={() => {
-                    const compJoinCode = competition.joinCode || competition.joincode || (player && (player.joinCode || player.joincode)) || '';
-                    if (compJoinCode) {
-                      navigate(`/leaderboard/${compJoinCode}`, { state: { date: competition.date, type: competition.type } });
-                    } else {
-                      alert('Competition join code not found.');
-                    }
-                  }}
-                  className="py-2 px-4 bg-yellow-500 text-white font-semibold rounded-2xl hover:bg-yellow-600 transition w-auto min-w-[140px]"
-                >
-                  View Leaderboard
-                </button>
-                <button
-                  onClick={() => navigate('/')}
-                  className="py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition w-auto min-w-[140px]"
-                >
-                  Home
-                </button>
-                <button
-                  onClick={() => setShowResetModal(true)}
-                  className="py-2 px-4 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 transition w-auto min-w-[140px]"
-                >
-                  Reset Scorecard
-                </button>
               </div>
               {showResetModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">

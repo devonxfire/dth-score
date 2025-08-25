@@ -98,29 +98,6 @@ export default function Dashboard({ user, onSignOut }) {
       </div>
       <div className="relative z-10 flex flex-col items-center px-4 mt-2">
   <div className="w-full max-w-md rounded-2xl shadow-lg p-8 flex flex-col gap-6" style={{ background: 'none' }}>
-          {user?.isadmin && (
-            <button
-              className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg flex items-center justify-center gap-2"
-              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-              onClick={() => navigate('/create')}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-            >
-              <PlusIcon className="h-6 w-6 text-white" aria-hidden="true" />
-              Create New Competition
-            </button>
-          )}
-          {/* ...existing code... */}
-          <button
-            className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg flex items-center justify-center gap-2"
-            style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-            onClick={() => navigate('/recent')}
-            onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-            onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-          >
-            <EyeIcon className="h-6 w-6 text-white" aria-hidden="true" />
-            View All Competitions
-          </button>
           {userComp && (
             <button
               className="w-full py-3 px-4 border border-red-400 text-white font-semibold rounded-2xl text-lg flex items-center justify-center gap-2 scorecard-pulse"
@@ -128,7 +105,6 @@ export default function Dashboard({ user, onSignOut }) {
               onClick={() => {
                 // Find the group/team the user is assigned to
                 const group = userComp.groups.find(g => Array.isArray(g.players) && g.players.includes(user.name));
-                console.log('Selected group:', group);
                 // Find the player object in the group (if available)
                 let playerObj = null;
                 if (group && Array.isArray(group.members)) {
@@ -145,7 +121,6 @@ export default function Dashboard({ user, onSignOut }) {
                     course_handicap: group?.handicaps?.[user.name] || '',
                   };
                 }
-                console.log('playerObj to pass:', playerObj);
                 const compId = userComp.joinCode || userComp.joincode || userComp.id || userComp._id || userComp.competitionType;
                 navigate(`/scorecard/${compId}`, {
                   state: {
@@ -159,6 +134,28 @@ export default function Dashboard({ user, onSignOut }) {
               {`My Scorecard for ${formatDate(userComp.date)}`}
             </button>
           )}
+          {user?.isadmin && (
+            <button
+              className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg flex items-center justify-center gap-2"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onClick={() => navigate('/create')}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+            >
+              <PlusIcon className="h-6 w-6 text-white" aria-hidden="true" />
+              Create New Competition
+            </button>
+          )}
+          <button
+            className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg flex items-center justify-center gap-2"
+            style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+            onClick={() => navigate('/recent')}
+            onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+            onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+          >
+            <EyeIcon className="h-6 w-6 text-white" aria-hidden="true" />
+            View All Competitions
+          </button>
         </div>
       </div>
     </PageBackground>
