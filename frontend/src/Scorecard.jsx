@@ -70,6 +70,49 @@ const defaultHoles = [
 
 
 export default function Scorecard(props) {
+  // Top menu for UI consistency (copied from ResultsMedal)
+  const userMenu = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch {
+      return null;
+    }
+  })();
+
+  const TopMenu = () => (
+    <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
+      <button
+        className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
+        style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
+        onClick={() => navigate('/dashboard')}
+      >
+        Dashboard
+      </button>
+      <button
+        className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
+        style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
+        onClick={() => navigate('/recent')}
+      >
+        Competitions
+      </button>
+      <span
+        className="text-sm text-white font-semibold opacity-80 bg-transparent border-none outline-none px-2 py-1 cursor-default select-none"
+        style={{ background: 'none', border: 'none', boxShadow: 'none', lineHeight: '2.25rem' }}
+      >
+        Welcome, {(userMenu?.name?.split(' ')[0]) || 'Player'}!
+      </span>
+      <button
+        className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
+        style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+        onClick={() => {
+          localStorage.removeItem('user');
+          window.location.href = '/';
+        }}
+      >
+        Sign Out
+      </button>
+    </div>
+  );
   // Handler to reset all gross scores (local and backend)
   const handleResetScorecard = async () => {
     setScores(groupPlayers.map(() => Array(18).fill('')));
@@ -299,6 +342,7 @@ export default function Scorecard(props) {
 
   return (
     <PageBackground>
+      <TopMenu />
       {/* Tee/Handicap Modal */}
       {showTeeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -429,7 +473,7 @@ export default function Scorecard(props) {
             </div>
           </div>
           <div className="flex flex-col items-center px-4 mt-8">
-            <div className="w-full max-w-7xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+            <div className="w-full max-w-3xl rounded-2xl bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
               <div className="flex flex-row justify-between items-start w-full">
                 {/* Mini table and comp info */}
                 <div className="mb-2 text-white/90">
@@ -505,12 +549,7 @@ export default function Scorecard(props) {
                 </div>
                 {/* Action buttons stacked vertically at top right */}
                 <div className="flex flex-col items-end space-y-2 ml-8 mt-2">
-                  <button
-                    onClick={() => navigate('/dashboard')}
-                    className="py-2 px-4 w-44 bg-[#1B3A6B] text-white rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
-                  >
-                    Dashboard
-                  </button>
+                  {/* Dashboard button removed */}
                   <button
                     onClick={() => {
                       if (competition && (competition.id || competition._id || competition.joinCode || competition.joincode)) {
@@ -524,12 +563,7 @@ export default function Scorecard(props) {
                   >
                     View Results
                   </button>
-                  <button
-                    onClick={handleSaveScores}
-                    className="py-2 px-4 w-44 bg-green-600 text-white font-semibold rounded-2xl hover:bg-white hover:text-green-700 border border-white transition"
-                  >
-                    Sign Scorecard
-                  </button>
+                  {/* Sign Scorecard button removed */}
                   <button
                     onClick={() => setShowResetModal(true)}
                     className="py-2 px-4 w-44 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 border border-white transition"
