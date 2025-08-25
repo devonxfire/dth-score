@@ -68,6 +68,12 @@ export default function ResultsMedal() {
               // 6. Net = Gross - PH, DTH Net = Gross - CH
               const net = gross - ph;
               const dthNet = gross - ch;
+              // Calculate 'Thru' as the number of holes with a non-empty score
+              let thru = scores.filter(v => v !== null && v !== '' && !isNaN(v)).length;
+              // If no scores, default to 4 ball's tee time start if available
+              if (thru === 0 && group.teeTime) {
+                thru = group.teeTime; // e.g., '8:10 AM'
+              }
               playerRows.push({
                 name: playerName,
                 gross,
@@ -76,12 +82,20 @@ export default function ResultsMedal() {
                 ph,
                 ch,
                 scores,
+                thru,
               });
             }
           }
         }
-        // 7. Sort by net ascending, assign position
-        playerRows.sort((a, b) => a.net - b.net);
+        // 7. Sort: players with scores (thru is number) by net, then those with no scores (thru is string/teeTime) at bottom
+        playerRows.sort((a, b) => {
+          const aStarted = typeof a.thru === 'number' && a.thru > 0;
+          const bStarted = typeof b.thru === 'number' && b.thru > 0;
+          if (aStarted && bStarted) return a.net - b.net;
+          if (aStarted) return -1;
+          if (bStarted) return 1;
+          return 0;
+        });
         playerRows.forEach((p, i) => (p.position = i + 1));
         setPlayers(playerRows);
       } catch (err) {
@@ -141,6 +155,7 @@ export default function ResultsMedal() {
                 <tr className="bg-blue-900/90">
                   <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Pos</th>
                   <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Name</th>
+                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Thru</th>
                   <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Gross</th>
                   <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Net</th>
                   <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>DTH Net</th>
@@ -155,6 +170,7 @@ export default function ResultsMedal() {
                   <tr key={p.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
                     <td className="border px-2 py-1 font-bold">{p.position}</td>
                     <td className="border px-2 py-1 text-left">{p.name}</td>
+                    <td className="border px-2 py-1">{p.thru}</td>
                     <td className="border px-2 py-1">{p.gross}</td>
                     <td className="border px-2 py-1">{p.net}</td>
                     <td className="border px-2 py-1">{p.dthNet}</td>
