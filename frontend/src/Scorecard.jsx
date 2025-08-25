@@ -402,77 +402,113 @@ export default function Scorecard(props) {
           </div>
           <div className="flex flex-col items-center px-4 mt-8">
             <div className="w-full max-w-7xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
-              {/* Home button moved to bottom */}
-              <div className="mb-2 text-white/90">
-                <span className="font-semibold">Competition:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')} <br />
-                <span className="font-semibold">Date:</span> {formatDate(competition.date)} <br />
-                {/* Tee Box removed as per user request */}
-                <span className="font-semibold">Handicap Allowance:</span> {
-                  competition.handicapallowance && competition.handicapallowance !== 'N/A'
-                    ? competition.handicapallowance + '%'
-                    : 'N/A'
-                } <br />
-                {/* 4 Ball number removed as per user request */}
-                {groupPlayers.length >= 2 && (
-                  <div className="my-2">
-                    <table className="min-w-[300px] border border-white/30 text-white text-sm rounded mb-2">
-                      <thead>
-                        <tr>
-                          <th className="border px-2 py-1 bg-white/10"></th>
-                          <th className="border px-2 py-1 bg-white/10">Name</th>
-                          <th className="border px-2 py-1 bg-white/10">Tee</th>
-                          <th className="border px-2 py-1 bg-white/10">CH</th>
-                          <th className="border px-2 py-1 bg-white/10">PH</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groupPlayers.map((name, idx) => {
-                          // Try to get full and adjusted handicap from the correct group structure
-                          let fullHandicap = '';
-                          let adjHandicap = '';
-                          let teebox = '';
-                          if (groupForPlayer) {
-                            if (groupForPlayer.handicaps) {
-                              fullHandicap = groupForPlayer.handicaps[name] || '';
+              <div className="flex flex-row justify-between items-start w-full">
+                {/* Mini table and comp info */}
+                <div className="mb-2 text-white/90">
+                  <span className="font-semibold">Competition:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')} <br />
+                  <span className="font-semibold">Date:</span> {formatDate(competition.date)} <br />
+                  {/* Tee Box removed as per user request */}
+                  <span className="font-semibold">Handicap Allowance:</span> {
+                    competition.handicapallowance && competition.handicapallowance !== 'N/A'
+                      ? competition.handicapallowance + '%'
+                      : 'N/A'
+                  } <br />
+                  {/* 4 Ball number removed as per user request */}
+                  {groupPlayers.length >= 2 && (
+                    <div className="my-2">
+                      <table className="min-w-[300px] border border-white/30 text-white text-sm rounded mb-2">
+                        <thead>
+                          <tr>
+                            <th className="border px-2 py-1 bg-white/10"></th>
+                            <th className="border px-2 py-1 bg-white/10">Name</th>
+                            <th className="border px-2 py-1 bg-white/10">Tee</th>
+                            <th className="border px-2 py-1 bg-white/10">CH</th>
+                            <th className="border px-2 py-1 bg-white/10">PH</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {groupPlayers.map((name, idx) => {
+                            // Try to get full and adjusted handicap from the correct group structure
+                            let fullHandicap = '';
+                            let adjHandicap = '';
+                            let teebox = '';
+                            if (groupForPlayer) {
+                              if (groupForPlayer.handicaps) {
+                                fullHandicap = groupForPlayer.handicaps[name] || '';
+                              }
+                              if (groupForPlayer.teeboxes) {
+                                teebox = groupForPlayer.teeboxes[name] || '';
+                              }
                             }
-                            if (groupForPlayer.teeboxes) {
-                              teebox = groupForPlayer.teeboxes[name] || '';
+                            // Calculate adjusted handicap if allowance is set
+                            if (fullHandicap && competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+                              adjHandicap = Math.round(Number(fullHandicap) * Number(competition.handicapallowance) / 100);
                             }
-                          }
-                          // Calculate adjusted handicap if allowance is set
-                          if (fullHandicap && competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
-                            adjHandicap = Math.round(Number(fullHandicap) * Number(competition.handicapallowance) / 100);
-                          }
-                          // Conditional tee color
-                          let teeBg = '';
-                          if (teebox === 'White') teeBg = 'bg-white text-black border-white';
-                          else if (teebox === 'Red') teeBg = 'bg-red-500 text-white';
-                          else if (teebox === 'Yellow') teeBg = 'bg-yellow-300 text-black border-white';
-                          // Format player name as first initial + surname (ignore nickname)
-                          let displayName = name;
-                          if (name && typeof name === 'string') {
-                            const parts = name.trim().split(' ');
-                            if (parts.length > 1) {
-                              displayName = parts[0][0] + '. ' + parts[parts.length - 1];
-                            } else {
-                              displayName = name;
+                            // Conditional tee color
+                            let teeBg = '';
+                            if (teebox === 'White') teeBg = 'bg-white text-black border-white';
+                            else if (teebox === 'Red') teeBg = 'bg-red-500 text-white';
+                            else if (teebox === 'Yellow') teeBg = 'bg-yellow-300 text-black border-white';
+                            // Format player name as first initial + surname (ignore nickname)
+                            let displayName = name;
+                            if (name && typeof name === 'string') {
+                              const parts = name.trim().split(' ');
+                              if (parts.length > 1) {
+                                displayName = parts[0][0] + '. ' + parts[parts.length - 1];
+                              } else {
+                                displayName = name;
+                              }
                             }
-                          }
-                          return (
-                            <tr key={name}>
-                              <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
-                              <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>{displayName}</td>
-                              <td className={`border px-2 py-1 text-center ${teeBg}`}>{teebox !== '' ? teebox : '-'}</td>
-                              <td className="border px-2 py-1 text-center">{fullHandicap !== '' ? fullHandicap : '-'}</td>
-                              <td className="border px-2 py-1 text-center">{adjHandicap !== '' ? adjHandicap : '-'}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                {competition.notes && <><span className="font-semibold">Notes from Captain:</span> {competition.notes} <br /></>}
+                            return (
+                              <tr key={name}>
+                                <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
+                                <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>{displayName}</td>
+                                <td className={`border px-2 py-1 text-center ${teeBg}`}>{teebox !== '' ? teebox : '-'}</td>
+                                <td className="border px-2 py-1 text-center">{fullHandicap !== '' ? fullHandicap : '-'}</td>
+                                <td className="border px-2 py-1 text-center">{adjHandicap !== '' ? adjHandicap : '-'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {competition.notes && <><span className="font-semibold">Notes from Captain:</span> {competition.notes} <br /></>}
+                </div>
+                {/* Action buttons stacked vertically at top right */}
+                <div className="flex flex-col items-end space-y-2 ml-8 mt-2">
+                  <button
+                    onClick={() => navigate('/')}
+                    className="py-2 px-4 w-44 bg-[#1B3A6B] text-white rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
+                  >
+                    Home
+                  </button>
+                  <button
+                    onClick={handleSaveScores}
+                    className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
+                  >
+                    Save Scores
+                  </button>
+                  <button
+                    onClick={() => {
+                      const compJoinCode = competition.joinCode || competition.joincode || (player && (player.joinCode || player.joincode)) || '';
+                      if (compJoinCode) {
+                        navigate(`/leaderboard/${compJoinCode}`, { state: { date: competition.date, type: competition.type } });
+                      } else {
+                        alert('Competition join code not found.');
+                      }
+                    }}
+                    className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
+                  >
+                    View Leaderboard
+                  </button>
+                  <button
+                    onClick={() => setShowResetModal(true)}
+                    className="py-2 px-4 w-44 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 border border-white transition"
+                  >
+                    Reset Scorecard
+                  </button>
+                </div>
               </div>
               {isAlliance && (
                 <div className="mb-4">
@@ -698,37 +734,40 @@ export default function Scorecard(props) {
                   </tbody>
                 </table>
               </div>
-              <button
-                onClick={handleSaveScores}
-                className="mt-6 w-full py-2 px-4 bg-transparent border border-white text-white font-semibold rounded-2xl hover:bg-white hover:text-black transition"
-              >
-                Save Scores
-              </button>
-              <button
-                onClick={() => {
-                  const compJoinCode = competition.joinCode || competition.joincode || (player && (player.joinCode || player.joincode)) || '';
-                  if (compJoinCode) {
-                    navigate(`/leaderboard/${compJoinCode}`, { state: { date: competition.date, type: competition.type } });
-                  } else {
-                    alert('Competition join code not found.');
-                  }
-                }}
-                className="mt-3 w-full py-2 px-4 bg-yellow-500 text-white font-semibold rounded-2xl hover:bg-yellow-600 transition"
-              >
-                View Leaderboard
-              </button>
-              <button
-                onClick={() => navigate('/')}
-                className="mt-3 w-full py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition"
-              >
-                Home
-              </button>
-              <button
-                onClick={() => setShowResetModal(true)}
-                className="mt-3 w-full py-2 px-4 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 transition"
-              >
-                Reset Scorecard
-              </button>
+              {/* Top-right action buttons inside container */}
+              <div className="flex flex-row justify-end items-start w-full mb-6 space-x-2">
+                <button
+                  onClick={handleSaveScores}
+                  className="py-2 px-4 bg-transparent border border-white text-white font-semibold rounded-2xl hover:bg-white hover:text-black transition w-auto min-w-[140px]"
+                >
+                  Save Scores
+                </button>
+                <button
+                  onClick={() => {
+                    const compJoinCode = competition.joinCode || competition.joincode || (player && (player.joinCode || player.joincode)) || '';
+                    if (compJoinCode) {
+                      navigate(`/leaderboard/${compJoinCode}`, { state: { date: competition.date, type: competition.type } });
+                    } else {
+                      alert('Competition join code not found.');
+                    }
+                  }}
+                  className="py-2 px-4 bg-yellow-500 text-white font-semibold rounded-2xl hover:bg-yellow-600 transition w-auto min-w-[140px]"
+                >
+                  View Leaderboard
+                </button>
+                <button
+                  onClick={() => navigate('/')}
+                  className="py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition w-auto min-w-[140px]"
+                >
+                  Home
+                </button>
+                <button
+                  onClick={() => setShowResetModal(true)}
+                  className="py-2 px-4 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 transition w-auto min-w-[140px]"
+                >
+                  Reset Scorecard
+                </button>
+              </div>
               {showResetModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
                   <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-red-200">
