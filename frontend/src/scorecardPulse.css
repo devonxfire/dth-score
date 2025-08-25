@@ -1,12 +1,12 @@
-@keyframes pulse-red {
+@keyframes pulse-green {
   0%, 100% {
-    background-color: #b91c1c; /* red-700 */
+    background-color: #15803d; /* green-700 */
   }
   50% {
-    background-color: #ef4444; /* red-500 */
+    background-color: #22c55e; /* green-500 */
   }
 }
 
 .scorecard-pulse {
-  animation: pulse-red 1.2s infinite;
+  animation: pulse-green 1.2s infinite;
 }

@@ -638,7 +638,7 @@ export default function Scorecard(props) {
                           <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pIdx % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
                             {String.fromCharCode(65 + pIdx)}
                           </td>
-                          <td className="border px-2 py-1 text-xs font-semibold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
+                          <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
                           {defaultHoles.slice(0,9).map((hole, hIdx) => (
                             <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                               <div className="flex items-center justify-center">
@@ -648,7 +648,7 @@ export default function Scorecard(props) {
                                   max="20"
                                   value={scores[pIdx][hIdx]}
                                   onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
-                                  className="w-12 text-center text-white focus:outline-none block mx-auto font-bold text-base appearance-none px-2"
+                                  className="w-12 text-center text-white focus:outline-none block mx-auto font-bold text-base no-spinner px-2"
                                   inputMode="numeric"
                                   style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
                                 />
@@ -770,7 +770,7 @@ export default function Scorecard(props) {
                           <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pIdx % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
                             {String.fromCharCode(65 + pIdx)}
                           </td>
-                          <td className="border px-2 py-1 text-xs font-semibold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
+                          <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
                           {defaultHoles.slice(9,18).map((hole, hIdx) => (
                             <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                               <div className="flex items-center justify-center">
@@ -780,13 +780,14 @@ export default function Scorecard(props) {
                                   max="20"
                                   value={scores[pIdx][hIdx+9]}
                                   onChange={e => handleScoreChange(hIdx+9, e.target.value, pIdx)}
-                                  className="w-12 text-center text-white focus:outline-none block mx-auto font-bold text-base appearance-none px-2"
+                                  className="w-12 text-center text-white focus:outline-none block mx-auto font-bold text-base no-spinner px-2"
                                   inputMode="numeric"
                                   style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
                                 />
                               </div>
                             </td>
                           ))}
+
                           <td className="border px-2 py-1 font-bold text-base">{scores[pIdx].slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0)}</td>
                           <td className="border px-2 py-1 font-bold text-base">{scores[pIdx].reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0)}</td>
                         </tr>

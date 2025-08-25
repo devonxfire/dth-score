@@ -114,7 +114,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
         <TopMenu user={user} isPlayerInComp={isPlayerInComp} competitionList={competitionList} />
         <div className="flex flex-col items-center px-4 mt-8">
           <div className="mb-10">
-            <h1 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-2 leading-tight" style={{ letterSpacing: '0.01em', textShadow: '0 2px 8px rgba(0,0,0,0.10)' }}>Recent Competitions</h1>
+            <h1 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-2 leading-tight" style={{ letterSpacing: '0.01em', textShadow: '0 2px 8px rgba(0,0,0,0.10)' }}>Competitions</h1>
             <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
           </div>
           <div className="w-full max-w-4xl bg-transparent text-white mb-8 px-8" style={{ backdropFilter: 'none' }}>
@@ -173,7 +173,17 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                     <td className="border px-2 py-1">{formatDate(comp.date)}</td>
                     <td className="border px-2 py-1">{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</td>
                     <td className="border px-2 py-1">{comp.club || comp.joinCode || comp.joincode || '-'}</td>
-                    <td className="border px-2 py-1">{status}</td>
+                    <td className={
+                      `border px-2 py-1 font-semibold rounded ${
+                        status === 'Open'
+                          ? 'bg-green-500/80 text-white'
+                          : status === 'Closed'
+                            ? 'bg-red-500/80 text-white'
+                            : ''
+                      }`
+                    }>
+                      {status}
+                    </td>
                     <td className="border px-2 py-1">
                       <div className="flex flex-row gap-2 justify-center items-center">
                         <button
