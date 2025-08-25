@@ -598,8 +598,7 @@ export default function Scorecard(props) {
                         {/* Net row (no player label cell) */}
                         <tr key={name + '-net-front'}>
                           <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle' }}>Net</td>
-                          {defaultHoles.slice(0,9).map((hole, hIdx) => {
-                            // Use playing handicap (adjHandicap) for net calculation
+                          {(() => {
                             let adjHandicap = 0;
                             if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
                               const fullHandicap = parseInt(groupForPlayer.handicaps[name], 10) || 0;
@@ -609,26 +608,61 @@ export default function Scorecard(props) {
                                 adjHandicap = fullHandicap;
                               }
                             }
-                            const strokeIdx = hole.index;
-                            let strokesReceived = 0;
-                            if (adjHandicap > 0) {
-                              if (adjHandicap >= 18) {
-                                strokesReceived = 1;
-                                if (adjHandicap - 18 >= strokeIdx) strokesReceived = 2;
-                                else if (strokeIdx <= (adjHandicap % 18)) strokesReceived = 2;
-                              } else if (strokeIdx <= adjHandicap) {
-                                strokesReceived = 1;
+                            let netFrontTotal = 0;
+                            return defaultHoles.slice(0,9).map((hole, hIdx) => {
+                              const strokeIdx = hole.index;
+                              let strokesReceived = 0;
+                              if (adjHandicap > 0) {
+                                if (adjHandicap >= 18) {
+                                  strokesReceived = 1;
+                                  if (adjHandicap - 18 >= strokeIdx) strokesReceived = 2;
+                                  else if (strokeIdx <= (adjHandicap % 18)) strokesReceived = 2;
+                                } else if (strokeIdx <= adjHandicap) {
+                                  strokesReceived = 1;
+                                }
                               }
-                            }
-                            const gross = parseInt(scores[pIdx][hIdx], 10) || 0;
-                            const net = gross - strokesReceived;
-                            return (
-                              <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle' }}>
-                                {gross ? net : ''}
-                              </td>
-                            );
-                          })}
-                          <td className="border px-2 py-1 bg-white/5 align-middle text-sm font-semibold" style={{ verticalAlign: 'middle' }}></td>
+                              const gross = parseInt(scores[pIdx][hIdx], 10) || 0;
+                              const net = gross ? gross - strokesReceived : '';
+                              if (typeof net === 'number') netFrontTotal += net;
+                              return (
+                                <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle' }}>
+                                  {gross ? net : ''}
+                                </td>
+                              );
+                            });
+                          })()}
+                          {/* Net front 9 total */}
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-sm font-semibold" style={{ verticalAlign: 'middle' }}>
+                            {(() => {
+                              let adjHandicap = 0;
+                              if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
+                                const fullHandicap = parseInt(groupForPlayer.handicaps[name], 10) || 0;
+                                if (competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+                                  adjHandicap = Math.round(fullHandicap * Number(competition.handicapallowance) / 100);
+                                } else {
+                                  adjHandicap = fullHandicap;
+                                }
+                              }
+                              let netFrontTotal = 0;
+                              defaultHoles.slice(0,9).forEach((hole, hIdx) => {
+                                const strokeIdx = hole.index;
+                                let strokesReceived = 0;
+                                if (adjHandicap > 0) {
+                                  if (adjHandicap >= 18) {
+                                    strokesReceived = 1;
+                                    if (adjHandicap - 18 >= strokeIdx) strokesReceived = 2;
+                                    else if (strokeIdx <= (adjHandicap % 18)) strokesReceived = 2;
+                                  } else if (strokeIdx <= adjHandicap) {
+                                    strokesReceived = 1;
+                                  }
+                                }
+                                const gross = parseInt(scores[pIdx][hIdx], 10) || 0;
+                                const net = gross ? gross - strokesReceived : 0;
+                                if (typeof net === 'number') netFrontTotal += net;
+                              });
+                              return netFrontTotal;
+                            })()}
+                          </td>
                         </tr>
                       </React.Fragment>
                     ))}
@@ -697,8 +731,7 @@ export default function Scorecard(props) {
                         {/* Net row (no player label cell) */}
                         <tr key={name + '-net-back'}>
                           <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle' }}>Net</td>
-                          {defaultHoles.slice(9,18).map((hole, hIdx) => {
-                            // Use playing handicap (adjHandicap) for net calculation
+                          {(() => {
                             let adjHandicap = 0;
                             if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
                               const fullHandicap = parseInt(groupForPlayer.handicaps[name], 10) || 0;
@@ -708,26 +741,92 @@ export default function Scorecard(props) {
                                 adjHandicap = fullHandicap;
                               }
                             }
-                            const strokeIdx = hole.index;
-                            let strokesReceived = 0;
-                            if (adjHandicap > 0) {
-                              if (adjHandicap >= 18) {
-                                strokesReceived = 1;
-                                if (adjHandicap - 18 >= strokeIdx) strokesReceived = 2;
-                                else if (strokeIdx <= (adjHandicap % 18)) strokesReceived = 2;
-                              } else if (strokeIdx <= adjHandicap) {
-                                strokesReceived = 1;
+                            let netBackTotal = 0;
+                            return defaultHoles.slice(9,18).map((hole, hIdx) => {
+                              const strokeIdx = hole.index;
+                              let strokesReceived = 0;
+                              if (adjHandicap > 0) {
+                                if (adjHandicap >= 18) {
+                                  strokesReceived = 1;
+                                  if (adjHandicap - 18 >= strokeIdx) strokesReceived = 2;
+                                  else if (strokeIdx <= (adjHandicap % 18)) strokesReceived = 2;
+                                } else if (strokeIdx <= adjHandicap) {
+                                  strokesReceived = 1;
+                                }
                               }
-                            }
-                            const gross = parseInt(scores[pIdx][hIdx+9], 10) || 0;
-                            const net = gross - strokesReceived;
-                            return (
-                              <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle' }}>
-                                {gross ? net : ''}
-                              </td>
-                            );
-                          })}
-                          <td className="border px-2 py-1 bg-white/5 align-middle text-sm font-semibold" style={{ verticalAlign: 'middle' }}></td>
+                              const gross = parseInt(scores[pIdx][hIdx+9], 10) || 0;
+                              const net = gross ? gross - strokesReceived : '';
+                              if (typeof net === 'number') netBackTotal += net;
+                              return (
+                                <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle' }}>
+                                  {gross ? net : ''}
+                                </td>
+                              );
+                            });
+                          })()}
+                          {/* Net back 9 and total */}
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-sm font-semibold" style={{ verticalAlign: 'middle' }}>
+                            {(() => {
+                              let adjHandicap = 0;
+                              if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
+                                const fullHandicap = parseInt(groupForPlayer.handicaps[name], 10) || 0;
+                                if (competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+                                  adjHandicap = Math.round(fullHandicap * Number(competition.handicapallowance) / 100);
+                                } else {
+                                  adjHandicap = fullHandicap;
+                                }
+                              }
+                              let netBackTotal = 0;
+                              defaultHoles.slice(9,18).forEach((hole, hIdx) => {
+                                const strokeIdx = hole.index;
+                                let strokesReceived = 0;
+                                if (adjHandicap > 0) {
+                                  if (adjHandicap >= 18) {
+                                    strokesReceived = 1;
+                                    if (adjHandicap - 18 >= strokeIdx) strokesReceived = 2;
+                                    else if (strokeIdx <= (adjHandicap % 18)) strokesReceived = 2;
+                                  } else if (strokeIdx <= adjHandicap) {
+                                    strokesReceived = 1;
+                                  }
+                                }
+                                const gross = parseInt(scores[pIdx][hIdx+9], 10) || 0;
+                                const net = gross ? gross - strokesReceived : 0;
+                                if (typeof net === 'number') netBackTotal += net;
+                              });
+                              return netBackTotal;
+                            })()}
+                          </td>
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-sm font-semibold" style={{ verticalAlign: 'middle' }}>
+                            {(() => {
+                              let adjHandicap = 0;
+                              if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
+                                const fullHandicap = parseInt(groupForPlayer.handicaps[name], 10) || 0;
+                                if (competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+                                  adjHandicap = Math.round(fullHandicap * Number(competition.handicapallowance) / 100);
+                                } else {
+                                  adjHandicap = fullHandicap;
+                                }
+                              }
+                              let netTotal = 0;
+                              defaultHoles.forEach((hole, hIdx) => {
+                                const strokeIdx = hole.index;
+                                let strokesReceived = 0;
+                                if (adjHandicap > 0) {
+                                  if (adjHandicap >= 18) {
+                                    strokesReceived = 1;
+                                    if (adjHandicap - 18 >= strokeIdx) strokesReceived = 2;
+                                    else if (strokeIdx <= (adjHandicap % 18)) strokesReceived = 2;
+                                  } else if (strokeIdx <= adjHandicap) {
+                                    strokesReceived = 1;
+                                  }
+                                }
+                                const gross = parseInt(scores[pIdx][hIdx], 10) || 0;
+                                const net = gross ? gross - strokesReceived : 0;
+                                if (typeof net === 'number') netTotal += net;
+                              });
+                              return netTotal;
+                            })()}
+                          </td>
                         </tr>
                       </React.Fragment>
                     ))}

@@ -37,11 +37,21 @@ export default function ResultsMedal() {
               }
               // 4. Compute gross (sum of all entered scores)
               const gross = scores.reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0);
-              // 5. Get PH (Playing Handicap) and CH (Course Handicap)
-              // PH: user.handicap or group.teeboxes/handicaps if available
-              // CH: group.handicaps[playerName] if available
-              const ph = user.handicap || 0;
-              const ch = group.handicaps?.[playerName] || 0;
+              // 5. Get PH (Playing Handicap) with allowance, and CH (Course Handicap)
+              let ph = 0;
+              let ch = 0;
+              if (group.handicaps && group.handicaps[playerName]) {
+                const fullHandicap = parseInt(group.handicaps[playerName], 10) || 0;
+                ch = fullHandicap;
+                if (comp.handicapallowance && !isNaN(Number(comp.handicapallowance))) {
+                  ph = Math.round(fullHandicap * Number(comp.handicapallowance) / 100);
+                } else {
+                  ph = fullHandicap;
+                }
+              } else if (user.handicap) {
+                ph = user.handicap;
+                ch = user.handicap;
+              }
               // 6. Net = Gross - PH, DTH Net = Gross - CH
               const net = gross - ph;
               const dthNet = gross - ch;
