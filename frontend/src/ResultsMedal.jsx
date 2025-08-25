@@ -248,18 +248,12 @@ export default function ResultsMedal() {
             )}
             <div className="flex flex-col items-end space-y-2 ml-8" style={{alignItems:'flex-end', marginTop: 0}}>
               <button
-                onClick={() => navigate('/dashboard')}
-                className="py-2 px-4 w-44 bg-[#1B3A6B] text-white rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
-              >
-                Dashboard
-              </button>
-              <button
                 onClick={() => {
                   const compId = competition?.id || competition?._id || competition?.joinCode || competition?.joincode || id;
                   console.log('Navigating to Scorecard with compId:', compId, 'competition:', competition);
                   navigate(`/scorecard/${compId}`, { state: { competition } });
                 }}
-                className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
+                className="py-2 px-4 w-44 bg-green-600 text-white font-semibold rounded-2xl hover:bg-green-700 border border-white transition"
               >
                 Back to Scorecard
               </button>

@@ -536,7 +536,50 @@ export default function Scorecard(props) {
                                 <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
                                 <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>{displayName}</td>
                                 <td className={`border px-2 py-1 text-center ${teeBg}`}>{teebox !== '' ? teebox : '-'}</td>
-                                <td className="border px-2 py-1 text-center">{fullHandicap !== '' ? fullHandicap : '-'}</td>
+                                <td className="border px-2 py-1 text-center">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="54"
+                                    value={fullHandicap !== '' ? fullHandicap : ''}
+                                    onChange={async (e) => {
+                                      const newCH = e.target.value;
+                                      // Update backend for this player's CH
+                                      if (!groupTeamId) return;
+                                      let userId = null;
+                                      if (competition.users) {
+                                        const user = competition.users.find(u => u.name === name);
+                                        if (user) userId = user.id || user.user_id || user.userId;
+                                      }
+                                      if (!userId) return;
+                                      const patchUrl = `/api/teams/${groupTeamId}/users/${userId}`;
+                                      const patchBody = { course_handicap: newCH };
+                                      try {
+                                        await fetch(patchUrl, {
+                                          method: 'PATCH',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify(patchBody)
+                                        });
+                                        // Optionally update UI immediately
+                                        if (groupForPlayer && groupForPlayer.handicaps) {
+                                          groupForPlayer.handicaps[name] = newCH;
+                                        }
+                                        // Optionally re-fetch competition data
+                                        if (competition && competition.id) {
+                                          const res = await fetch(`/api/competitions/${competition.id}`);
+                                          if (res.ok) {
+                                            const data = await res.json();
+                                            setCompetition(data);
+                                          }
+                                        }
+                                      } catch (err) {
+                                        alert('Failed to update Course Handicap.');
+                                      }
+                                    }}
+                                    className="w-14 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                                    style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
+                                  />
+                                </td>
                                 <td className="border px-2 py-1 text-center">{adjHandicap !== '' ? adjHandicap : '-'}</td>
                               </tr>
                             );
@@ -694,7 +737,7 @@ export default function Scorecard(props) {
                             });
                           })()}
                           {/* Net front 9 total */}
-                          <td className="border px-2 py-1 bg-white/5 align-middle text-sm font-semibold" style={{ verticalAlign: 'middle' }}>
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle' }}>
                             {(() => {
                               let adjHandicap = 0;
                               if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
@@ -828,7 +871,7 @@ export default function Scorecard(props) {
                             });
                           })()}
                           {/* Net back 9 and total */}
-                          <td className="border px-2 py-1 bg-white/5 align-middle text-sm font-semibold" style={{ verticalAlign: 'middle' }}>
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle' }}>
                             {(() => {
                               let adjHandicap = 0;
                               if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
@@ -859,7 +902,7 @@ export default function Scorecard(props) {
                               return netBackTotal;
                             })()}
                           </td>
-                          <td className="border px-2 py-1 bg-white/5 align-middle text-sm font-semibold" style={{ verticalAlign: 'middle' }}>
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle' }}>
                             {(() => {
                               let adjHandicap = 0;
                               if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
