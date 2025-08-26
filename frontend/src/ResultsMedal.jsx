@@ -13,6 +13,51 @@ import html2canvas from 'html2canvas';
 // Medal Results Page UI (fetches real data)
 export default function ResultsMedal() {
   const { id } = useParams();
+  // Modal state for email PDF
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailAddress, setEmailAddress] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState("");
+
+  // Email PDF handler
+  const handleEmailPDF = async () => {
+    setEmailError("");
+    setEmailSuccess("");
+    setEmailSending(true);
+    if (!plainExportRef.current) {
+      setEmailError("PDF export ref not set");
+      setEmailSending(false);
+      return;
+    }
+    const element = plainExportRef.current;
+    element.style.display = 'block';
+    try {
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#fff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const imgWidth = pageWidth - 40;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 20, 20, imgWidth, imgHeight);
+      const pdfBlob = pdf.output('blob');
+      const formData = new FormData();
+      formData.append('email', emailAddress);
+      formData.append('pdf', pdfBlob, 'results.pdf');
+      const res = await fetch('/api/email-pdf', {
+        method: 'POST',
+        body: formData
+      });
+      if (!res.ok) throw new Error('Failed to send email');
+      setEmailSuccess('Email sent successfully!');
+      setShowEmailModal(false);
+    } catch (err) {
+      setEmailError('Error sending email: ' + err.message);
+    } finally {
+      element.style.display = 'none';
+      setEmailSending(false);
+    }
+  };
   const navigate = useNavigate();
   const location = useLocation();
   const [competition, setCompetition] = useState(null);
@@ -96,15 +141,12 @@ export default function ResultsMedal() {
         }
         // 7. Sort: players with scores (thru is number) by holes completed (desc), then net (asc), then those with no scores (thru is string/teeTime) at bottom
         playerRows.sort((a, b) => {
-          const aStarted = typeof a.thru === 'number' && a.thru > 0;
-          const bStarted = typeof b.thru === 'number' && b.thru > 0;
-          if (aStarted && bStarted) {
-            if (b.thru !== a.thru) return b.thru - a.thru; // more holes completed first
-            return a.net - b.net; // then by net
-          }
-          if (aStarted) return -1;
-          if (bStarted) return 1;
-          return 0;
+          // Convert 'F' to 18 for sorting, teeTime/other string to -1
+          const getThruNum = (p) => p.thru === 'F' ? 18 : (typeof p.thru === 'number' ? p.thru : -1);
+          const aThru = getThruNum(a);
+          const bThru = getThruNum(b);
+          if (aThru !== bThru) return bThru - aThru; // more holes completed first, 'F' (18) is highest
+          return a.net - b.net; // then by net
         });
         playerRows.forEach((p, i) => (p.position = i + 1));
         setPlayers(playerRows);
@@ -124,7 +166,7 @@ export default function ResultsMedal() {
   // Export to PDF handler
   const handleExportPDF = async () => {
     if (!plainExportRef.current) {
-      alert('Plain export ref not set');
+      setError('Plain export ref not set');
       return;
     }
     const element = plainExportRef.current;
@@ -158,10 +200,28 @@ export default function ResultsMedal() {
       const filename = `${dateStr ? dateStr + '_' : ''}${typeStr}_results.pdf`;
       pdf.save(filename);
     } catch (err) {
-      alert('Error generating PDF: ' + err.message);
+      setError('Error generating PDF: ' + err.message);
     } finally {
       element.style.display = 'none'; // Hide after export
     }
+  {/* Error Modal for PDF Export */}
+  {error && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-blue-200">
+        <div className="flex flex-col items-center mb-4">
+          <span className="text-5xl mb-2" role="img" aria-label="Error">❌</span>
+          <h2 className="text-2xl font-extrabold mb-2 drop-shadow" style={{ color: '#1B3A6B' }}>PDF Export Error</h2>
+        </div>
+        <p className="mb-6 text-gray-700 text-center text-base font-medium">{error}</p>
+        <button
+          className="py-2 px-6 bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B]"
+          onClick={() => setError("")}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  )}
   };
 
   // Determine if user is a player in this competition
@@ -260,10 +320,60 @@ export default function ResultsMedal() {
               <button
                 onClick={handleExportPDF}
                 className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B] mt-2"
-                title="Export this page to PDF"
+                title="Download this page as PDF"
               >
-                Export to PDF
+                Download PDF
               </button>
+              <button
+                onClick={() => setShowEmailModal(true)}
+                className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B] mt-2"
+                title="Email this page as PDF"
+              >
+                Email PDF
+              </button>
+
+            {/* Email PDF Modal */}
+            {showEmailModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-blue-200">
+                  <div className="flex flex-col items-center mb-4">
+                    <span className="text-5xl mb-2" role="img" aria-label="Email">📧</span>
+                    <h2 className="text-2xl font-extrabold mb-2 drop-shadow" style={{ color: '#1B3A6B' }}>Email PDF</h2>
+                  </div>
+                  <p className="mb-6 text-gray-700 text-center text-base font-medium">
+                    Enter the email address to send the PDF results to.<br/>
+                    The PDF will be generated and emailed as an attachment.
+                  </p>
+                  <input
+                    type="email"
+                    className="w-full mb-4 p-2 border border-gray-300 rounded focus:outline-none"
+                    placeholder="Enter recipient's email address"
+                    value={emailAddress}
+                    onChange={e => setEmailAddress(e.target.value)}
+                    disabled={emailSending}
+                  />
+                  {emailError && <div className="text-red-500 mb-2 font-semibold">{emailError}</div>}
+                  {emailSuccess && <div className="text-green-600 mb-2 font-semibold">{emailSuccess}</div>}
+                  <div className="flex gap-4 w-full justify-center">
+                    <button
+                      className="px-5 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold shadow"
+                      onClick={() => setShowEmailModal(false)}
+                      disabled={emailSending}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="px-5 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+                      style={{ backgroundColor: '#1B3A6B', color: 'white' }}
+                      onClick={handleEmailPDF}
+                      disabled={emailSending || !emailAddress}
+                    >
+                      {emailSending ? 'Sending...' : 'Send Email'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             </div>
           </div>
           <div className="flex flex-col mt-12">
