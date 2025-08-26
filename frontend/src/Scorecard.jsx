@@ -685,16 +685,33 @@ export default function Scorecard(props) {
                           {defaultHoles.slice(0,9).map((hole, hIdx) => (
                             <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                               <div className="flex items-center justify-center">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="20"
-                                  value={scores[pIdx][hIdx]}
-                                  onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
-                                  className="w-12 text-center text-white focus:outline-none block mx-auto font-bold text-base no-spinner px-2"
-                                  inputMode="numeric"
-                                  style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
-                                />
+                                {(() => {
+                                  const gross = parseInt(scores[pIdx][hIdx], 10);
+                                  const isEagleOrBetter = gross > 0 && gross <= hole.par - 2;
+                                  const isBirdie = gross > 0 && gross === hole.par - 1;
+                                  const isBogey = gross > 0 && gross === hole.par + 1;
+                                  const isDoubleBogey = gross > 0 && gross === hole.par + 2;
+                                  const isTripleOrWorse = gross > 0 && gross >= hole.par + 3;
+                                  let inputClass = 'w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0';
+                                  if (isEagleOrBetter) inputClass += ' text-blue-400 border-blue-400 rounded-full border-2';
+                                  else if (isBirdie) inputClass += ' text-green-500 border-green-500 rounded-full border';
+                                  else if (isTripleOrWorse) inputClass += ' text-purple-400 border-purple-400 border';
+                                  else if (isDoubleBogey) inputClass += ' text-red-400 border-red-400 border-2 double-border';
+                                  else if (isBogey) inputClass += ' text-yellow-400 border-yellow-400 border';
+                                  else inputClass += ' text-white';
+                                  return (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="20"
+                                      value={scores[pIdx][hIdx]}
+                                      onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
+                                      className={inputClass}
+                                      inputMode="numeric"
+                                      style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
+                                    />
+                                  );
+                                })()}
                               </div>
                             </td>
                           ))}
@@ -702,7 +719,7 @@ export default function Scorecard(props) {
                         </tr>
                         {/* Net row (no player label cell) */}
                         <tr key={name + '-net-front'}>
-                          <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle' }}>Net</td>
+                          <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Net</td>
                           {(() => {
                             let adjHandicap = 0;
                             if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
@@ -730,14 +747,14 @@ export default function Scorecard(props) {
                               const net = gross ? gross - strokesReceived : '';
                               if (typeof net === 'number') netFrontTotal += net;
                               return (
-                                <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle' }}>
+                                <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
                                   {gross ? net : ''}
                                 </td>
                               );
                             });
                           })()}
                           {/* Net front 9 total */}
-                          <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle' }}>
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                             {(() => {
                               let adjHandicap = 0;
                               if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
@@ -817,16 +834,33 @@ export default function Scorecard(props) {
                           {defaultHoles.slice(9,18).map((hole, hIdx) => (
                             <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                               <div className="flex items-center justify-center">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="20"
-                                  value={scores[pIdx][hIdx+9]}
-                                  onChange={e => handleScoreChange(hIdx+9, e.target.value, pIdx)}
-                                  className="w-12 text-center text-white focus:outline-none block mx-auto font-bold text-base no-spinner px-2"
-                                  inputMode="numeric"
-                                  style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
-                                />
+                                {(() => {
+                                  const gross = parseInt(scores[pIdx][hIdx+9], 10);
+                                  const isEagleOrBetter = gross > 0 && gross <= hole.par - 2;
+                                  const isBirdie = gross > 0 && gross === hole.par - 1;
+                                  const isBogey = gross > 0 && gross === hole.par + 1;
+                                  const isDoubleBogey = gross > 0 && gross === hole.par + 2;
+                                  const isTripleOrWorse = gross > 0 && gross >= hole.par + 3;
+                                  let inputClass = 'w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0';
+                                  if (isEagleOrBetter) inputClass += ' text-blue-400 border-blue-400 rounded-full border-2';
+                                  else if (isBirdie) inputClass += ' text-green-500 border-green-500 rounded-full border';
+                                  else if (isTripleOrWorse) inputClass += ' text-purple-400 border-purple-400 border';
+                                  else if (isDoubleBogey) inputClass += ' text-red-400 border-red-400 border-2 double-border';
+                                  else if (isBogey) inputClass += ' text-yellow-400 border-yellow-400 border';
+                                  else inputClass += ' text-white';
+                                  return (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="20"
+                                      value={scores[pIdx][hIdx+9]}
+                                      onChange={e => handleScoreChange(hIdx+9, e.target.value, pIdx)}
+                                      className={inputClass}
+                                      inputMode="numeric"
+                                      style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
+                                    />
+                                  );
+                                })()}
                               </div>
                             </td>
                           ))}
@@ -836,7 +870,7 @@ export default function Scorecard(props) {
                         </tr>
                         {/* Net row (no player label cell) */}
                         <tr key={name + '-net-back'}>
-                          <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle' }}>Net</td>
+                          <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Net</td>
                           {(() => {
                             let adjHandicap = 0;
                             if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
@@ -864,14 +898,14 @@ export default function Scorecard(props) {
                               const net = gross ? gross - strokesReceived : '';
                               if (typeof net === 'number') netBackTotal += net;
                               return (
-                                <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle' }}>
+                                <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
                                   {gross ? net : ''}
                                 </td>
                               );
                             });
                           })()}
                           {/* Net back 9 and total */}
-                          <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle' }}>
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                             {(() => {
                               let adjHandicap = 0;
                               if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
@@ -902,7 +936,7 @@ export default function Scorecard(props) {
                               return netBackTotal;
                             })()}
                           </td>
-                          <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle' }}>
+                          <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                             {(() => {
                               let adjHandicap = 0;
                               if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
