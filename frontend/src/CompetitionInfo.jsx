@@ -9,6 +9,7 @@ function formatDate(dateStr) {
 }
 
 import React, { useEffect, useState } from "react";
+import { ArrowLeftIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
@@ -99,10 +100,25 @@ export default function CompetitionInfo({ user }) {
                         <td className="border px-2 py-1">{group.teeTime || "-"}</td>
                         <td className="border px-2 py-1">
                           {Array.isArray(group.players) && group.players.length > 0 ? (
-                            <div className="flex flex-col items-center">
-                              {group.players.map((name, i) => (
-                                <span key={i}>{name}</span>
-                              ))}
+                            <div className="flex flex-row items-center gap-2 justify-center">
+                              {group.players.map((name, i, arr) => {
+                                let initial = '', surname = '';
+                                if (typeof name === 'string') {
+                                  const parts = name.trim().split(/\s+/);
+                                  if (parts.length > 1) {
+                                    initial = parts[0][0].toUpperCase();
+                                    surname = parts[parts.length - 1];
+                                  } else {
+                                    initial = parts[0][0].toUpperCase();
+                                    surname = '';
+                                  }
+                                }
+                                return (
+                                  <span key={i}>
+                                    {initial}{surname && '. '}{surname}{i < arr.length - 1 ? ', ' : ''}
+                                  </span>
+                                );
+                              })}
                             </div>
                           ) : null}
                         </td>
@@ -112,15 +128,28 @@ export default function CompetitionInfo({ user }) {
                 </table>
               </div>
             )}
-            <button
-              className="py-2 px-4 border border-white text-white rounded-2xl font-semibold transition"
-              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-              onClick={() => navigate('/recent')}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-            >
-              Back to Competitions
-            </button>
+            <div className="flex gap-3 justify-start mt-2" style={{ maxWidth: 340 }}>
+              <button
+                className="py-2 px-4 border border-white text-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap"
+                style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                onClick={() => navigate('/recent')}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              >
+                <ArrowLeftIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
+                Back to Competitions
+              </button>
+              <button
+                className="py-2 px-4 border border-white text-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap"
+                style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                onClick={() => navigate(`/results/${compId}`)}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              >
+                <ChartBarIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
+                Leaderboard
+              </button>
+            </div>
           </div>
     </div>
   </PageBackground>

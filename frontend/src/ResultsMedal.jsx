@@ -311,7 +311,67 @@ export default function ResultsMedal() {
           <div className="mb-6 mt-12">
             <h1 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-2 leading-tight">Medal Results</h1>
             <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
-          {/* ...existing code... */}
+       
+          <div className="flex flex-col mt-12">
+            <div className="w-full rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+              {loading ? (
+                <div className="text-center text-white py-8">Loading results...</div>
+              ) : error ? (
+                <div className="text-center text-red-400 py-8">{error}</div>
+              ) : (
+                <React.Fragment>
+                  <table className="min-w-full border text-center mb-8">
+                    <thead>
+                      <tr className="bg-blue-900/90">
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Pos</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Name</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Thru</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Gross</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Net</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>DTH Net</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Dog</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Waters</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>2 Clubs</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Fines</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {players.map((p, idx) => (
+                        <tr key={p.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
+                          <td className="border px-2 py-0.5 font-bold">{p.position}</td>
+                          <td className="border px-2 py-0.5 text-left">{p.name}</td>
+                          <td className="border px-2 py-0.5">{p.thru}</td>
+                          <td className="border px-2 py-0.5">{p.gross}</td>
+                          <td className="border px-2 py-0.5">{p.net}</td>
+                          <td className="border px-2 py-0.5">{p.dthNet}</td>
+                          <td className="border px-2 py-0.5">{p.dog ? '🐶' : ''}</td>
+                          <td className="border px-2 py-0.5">{p.waters || ''}</td>
+                          <td className="border px-2 py-0.5">{p.twoClubs || ''}</td>
+                          <td className="border px-2 py-0.5">
+                            {isAdmin(user) ? (
+                              <input
+                                type="number"
+                                min="0"
+                                className="w-14 h-8 text-center text-white bg-transparent rounded mx-auto block font-bold text-base no-spinner px-0"
+                                value={fines[p.name] || ''}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setFines(f => ({ ...f, [p.name]: val === '' ? '' : Math.max(0, parseInt(val, 10) || 0) }));
+                                }}
+                                placeholder="0"
+                                inputMode="numeric"
+                                style={{ color: 'white', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
+                              />
+                            ) : (
+                              fines[p.name] || ''
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                     {/* ...existing code... */}
           <div className="flex flex-row items-start mt-4 justify-between">
             {/* Competition info section */}
             {competition && (
@@ -319,6 +379,20 @@ export default function ResultsMedal() {
                 <span className="font-semibold">Competition Type:</span> {competition.type ? (competition.type.replace(/(^|_|-)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')) : '-'} <br />
                 <span className="font-semibold">Date:</span> {competition.date ? (new Date(competition.date).toLocaleDateString('en-GB')) : '-'} <br />
                 <span className="font-semibold">Handicap Allowance:</span> {competition.handicapallowance && competition.handicapallowance !== 'N/A' ? competition.handicapallowance + '%' : 'N/A'}
+                {/* Good Scores section - moved here */}
+                {(() => {
+                  const goodScores = players.filter(p => typeof p.dthNet === 'number' && p.dthNet < 70 && p.thru === 'F');
+                  return (
+                    <div className="mt-4 mb-2 text-white text-base font-semibold" style={{maxWidth: '100%', textAlign: 'left'}}>
+                      <div style={{marginBottom: 4, marginLeft: 0, textDecoration: 'underline', textUnderlineOffset: 3}}>Good Scores</div>
+                      {goodScores.length === 0
+                        ? <div style={{marginLeft: 0}}>No one. Everyone shit.</div>
+                        : goodScores.map(p => (
+                            <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{p.name}: Net {p.dthNet}</div>
+                          ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
             <div className="flex flex-col items-end space-y-2 ml-8" style={{alignItems:'flex-end', marginTop: 0}}>
@@ -327,7 +401,8 @@ export default function ResultsMedal() {
                   const compId = competition?.id || competition?._id || competition?.joinCode || competition?.joincode || id;
                   navigate(`/scorecard/${compId}`, { state: { competition } });
                 }}
-                className="py-2 px-4 w-44 bg-green-600 text-white font-semibold rounded-2xl hover:bg-green-700 border border-white transition"
+                className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B]"
+                title="Back to Scorecard"
               >
                 Back to Scorecard
               </button>
@@ -390,78 +465,7 @@ export default function ResultsMedal() {
             )}
             </div>
           </div>
-          <div className="flex flex-col mt-12">
-            <div className="w-full rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
-              {loading ? (
-                <div className="text-center text-white py-8">Loading results...</div>
-              ) : error ? (
-                <div className="text-center text-red-400 py-8">{error}</div>
-              ) : (
-                <React.Fragment>
-                  <table className="min-w-full border text-center mb-8">
-                    <thead>
-                      <tr className="bg-blue-900/90">
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Pos</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Name</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Thru</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Gross</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Net</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>DTH Net</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Dog</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Waters</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>2 Clubs</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Fines</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {players.map((p, idx) => (
-                        <tr key={p.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
-                          <td className="border px-2 py-0.5 font-bold">{p.position}</td>
-                          <td className="border px-2 py-0.5 text-left">{p.name}</td>
-                          <td className="border px-2 py-0.5">{p.thru}</td>
-                          <td className="border px-2 py-0.5">{p.gross}</td>
-                          <td className="border px-2 py-0.5">{p.net}</td>
-                          <td className="border px-2 py-0.5">{p.dthNet}</td>
-                          <td className="border px-2 py-0.5">{p.dog ? '🐶' : ''}</td>
-                          <td className="border px-2 py-0.5">{p.waters || ''}</td>
-                          <td className="border px-2 py-0.5">{p.twoClubs || ''}</td>
-                          <td className="border px-2 py-0.5">
-                            {isAdmin(user) ? (
-                              <input
-                                type="number"
-                                min="0"
-                                className="w-14 h-8 text-center text-white bg-transparent rounded mx-auto block font-bold text-base no-spinner px-0"
-                                value={fines[p.name] || ''}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  setFines(f => ({ ...f, [p.name]: val === '' ? '' : Math.max(0, parseInt(val, 10) || 0) }));
-                                }}
-                                placeholder="0"
-                                inputMode="numeric"
-                                style={{ color: 'white', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
-                              />
-                            ) : (
-                              fines[p.name] || ''
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {/* Good Scores section - directly below the results table */}
-                  {(() => {
-                    const goodScores = players.filter(p => typeof p.dthNet === 'number' && p.dthNet < 70 && p.thru === 'F');
-                    return (
-                      <div className="mt-2 mb-8 text-white text-base font-semibold" style={{maxWidth: '100%', textAlign: 'left'}}>
-                        <div style={{marginBottom: 4, marginLeft: 0, textDecoration: 'underline', textUnderlineOffset: 3}}>Good Scores</div>
-                        {goodScores.length === 0
-                          ? <div style={{marginLeft: 0}}>No one. Everyone shit.</div>
-                          : goodScores.map(p => (
-                              <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{p.name}: Net {p.dthNet}</div>
-                            ))}
-                      </div>
-                    );
-                  })()}
+                  {/* Good Scores section moved above */}
                 </React.Fragment>
               )}
             </div>
