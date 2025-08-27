@@ -124,17 +124,19 @@ function RecentCompetitions({ user = {}, comps = [] }) {
   <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
         {/* Top nav menu */}
         <TopMenu user={user} isPlayerInComp={isPlayerInComp} competitionList={competitionList} />
-        <div className="flex flex-col items-center px-4 mt-8">
+  <div className="flex flex-col items-center px-4 mt-12">
           <div className="mb-10">
-            <h1 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-2 leading-tight" style={{ letterSpacing: '0.01em', textShadow: '0 2px 8px rgba(0,0,0,0.10)' }}>Competitions</h1>
+            <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+              Competitions
+            </h1>
             <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
           </div>
           <div className="w-full max-w-4xl bg-transparent text-white mb-8 px-8" style={{ backdropFilter: 'none' }}>
             {isAdmin(user) && (
               <div className="mb-4">
                 <button
-                  className="flex flex-row items-center gap-2 py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg bg-[#1B3A6B] hover:bg-white hover:text-[#1B3A6B]"
-                  style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                  className="flex flex-row items-center gap-2 py-2 px-6 border border-white text-white font-extrabold rounded-2xl transition text-lg bg-[#1B3A6B] hover:bg-white hover:text-[#1B3A6B]"
+                  style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
                   onClick={() => {
                     console.log('Create New Competition clicked. openComps:', openComps);
                     if (openComps.length > 0) {
@@ -149,14 +151,14 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 </button>
               </div>
             )}
-            <table className="w-full border-collapse text-base shadow-xl overflow-hidden bg-white/10">
+            <table className="w-full border-collapse text-base shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
               <thead>
-                <tr>
-                  <th className="border px-2 py-1">Date</th>
-                  <th className="border px-2 py-1">Type</th>
-                  <th className="border px-2 py-1">Course</th>
-                  <th className="border px-2 py-1 w-[100px] text-center">Status</th>
-                  <th className={`border border-white px-2 py-1${isAdmin(user) ? ' w-[260px]' : ''}`}>Action</th>
+                <tr style={{ background: '#00204A' }}>
+                  <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Date</th>
+                  <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Type</th>
+                  <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Course</th>
+                  <th className="border px-2 py-1 w-[100px] text-center" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Status</th>
+                  <th className={`border border-white px-2 py-1${isAdmin(user) ? ' w-[260px]' : ''}`} style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Action</th>
                 </tr>
               </thead>
             <tbody>
@@ -199,8 +201,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                     <td className={`border px-2 py-1${isAdmin(user) ? ' w-[260px]' : ''}`}>
                       <div className={`flex flex-row gap-2 items-center${isAdmin(user) ? ' w-full justify-between' : ' justify-center'}`}>
                         <button
-                          className={`py-1 px-3 flex items-center gap-1 border font-semibold rounded-2xl transition ${status === 'Closed' ? 'bg-gray-700 border-gray-500 text-gray-400 cursor-not-allowed' : 'border-[#1B3A6B] text-white bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white'}`}
-                          style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                          className={`py-1 px-3 flex items-center gap-1 border font-semibold rounded-2xl transition ${status === 'Closed' ? 'bg-gray-700 border-gray-500 text-gray-400 cursor-not-allowed' : 'border-[#FFD700] text-[#002F5F] bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F]'}`}
+                          style={{ boxShadow: '0 2px 8px 0 rgba(255,215,0,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
                           onClick={() => {
                             if (status !== 'Closed') navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}`, { state: { comp } });
                           }}
@@ -211,8 +213,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                         {isAdmin(user) && (
                           <>
                             <button
-                              className={`py-1 px-3 flex items-center gap-1 border font-semibold rounded-2xl transition ${status === 'Closed' ? 'bg-gray-700 border-gray-500 text-gray-400 cursor-not-allowed' : 'border-[#1B3A6B] text-white bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white'}`}
-                              style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                              className={`py-1 px-3 flex items-center gap-1 border font-semibold rounded-2xl transition ${status === 'Closed' ? 'bg-gray-700 border-gray-500 text-gray-400 cursor-not-allowed' : 'border-[#FFD700] text-[#002F5F] bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F]'}`}
+                              style={{ boxShadow: '0 2px 8px 0 rgba(255,215,0,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
                               onClick={() => {
                                 if (status !== 'Closed') navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}/edit`, { state: { comp } });
                               }}
@@ -221,8 +223,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                               <ScissorsIcon className="h-5 w-5 mr-1" /> Edit
                             </button>
                             {(() => {
-                              const endBtnClass = "py-1 px-6 min-w-[115px] flex items-center gap-1 border border-[#1B3A6B] text-white font-semibold rounded-2xl transition bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white whitespace-nowrap";
-                              const reopenBtnClass = "py-1 px-3 min-w-[80px] flex items-center gap-1 border border-[#1B3A6B] text-white font-semibold rounded-2xl transition bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white whitespace-nowrap";
+                              const endBtnClass = "py-1 px-6 min-w-[115px] flex items-center gap-1 border border-[#FFD700] text-[#002F5F] font-semibold rounded-2xl transition bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F] whitespace-nowrap";
+                              const reopenBtnClass = "py-1 px-3 min-w-[80px] flex items-center gap-1 border border-[#FFD700] text-[#002F5F] font-semibold rounded-2xl transition bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F] whitespace-nowrap";
                               return (
                                 <button
                                   className={status === 'Open' ? endBtnClass : reopenBtnClass}
