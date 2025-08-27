@@ -67,13 +67,16 @@ export default function CompetitionInfo({ user }) {
 
   return (
     <PageBackground>
-      <TopMenu user={user} userComp={isPlayerInComp ? comp : null} isPlayerInComp={isPlayerInComp} />
-      <div className="flex flex-col items-center px-4 mt-4">
-        <div className="mb-0">
-          <h1 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-1 leading-tight" style={{ letterSpacing: '0.01em', textShadow: '0 2px 8px rgba(0,0,0,0.10)' }}>Competition Info</h1>
-          <div className="mx-auto mt-1 mb-1" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
-        </div>
-  <div className="w-full max-w-4xl rounded-2xl bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none', marginTop: 0 }}>
+      <div>
+        <TopMenu user={user} userComp={isPlayerInComp ? comp : null} isPlayerInComp={isPlayerInComp} />
+        <div className="flex flex-col items-center px-4 mt-12">
+          <div className="mb-10">
+            <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+              Competition Info
+            </h1>
+            <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
+          </div>
+  <div className="w-full max-w-4xl rounded-2xl bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none', marginTop: 0, fontFamily: 'Lato, Arial, sans-serif', color: 'white', borderColor: '#FFD700' }}>
           <div className="mb-4">
               <div><span className="font-semibold">Date:</span> {formatDate(comp.date)}</div>
               <div><span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</div>
@@ -85,12 +88,12 @@ export default function CompetitionInfo({ user }) {
             </div>
             {comp.groups && Array.isArray(comp.groups) && (
               <div className="mb-4">
-                <table className="min-w-full border text-center mb-2">
+                <table className="min-w-full border text-center mb-2" style={{ fontFamily: 'Lato, Arial, sans-serif', color: 'white', borderColor: '#FFD700' }}>
                   <thead>
-                    <tr className="bg-white/10">
-                      <th className="border px-2 py-1">Group</th>
-                      <th className="border px-2 py-1">Tee Time</th>
-                      <th className="border px-2 py-1">Players</th>
+                    <tr style={{ background: '#00204A' }}>
+                      <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Group</th>
+                      <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Tee Time</th>
+                      <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Players</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -151,7 +154,8 @@ export default function CompetitionInfo({ user }) {
               </button>
             </div>
           </div>
-    </div>
-  </PageBackground>
+        </div>
+      </div>
+    </PageBackground>
   );
 }

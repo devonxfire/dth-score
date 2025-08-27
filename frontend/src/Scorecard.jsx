@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { TrophyIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageBackground from './PageBackground';
+import TopMenu from './TopMenu';
+import './popupJiggle.css';
 
 // Modal state for reset confirmation
 // (restored below imports)
@@ -105,40 +107,6 @@ export default function Scorecard(props) {
     }
   })();
 
-  const TopMenu = () => (
-    <div className="flex flex-wrap justify-around gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
-      <button
-        className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
-        style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-        onClick={() => navigate('/dashboard')}
-      >
-        Dashboard
-      </button>
-      <button
-        className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
-        style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-        onClick={() => navigate('/recent')}
-      >
-        Competitions
-      </button>
-      <span
-        className="text-sm text-white font-semibold opacity-80 bg-transparent border-none outline-none px-2 py-1 cursor-default select-none"
-        style={{ background: 'none', border: 'none', boxShadow: 'none', lineHeight: '2.25rem' }}
-      >
-        Welcome, {(userMenu?.name?.split(' ')[0]) || 'Player'}!
-      </span>
-      <button
-        className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
-        style={{ background: 'none', border: 'none', boxShadow: 'none' }}
-        onClick={() => {
-          localStorage.removeItem('user');
-          window.location.href = '/';
-        }}
-      >
-        Sign Out
-      </button>
-    </div>
-  );
   // Handler to reset all gross scores (local and backend)
   const handleResetScorecard = async () => {
     setScores(groupPlayers.map(() => Array(18).fill('')));
@@ -429,10 +397,10 @@ export default function Scorecard(props) {
   {/* Birdie Celebration Popup */}
       {showBirdie && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-green-300 animate-bounceIn">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
             <span className="text-6xl mb-2" role="img" aria-label="Birdie">🕊️</span>
-            <h2 className="text-3xl font-extrabold mb-2 text-green-700 drop-shadow">Birdie!</h2>
-            <div className="text-lg font-semibold text-gray-700 mb-1">For {birdiePlayer} on Hole {birdieHole}</div>
+            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Birdie!</h2>
+            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>For {birdiePlayer} on Hole {birdieHole}</div>
             <button
               className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
               style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
@@ -452,10 +420,10 @@ export default function Scorecard(props) {
   {/* Eagle Celebration Popup */}
       {showEagle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-yellow-400">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
             <span className="text-6xl mb-2" role="img" aria-label="Eagle">🦅</span>
-            <h2 className="text-3xl font-extrabold mb-2 text-yellow-600 drop-shadow">Eagle!</h2>
-            <div className="text-lg font-semibold text-gray-700 mb-1">For {eaglePlayer} on Hole {eagleHole}</div>
+            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Eagle!</h2>
+            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>For {eaglePlayer} on Hole {eagleHole}</div>
             <button
               className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
               style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
@@ -476,10 +444,10 @@ export default function Scorecard(props) {
       {/* Dog Popup */}
       {showDogPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-orange-400 animate-bounceIn">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
             <span className="text-6xl mb-2" role="img" aria-label="Dog">🐶</span>
-            <h2 className="text-3xl font-extrabold mb-2 text-orange-700 drop-shadow">Woof!</h2>
-            <div className="text-lg font-semibold text-gray-700 mb-1">{dogPlayer} has just gotten the dog</div>
+            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Woof!</h2>
+            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{dogPlayer} has just gotten the dog</div>
             <button
               className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
               style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
@@ -497,10 +465,10 @@ export default function Scorecard(props) {
       )}
       {showBlowup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-red-500">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
             <span className="text-6xl mb-2" role="img" aria-label="Explosion">💥</span>
-            <h2 className="text-2xl font-extrabold mb-2 text-red-700 drop-shadow">How embarrassing.</h2>
-            <div className="text-lg font-semibold text-gray-700 mb-1">{blowupPlayer} just blew up on Hole {blowupHole}.</div>
+            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>How embarrassing.</h2>
+            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{blowupPlayer} just blew up on Hole {blowupHole}.</div>
             <button
               className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
               style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
@@ -517,7 +485,12 @@ export default function Scorecard(props) {
         </div>
       )}
 
-      <TopMenu />
+      <TopMenu
+        user={userMenu}
+        userComp={props.competition}
+        isPlayerInComp={props.isPlayerInComp}
+        competitionList={props.competitionList}
+      />
       {/* Tee/Handicap Modal */}
       {showTeeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -633,18 +606,18 @@ export default function Scorecard(props) {
       ) : !showTeeModal && (
         <>
           <div className="flex flex-col items-center px-4">
-            <div className="mb-6">
-              <h2 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-2 leading-tight">
+            <div className="mt-12">
+              <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
                 {competition.fourballs ? `4 BALL # ${competition.fourballs}'s Scorecard` : 'Scorecard'}
-              </h2>
-              <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
+              </h1>
+              <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
             </div>
           </div>
-          <div className="flex flex-col items-center px-4 mt-8">
-            <div className="w-full max-w-3xl rounded-2xl bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+          <div className="flex flex-col items-center px-4 mt-4">
+            <div className="w-full max-w-4xl rounded-2xl bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none', fontFamily: 'Lato, Arial, sans-serif', color: 'white', borderColor: '#FFD700' }}>
               <div className="flex flex-row justify-between items-start w-full">
                 {/* Mini table and comp info */}
-                <div className="mb-2 text-white/90">
+                <div className="mb-2 text-white/90" style={{ fontFamily: 'Lato, Arial, sans-serif', color: 'white' }}>
                   <span className="font-semibold">Competition:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')} <br />
                   <span className="font-semibold">Date:</span> {formatDate(competition.date)} <br />
                   {/* Tee Box removed as per user request */}
@@ -656,17 +629,17 @@ export default function Scorecard(props) {
                   {/* 4 Ball number removed as per user request */}
                   {groupPlayers.length >= 2 && (
                     <div className="my-2">
-                      <table className="min-w-[300px] border border-white/30 text-white text-sm rounded mb-2">
+                      <table className="min-w-[300px] border text-white text-sm rounded mb-2" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
                         <thead>
                           <tr>
-                            <th className="border px-2 py-1 bg-white/10"></th>
-                            <th className="border px-2 py-1 bg-white/10">Name</th>
-                            <th className="border px-2 py-1 bg-white/10">Tee</th>
-                            <th className="border px-2 py-1 bg-white/10">CH</th>
-                            <th className="border px-2 py-1 bg-white/10">PH</th>
-                            <th className="border px-2 py-1 bg-white/10">Waters</th>
-                            <th className="border px-2 py-1 bg-white/10">Dog</th>
-                            <th className="border px-2 py-1 bg-white/10">2 Clubs</th>
+                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}></th>
+                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
+                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Tee</th>
+                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>CH</th>
+                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>PH</th>
+                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -794,10 +767,10 @@ export default function Scorecard(props) {
       {/* Waters Popup */}
       {showWatersPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-blue-400 animate-bounceIn">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
             <span className="text-6xl mb-2" role="img" aria-label="Splash">💧</span>
-            <h2 className="text-3xl font-extrabold mb-2 text-blue-700 drop-shadow">Splash!</h2>
-            <div className="text-lg font-semibold text-gray-700 mb-1">{watersPlayer} has just earned a water</div>
+            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Splash!</h2>
+            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{watersPlayer} has just earned a water</div>
             <button
               className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
               style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
@@ -924,13 +897,16 @@ export default function Scorecard(props) {
                     }}
                     className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
                   >
-                    <TrophyIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
+                    <TrophyIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" style={{ color: '#FFD700', filter: 'drop-shadow(0 1px 2px #bfa100)' }} />
                     Leaderboard
                   </button>
                   {/* Sign Scorecard button removed */}
                   <button
                     onClick={() => setShowResetModal(true)}
-                    className="py-2 px-4 w-44 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 border border-white transition flex items-center"
+                    className="py-2 px-4 w-44 text-white font-bold rounded-2xl border border-white transition flex items-center"
+                    style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#FFD700'}
+                    onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
                   >
                     <ArrowPathIcon className="h-6 w-6 mr-2 inline-block" />
                     Reset Scores
@@ -1297,24 +1273,25 @@ export default function Scorecard(props) {
               </div>
               {showResetModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                  <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-red-200">
+                  <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border-4 border-[#FFD700]">
                     <div className="flex flex-col items-center mb-4">
                       <span className="text-5xl mb-2" role="img" aria-label="Warning">⚠️</span>
-                      <h2 className="text-2xl font-extrabold mb-2 drop-shadow" style={{ color: '#1B3A6B' }}>Reset Scorecard?</h2>
+                      <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Reset Scorecard?</h2>
                     </div>
-                    <p className="mb-6 text-gray-700 text-center text-base font-medium">This will <span className='font-bold' style={{ color: '#1B3A6B' }}>permanently clear all gross scores for all players</span> in this group.<br/>This action cannot be undone.<br/><br/>Are you sure you want to reset?</p>
+                    <p className="mb-6 text-white text-center text-base font-medium" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>This will <span className='font-bold' style={{ color: '#FFD700' }}>permanently clear all gross scores for all players</span> in this group.<br/>This action cannot be undone.<br/><br/>Are you sure you want to reset?</p>
                     <div className="flex gap-4 w-full justify-center">
                       <button
-                        className="px-5 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold shadow"
+                        className="px-5 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+                        style={{ backgroundColor: '#888', color: 'white', fontFamily: 'Lato, Arial, sans-serif' }}
                         onClick={() => setShowResetModal(false)}
                       >
                         Cancel
                       </button>
                       <button
                         className="px-5 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
-                        style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                        onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-                        onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+                        style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                        onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
+                        onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
                         onClick={async () => {
                           await handleResetScorecard();
                           setShowResetModal(false);
