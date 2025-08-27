@@ -247,7 +247,7 @@ export default function ResultsMedal() {
     <PageBackground>
       {/* Top nav menu for UI consistency */}
       <TopMenu user={user} userComp={isPlayerInComp ? competition : null} />
-      <div className="flex flex-col items-center px-4 w-full">
+  <div className="flex flex-col items-center px-4 w-full" style={{ minHeight: '100vh', fontFamily: 'Lato, Arial, sans-serif' }}>
   <div className="w-full max-w-4xl" ref={exportRef} id="export-section">
         {/* Hidden plain export table for PDF generation only */}
         <div
@@ -310,38 +310,38 @@ export default function ResultsMedal() {
           })()}
         </div>
           <div className="mb-6 mt-12">
-            <h1 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-1 leading-tight flex items-center justify-center gap-2">
-              <TrophyIcon className="h-8 w-8 inline-block" style={{ color: '#FFD700', filter: 'drop-shadow(0 1px 2px #bfa100)' }} />
-              Leaderboard
+            <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+              <TrophyIcon className="h-10 w-10" style={{ color: '#FFD700', filter: 'drop-shadow(0 1px 2px #bfa100)' }} />
+              <span style={{lineHeight:1}}>Leaderboard</span>
             </h1>
             {competition?.date && (
-              <div className="text-lg text-white/90 text-center mb-2 font-semibold">
+              <div className="text-lg text-white text-center mb-2 font-semibold" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
                 {new Date(competition.date).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}
               </div>
             )}
             <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
        
           <div className="flex flex-col mt-12">
-            <div className="w-full rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+            <div className="w-full rounded-2xl text-white mb-8">
               {loading ? (
                 <div className="text-center text-white py-8">Loading results...</div>
               ) : error ? (
                 <div className="text-center text-red-400 py-8">{error}</div>
               ) : (
                 <React.Fragment>
-                  <table className="min-w-full border text-center mb-8">
+                  <table className="min-w-full border text-center mb-8" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
                     <thead>
-                      <tr className="bg-blue-900/90">
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Pos</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Name</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Thru</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Gross</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Net</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>DTH Net</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Dog</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Waters</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>2 Clubs</th>
-                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Fines</th>
+                      <tr style={{ background: '#00204A' }}>
+                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Pos</th>
+                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
+                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Thru</th>
+                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
+                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
+                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
+                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
                       </tr>
                     </thead>
                     <tbody>

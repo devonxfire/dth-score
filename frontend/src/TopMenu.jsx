@@ -36,39 +36,41 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
   const compId = scorecardComp && (scorecardComp.joinCode || scorecardComp.joincode || scorecardComp.id || scorecardComp._id || scorecardComp.competitionType);
 
   return (
-    <div className="flex flex-wrap justify-between gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
+  <div className="flex flex-wrap justify-between gap-6 mt-8 mb-4 w-full max-w-2xl mx-auto px-8 rounded-2xl" style={{ background: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}>
       <button
-        className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
-        style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
+  className={`text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150 ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
+  style={location.pathname === '/dashboard' ? { color: '#FFD700', borderColor: '#FFD700', borderBottomWidth: 3, background: 'none', borderStyle: 'solid', fontFamily: 'Merriweather, Georgia, serif' } : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
         onClick={() => navigate('/dashboard')}
       >
         Dashboard
       </button>
       {scorecardComp && (
         <button
-          className={`text-sm font-extrabold opacity-90 px-2 py-1 rounded text-green-600 hover:text-green-700 focus:text-green-700 transition-colors duration-150 cursor-pointer ${location.pathname.startsWith('/scorecard') ? 'border-b-4' : ''}`}
-          style={location.pathname.startsWith('/scorecard') ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
+          className={`text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150 ${location.pathname.startsWith('/scorecard') ? 'border-b-4 scorecard-pulse' : ''}`}
+          style={location.pathname.startsWith('/scorecard')
+            ? { borderColor: '#FFD700', borderBottomWidth: 3, background: 'none', borderStyle: 'solid', fontFamily: 'Merriweather, Georgia, serif' }
+            : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
           onClick={() => navigate(`/scorecard/${compId}`, { state: { competition: scorecardComp } })}
         >
           My Scorecard
         </button>
       )}
       <button
-        className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
-        style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
+  className={`text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150 ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
+  style={location.pathname === '/recent' ? { color: '#FFD700', borderColor: '#FFD700', borderBottomWidth: 3, background: 'none', borderStyle: 'solid', fontFamily: 'Merriweather, Georgia, serif' } : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
         onClick={() => navigate('/recent')}
       >
         Competitions
       </button>
       <span
-        className="text-sm text-white font-semibold opacity-80 bg-transparent border-none outline-none px-2 py-1 cursor-default select-none"
-        style={{ background: 'none', border: 'none', boxShadow: 'none', lineHeight: '2.25rem' }}
+  className="text-sm font-semibold px-2 py-1 cursor-default select-none"
+  style={{ color: 'white', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', lineHeight: '2.25rem' }}
       >
         Welcome, {(user?.name?.split(' ')[0]) || 'Player'}!
       </span>
       <button
-        className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
-        style={{ background: 'none', border: 'none', boxShadow: 'none' }}
+  className="text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150"
+  style={{ color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
         onClick={onSignOut || (() => {
           if (typeof window.onSignOut === 'function') window.onSignOut();
           else if (typeof window.signOut === 'function') window.signOut();

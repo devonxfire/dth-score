@@ -1,12 +1,17 @@
-@keyframes pulse-green {
+@keyframes pulse-yellow {
   0%, 100% {
-    background-color: #15803d; /* green-700 */
+    background-color: #FFD700; /* The Open yellow */
+    color: #002F5F;
   }
   50% {
-    background-color: #22c55e; /* green-500 */
+    background-color: #F5D06F; /* lighter yellow */
+    color: #002F5F;
   }
 }
 
 .scorecard-pulse {
-  animation: pulse-green 1.2s infinite;
+  animation: pulse-yellow 1.2s infinite;
+  color: #002F5F !important;
+  font-family: 'Merriweather', Georgia, serif;
+  font-weight: bold;
 }

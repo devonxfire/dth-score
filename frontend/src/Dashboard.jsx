@@ -83,8 +83,12 @@ export default function Dashboard({ user, onSignOut }) {
           className="mb-8 max-h-48 w-auto"
           style={{ objectFit: 'contain' }}
         />
-  <h1 className="text-5xl font-bold text-white mb-1 drop-shadow-lg text-center">Welcome</h1>
-  <h2 className="text-3xl font-semibold text-white mb-1 drop-shadow-lg text-center">{user?.name || ''}!</h2>
+  <h1 className="text-5xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: 'white', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+    Welcome
+  </h1>
+  <h2 className="text-3xl font-extrabold drop-shadow-lg text-center mb-1" style={{ color: 'white', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+    {user?.name || ''}!
+  </h2>
       </div>
       <div className="relative z-10 flex flex-col items-center px-4 mt-2">
         <div className="w-full max-w-md rounded-2xl shadow-lg p-8 flex flex-col gap-6" style={{ background: 'none' }}>
@@ -140,8 +144,8 @@ export default function Dashboard({ user, onSignOut }) {
             </button>
           )}
                             <button
-                              className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg flex items-center justify-center gap-2"
-                              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                              className="w-full py-3 px-4 border border-white text-white font-extrabold rounded-2xl transition text-lg flex items-center justify-center gap-2"
+                              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
                               onClick={() => navigate('/recent')}
                               onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
                               onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
