@@ -143,7 +143,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                   <th className="border px-2 py-1">Type</th>
                   <th className="border px-2 py-1">Course</th>
                   <th className="border px-2 py-1 w-[100px] text-center">Status</th>
-                  {isAdmin(user) && <th className="border border-white px-2 py-1 w-[260px]">Action</th>}
+                  <th className={`border border-white px-2 py-1${isAdmin(user) ? ' w-[260px]' : ''}`}>Action</th>
                 </tr>
               </thead>
             <tbody>
@@ -168,37 +168,42 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                   }
                 }
                 return (
-                  <tr key={keyBase + '-info'} className="border">
-                    <td className="border px-2 py-1">{formatDate(comp.date)}</td>
-                    <td className="border px-2 py-1 whitespace-nowrap">{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</td>
-                    <td className="border px-2 py-1 whitespace-nowrap">{comp.club || comp.joinCode || comp.joincode || '-'}</td>
+                  <tr key={keyBase + '-info'} className={`border${status === 'Closed' ? ' bg-gray-800/60' : ''}`}> 
+                    <td className={`border px-2 py-1${status === 'Closed' ? ' text-gray-300' : ''}`}>{formatDate(comp.date)}</td>
+                    <td className={`border px-2 py-1 whitespace-nowrap${status === 'Closed' ? ' text-gray-300' : ''}`}>{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</td>
+                    <td className={`border px-2 py-1 whitespace-nowrap${status === 'Closed' ? ' text-gray-300' : ''}`}>{comp.club || comp.joinCode || comp.joincode || '-'}</td>
                     <td className={
                       `border border-white px-2 py-1 text-center align-middle w-[100px] ${
                         status === 'Open'
                           ? 'bg-[#1B3A6B] text-white'
                           : status === 'Closed'
-                            ? 'text-white'
+                            ? 'text-gray-300'
                             : ''
                       }`
                     }>
                       {status}
                     </td>
-                    <td className="border px-2 py-1 w-[260px]">
-                      <div className={`flex flex-row gap-2 items-center w-full ${status === 'Open' ? 'justify-between' : 'justify-center'}`}> 
-                        {/* Always render 4 buttons for alignment: Info, Edit, End/Re-open, Delete. Use invisible placeholders for non-admins. */}
+                    <td className={`border px-2 py-1${isAdmin(user) ? ' w-[260px]' : ''}`}>
+                      <div className={`flex flex-row gap-2 items-center${isAdmin(user) ? ' w-full justify-between' : ' justify-center'}`}>
                         <button
-                          className="py-1 px-3 flex items-center gap-1 border border-[#1B3A6B] text-white font-semibold rounded-2xl transition bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white"
+                          className={`py-1 px-3 flex items-center gap-1 border font-semibold rounded-2xl transition ${status === 'Closed' ? 'bg-gray-700 border-gray-500 text-gray-400 cursor-not-allowed' : 'border-[#1B3A6B] text-white bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white'}`}
                           style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                          onClick={() => navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}`, { state: { comp } })}
+                          onClick={() => {
+                            if (status !== 'Closed') navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}`, { state: { comp } });
+                          }}
+                          disabled={status === 'Closed'}
                         >
                           <EyeIcon className="h-5 w-5 mr-1" /> Info
                         </button>
-                        {isAdmin(user) ? (
+                        {isAdmin(user) && (
                           <>
                             <button
-                              className="py-1 px-3 flex items-center gap-1 border border-[#1B3A6B] text-white font-semibold rounded-2xl transition bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white"
+                              className={`py-1 px-3 flex items-center gap-1 border font-semibold rounded-2xl transition ${status === 'Closed' ? 'bg-gray-700 border-gray-500 text-gray-400 cursor-not-allowed' : 'border-[#1B3A6B] text-white bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white'}`}
                               style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                              onClick={() => navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}/edit`, { state: { comp } })}
+                              onClick={() => {
+                                if (status !== 'Closed') navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}/edit`, { state: { comp } });
+                              }}
+                              disabled={status === 'Closed'}
                             >
                               <ScissorsIcon className="h-5 w-5 mr-1" /> Edit
                             </button>
@@ -273,13 +278,6 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                             >
                               <TrashIcon className="h-5 w-5 mr-1" /> Delete
                             </button>
-                          </>
-                        ) : (
-                          <>
-                            {/* Invisible placeholders for alignment */}
-                            <span className="py-1 px-3 min-w-[80px] flex items-center gap-1 opacity-0 select-none">Edit</span>
-                            <span className="py-1 px-3 min-w-[80px] flex items-center gap-1 opacity-0 select-none">End</span>
-                            <span className="py-1 px-3 min-w-[80px] flex items-center gap-1 opacity-0 select-none">Delete</span>
                           </>
                         )}
                       </div>
