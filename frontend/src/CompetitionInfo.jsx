@@ -9,7 +9,7 @@ function formatDate(dateStr) {
 }
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeftIcon, ChartBarIcon } from '@heroicons/react/24/solid';
+import { ArrowLeftIcon, ChartBarIcon, TrophyIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
@@ -146,7 +146,7 @@ export default function CompetitionInfo({ user }) {
                 onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
                 onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
               >
-                <ChartBarIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
+                <TrophyIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
                 Leaderboard
               </button>
             </div>

@@ -6,6 +6,7 @@ function isAdmin(user) {
   return user && (user.role === 'admin' || user.isAdmin || user.isadmin);
 }
 import PageBackground from './PageBackground';
+import { TrophyIcon, ArrowLeftIcon, ArrowDownTrayIcon, EnvelopeIcon } from '@heroicons/react/24/solid';
 import TopMenu from './TopMenu';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -309,7 +310,15 @@ export default function ResultsMedal() {
           })()}
         </div>
           <div className="mb-6 mt-12">
-            <h1 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-2 leading-tight">Medal Results</h1>
+            <h1 className="text-4xl font-extrabold text-white drop-shadow-lg text-center mb-1 leading-tight flex items-center justify-center gap-2">
+              <TrophyIcon className="h-8 w-8 inline-block" style={{ color: '#FFD700', filter: 'drop-shadow(0 1px 2px #bfa100)' }} />
+              Leaderboard
+            </h1>
+            {competition?.date && (
+              <div className="text-lg text-white/90 text-center mb-2 font-semibold">
+                {new Date(competition.date).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </div>
+            )}
             <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
        
           <div className="flex flex-col mt-12">
@@ -401,24 +410,32 @@ export default function ResultsMedal() {
                   const compId = competition?.id || competition?._id || competition?.joinCode || competition?.joincode || id;
                   navigate(`/scorecard/${compId}`, { state: { competition } });
                 }}
-                className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B]"
+                  className="py-2 px-4 min-w-[180px] border border-white text-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap"
+                style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
                 title="Back to Scorecard"
               >
+                <ArrowLeftIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
                 Back to Scorecard
               </button>
               <button
                 onClick={handleExportPDF}
-                className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B] mt-2"
+                className="py-2 px-4 min-w-[180px] bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B] mt-2 flex items-center whitespace-nowrap"
                 title="Download this page as PDF"
               >
+                <ArrowDownTrayIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
                 Download PDF
               </button>
               <button
                 onClick={() => setShowEmailModal(true)}
-                className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B] mt-2"
+                className="py-2 px-4 min-w-[180px] bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B] mt-2 flex items-center justify-center whitespace-nowrap"
                 title="Email this page as PDF"
               >
-                Email PDF
+                <span className="flex items-center justify-center">
+                  <EnvelopeIcon className="h-5 w-5 mr-1" />
+                  Email PDF
+                </span>
               </button>
 
             {/* Email PDF Modal */}

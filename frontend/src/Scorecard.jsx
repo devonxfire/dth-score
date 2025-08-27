@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { TrophyIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageBackground from './PageBackground';
 
@@ -923,14 +924,16 @@ export default function Scorecard(props) {
                     }}
                     className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
                   >
-                    View Results
+                    <TrophyIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
+                    Leaderboard
                   </button>
                   {/* Sign Scorecard button removed */}
                   <button
                     onClick={() => setShowResetModal(true)}
-                    className="py-2 px-4 w-44 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 border border-white transition"
+                    className="py-2 px-4 w-44 bg-red-600 text-white font-bold rounded-2xl hover:bg-red-700 border border-white transition flex items-center"
                   >
-                    Reset Scorecard
+                    <ArrowPathIcon className="h-6 w-6 mr-2 inline-block" />
+                    Reset Scores
                   </button>
                 </div>
               </div>
