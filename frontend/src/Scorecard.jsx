@@ -78,7 +78,7 @@ export default function Scorecard(props) {
   const [showDogPopup, setShowDogPopup] = useState(false);
   const [dogPlayer, setDogPlayer] = useState(null);
   const dogTimeoutRef = React.useRef(null);
-  // Mini table stats: Waters, Dog, 2 Clubs
+  // Mini table stats: Waters, Dog, 2 Clubs (persisted in backend)
   const [miniTableStats, setMiniTableStats] = useState({});
   // Birdie popup state
   const [showBirdie, setShowBirdie] = useState(false);
@@ -258,6 +258,37 @@ export default function Scorecard(props) {
   } else if (player && player.name) {
     groupPlayers = [player.name];
   }
+
+  // Fetch mini table stats from backend on load or group change
+  useEffect(() => {
+    async function fetchStats() {
+      if (!groupTeamId || !competition || !competition.users) return;
+      const stats = {};
+      for (const name of groupPlayers) {
+        const user = competition.users.find(u => u.name === name);
+        if (!user) continue;
+        const userId = user.id || user.user_id || user.userId;
+        try {
+          const res = await fetch(`/api/teams/${groupTeamId}/users/${userId}`);
+          if (res.ok) {
+            const data = await res.json();
+            stats[name] = {
+              waters: data.waters ?? '',
+              dog: !!data.dog,
+              twoClubs: data.two_clubs ?? ''
+            };
+          } else {
+            stats[name] = { waters: '', dog: false, twoClubs: '' };
+          }
+        } catch {
+          stats[name] = { waters: '', dog: false, twoClubs: '' };
+        }
+      }
+      setMiniTableStats(stats);
+    }
+    fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupTeamId, groupPlayers.length]);
 
   // Now the modal useEffect can safely reference groupForPlayer
   useEffect(() => {
@@ -732,7 +763,7 @@ export default function Scorecard(props) {
                                     className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
                                     style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
                                     value={miniTableStats[name]?.waters || ''}
-                                    onChange={e => {
+                                    onChange={async e => {
                                       const val = e.target.value;
                                       setMiniTableStats(stats => ({
                                         ...stats,
@@ -741,6 +772,16 @@ export default function Scorecard(props) {
                                           waters: val
                                         }
                                       }));
+                                      // Update backend
+                                      if (!groupTeamId || !competition.users) return;
+                                      const user = competition.users.find(u => u.name === name);
+                                      if (!user) return;
+                                      const userId = user.id || user.user_id || user.userId;
+                                      await fetch(`/api/teams/${groupTeamId}/users/${userId}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ waters: val })
+                                      });
                                       if (val && Number(val) > 0) {
                                         setWatersPlayer(name);
                                         setShowWatersPopup(true);
@@ -777,7 +818,11 @@ export default function Scorecard(props) {
                                   <input
                                     type="checkbox"
                                     checked={!!miniTableStats[name]?.dog}
-                                    onChange={e => {
+                                    onChange={async e => {
+                                      if (!groupTeamId || !competition.users) return;
+                                      const user = competition.users.find(u => u.name === name);
+                                      if (!user) return;
+                                      const userId = user.id || user.user_id || user.userId;
                                       if (e.target.checked) {
                                         // Unset dog for all, set for this player
                                         setMiniTableStats(stats => {
@@ -794,6 +839,17 @@ export default function Scorecard(props) {
                                           };
                                           return newStats;
                                         });
+                                        // Unset dog for all in backend, then set for this player
+                                        for (const otherName of groupPlayers) {
+                                          const otherUser = competition.users.find(u => u.name === otherName);
+                                          if (!otherUser) continue;
+                                          const otherUserId = otherUser.id || otherUser.user_id || otherUser.userId;
+                                          await fetch(`/api/teams/${groupTeamId}/users/${otherUserId}`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ dog: otherName === name })
+                                          });
+                                        }
                                         setDogPlayer(name);
                                         setShowDogPopup(true);
                                         if (dogTimeoutRef.current) clearTimeout(dogTimeoutRef.current);
@@ -806,6 +862,11 @@ export default function Scorecard(props) {
                                             dog: false
                                           }
                                         }));
+                                        await fetch(`/api/teams/${groupTeamId}/users/${userId}`, {
+                                          method: 'PATCH',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ dog: false })
+                                        });
                                       }
                                     }}
                                   />
@@ -818,14 +879,24 @@ export default function Scorecard(props) {
                                     className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
                                     style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
                                     value={miniTableStats[name]?.twoClubs || ''}
-                                    onChange={e => {
+                                    onChange={async e => {
+                                      const val = e.target.value;
                                       setMiniTableStats(stats => ({
                                         ...stats,
                                         [name]: {
                                           ...stats[name],
-                                          twoClubs: e.target.value
+                                          twoClubs: val
                                         }
                                       }));
+                                      if (!groupTeamId || !competition.users) return;
+                                      const user = competition.users.find(u => u.name === name);
+                                      if (!user) return;
+                                      const userId = user.id || user.user_id || user.userId;
+                                      await fetch(`/api/teams/${groupTeamId}/users/${userId}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ two_clubs: val })
+                                      });
                                     }}
                                   />
                                 </td>

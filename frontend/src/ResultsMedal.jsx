@@ -98,6 +98,19 @@ export default function ResultsMedal() {
                 const scoreData = await scoreRes.json();
                 scores = Array.isArray(scoreData.scores) ? scoreData.scores : [];
               }
+              // Fetch Waters, Dog, 2 Clubs for this player
+              let waters = '';
+              let dog = false;
+              let twoClubs = '';
+              try {
+                const statRes = await fetch(`/api/teams/${group.teamId}/users/${user.id}`);
+                if (statRes.ok) {
+                  const statData = await statRes.json();
+                  waters = statData.waters ?? '';
+                  dog = !!statData.dog;
+                  twoClubs = statData.two_clubs ?? '';
+                }
+              } catch {}
               // 4. Compute gross (sum of all entered scores)
               const gross = scores.reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0);
               // 5. Get PH (Playing Handicap) with allowance, and CH (Course Handicap)
@@ -135,6 +148,9 @@ export default function ResultsMedal() {
                 ch,
                 scores,
                 thru,
+                waters,
+                dog,
+                twoClubs
               });
             }
           }
@@ -238,7 +254,6 @@ export default function ResultsMedal() {
           style={{ display: 'none', background: '#fff', color: '#111', padding: 24, fontFamily: 'sans-serif', maxWidth: 900, margin: '0 auto', borderRadius: 8 }}
         >
           <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 28, marginBottom: 8 }}>Medal Results</div>
-          <div style={{ height: 2, width: 340, background: '#222', opacity: 0.2, borderRadius: 2, margin: '0 auto 18px auto' }}></div>
           {competition && (
             <div style={{ marginBottom: 18, fontSize: 16 }}>
               <span style={{ fontWeight: 'bold' }}>Competition Type:</span> {competition.type ? (competition.type.replace(/(^|_|-)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')) : '-'}<br />
@@ -270,9 +285,9 @@ export default function ResultsMedal() {
                   <td style={{ border: '1px solid #222', padding: 4 }}>{p.gross}</td>
                   <td style={{ border: '1px solid #222', padding: 4 }}>{p.net}</td>
                   <td style={{ border: '1px solid #222', padding: 4 }}>{p.dthNet}</td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}></td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}></td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}></td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.dog ? '🐶' : ''}</td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.waters || ''}</td>
+                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.twoClubs || ''}</td>
                   <td style={{ border: '1px solid #222', padding: 4 }}>{p.fines || ''}</td>
                 </tr>
               ))}
@@ -386,43 +401,44 @@ export default function ResultsMedal() {
                   <table className="min-w-full border text-center mb-8">
                     <thead>
                       <tr className="bg-blue-900/90">
-                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Pos</th>
-                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Name</th>
-                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Thru</th>
-                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Gross</th>
-                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Net</th>
-                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>DTH Net</th>
-                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Dog</th>
-                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Waters</th>
-                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>2 Clubs</th>
-                        <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>Fines</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Pos</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Name</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Thru</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Gross</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Net</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>DTH Net</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Dog</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Waters</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>2 Clubs</th>
+                        <th className="border px-2 py-0.5" style={{background:'#1B3A6B',color:'white'}}>Fines</th>
                       </tr>
                     </thead>
                     <tbody>
                       {players.map((p, idx) => (
                         <tr key={p.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
-                          <td className="border px-2 py-1 font-bold">{p.position}</td>
-                          <td className="border px-2 py-1 text-left">{p.name}</td>
-                          <td className="border px-2 py-1">{p.thru}</td>
-                          <td className="border px-2 py-1">{p.gross}</td>
-                          <td className="border px-2 py-1">{p.net}</td>
-                          <td className="border px-2 py-1">{p.dthNet}</td>
-                          <td className="border px-2 py-1"></td>
-                          <td className="border px-2 py-1"></td>
-                          <td className="border px-2 py-1"></td>
-                          <td className="border px-2 py-1">
+                          <td className="border px-2 py-0.5 font-bold">{p.position}</td>
+                          <td className="border px-2 py-0.5 text-left">{p.name}</td>
+                          <td className="border px-2 py-0.5">{p.thru}</td>
+                          <td className="border px-2 py-0.5">{p.gross}</td>
+                          <td className="border px-2 py-0.5">{p.net}</td>
+                          <td className="border px-2 py-0.5">{p.dthNet}</td>
+                          <td className="border px-2 py-0.5">{p.dog ? '🐶' : ''}</td>
+                          <td className="border px-2 py-0.5">{p.waters || ''}</td>
+                          <td className="border px-2 py-0.5">{p.twoClubs || ''}</td>
+                          <td className="border px-2 py-0.5">
                             {isAdmin(user) ? (
                               <input
                                 type="number"
                                 min="0"
-                                className="w-16 text-center text-white bg-transparent rounded mx-auto block"
+                                className="w-14 h-8 text-center text-white bg-transparent rounded mx-auto block font-bold text-base no-spinner px-0"
                                 value={fines[p.name] || ''}
                                 onChange={e => {
                                   const val = e.target.value;
                                   setFines(f => ({ ...f, [p.name]: val === '' ? '' : Math.max(0, parseInt(val, 10) || 0) }));
                                 }}
                                 placeholder="0"
-                                style={{ color: 'white' }}
+                                inputMode="numeric"
+                                style={{ color: 'white', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
                               />
                             ) : (
                               fines[p.name] || ''
