@@ -33,6 +33,16 @@ function RecentCompetitions({ user = {}, comps = [] }) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Debug: log open competitions whenever they change
+  useEffect(() => {
+    console.log('Open competitions:', openComps);
+  }, [openComps]);
+
+    // Debug: log open competitions whenever they change
+    useEffect(() => {
+      console.log('Open competitions:', openComps);
+    }, [openComps]);
+
   // useEffect for debug logging can be removed
 
   // Helper to fetch competitions and update state
@@ -110,6 +120,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
   return (
     <PageBackground>
       <div>
+  {/* Modal for open competition block */}
+  <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
         {/* Top nav menu */}
         <TopMenu user={user} isPlayerInComp={isPlayerInComp} competitionList={competitionList} />
         <div className="flex flex-col items-center px-4 mt-8">
@@ -124,6 +136,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                   className="flex flex-row items-center gap-2 py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg bg-[#1B3A6B] hover:bg-white hover:text-[#1B3A6B]"
                   style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
                   onClick={() => {
+                    console.log('Create New Competition clicked. openComps:', openComps);
                     if (openComps.length > 0) {
                       setShowOpenCompModal(true);
                     } else {
