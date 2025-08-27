@@ -70,6 +70,16 @@ const defaultHoles = [
 
 
 export default function Scorecard(props) {
+  // Waters popup state
+  const [showWatersPopup, setShowWatersPopup] = useState(false);
+  const [watersPlayer, setWatersPlayer] = useState(null);
+  const watersTimeoutRef = React.useRef(null);
+  // Dog popup state
+  const [showDogPopup, setShowDogPopup] = useState(false);
+  const [dogPlayer, setDogPlayer] = useState(null);
+  const dogTimeoutRef = React.useRef(null);
+  // Mini table stats: Waters, Dog, 2 Clubs
+  const [miniTableStats, setMiniTableStats] = useState({});
   // Birdie popup state
   const [showBirdie, setShowBirdie] = useState(false);
   const [birdieHole, setBirdieHole] = useState(null);
@@ -384,7 +394,7 @@ export default function Scorecard(props) {
 
   return (
     <PageBackground>
-      {/* Birdie Celebration Popup */}
+  {/* Birdie Celebration Popup */}
       {showBirdie && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-green-300 animate-bounceIn">
@@ -407,7 +417,7 @@ export default function Scorecard(props) {
         </div>
       )}
 
-      {/* Eagle Celebration Popup */}
+  {/* Eagle Celebration Popup */}
       {showEagle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-yellow-400">
@@ -430,7 +440,29 @@ export default function Scorecard(props) {
         </div>
       )}
 
-      {/* Blowup Popup */}
+  {/* Blowup Popup */}
+      {/* Dog Popup */}
+      {showDogPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-orange-400 animate-bounceIn">
+            <span className="text-6xl mb-2" role="img" aria-label="Dog">🐶</span>
+            <h2 className="text-3xl font-extrabold mb-2 text-orange-700 drop-shadow">Woof!</h2>
+            <div className="text-lg font-semibold text-gray-700 mb-1">{dogPlayer} has just gotten the dog</div>
+            <button
+              className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              onClick={() => {
+                setShowDogPopup(false);
+                if (dogTimeoutRef.current) clearTimeout(dogTimeoutRef.current);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       {showBlowup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-red-500">
@@ -600,10 +632,17 @@ export default function Scorecard(props) {
                             <th className="border px-2 py-1 bg-white/10">Tee</th>
                             <th className="border px-2 py-1 bg-white/10">CH</th>
                             <th className="border px-2 py-1 bg-white/10">PH</th>
+                            <th className="border px-2 py-1 bg-white/10">Waters</th>
+                            <th className="border px-2 py-1 bg-white/10">Dog</th>
+                            <th className="border px-2 py-1 bg-white/10">2 Clubs</th>
                           </tr>
                         </thead>
                         <tbody>
                           {groupPlayers.map((name, idx) => {
+                            // State for Waters, Dog, 2 Clubs
+                            if (!miniTableStats[name]) {
+                              miniTableStats[name] = { waters: '', dog: false, twoClubs: '' };
+                            }
                             // Try to get full and adjusted handicap from the correct group structure
                             let fullHandicap = '';
                             let adjHandicap = '';
@@ -685,6 +724,111 @@ export default function Scorecard(props) {
                                   />
                                 </td>
                                 <td className="border px-2 py-1 text-center">{adjHandicap !== '' ? adjHandicap : '-'}</td>
+                                {/* Waters column */}
+                                <td className="border px-2 py-1 text-center">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                                    style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
+                                    value={miniTableStats[name]?.waters || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setMiniTableStats(stats => ({
+                                        ...stats,
+                                        [name]: {
+                                          ...stats[name],
+                                          waters: val
+                                        }
+                                      }));
+                                      if (val && Number(val) > 0) {
+                                        setWatersPlayer(name);
+                                        setShowWatersPopup(true);
+                                        if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
+                                        watersTimeoutRef.current = setTimeout(() => setShowWatersPopup(false), 30000);
+                                      }
+                                    }}
+                                  />
+      {/* Waters Popup */}
+      {showWatersPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-blue-400 animate-bounceIn">
+            <span className="text-6xl mb-2" role="img" aria-label="Splash">💧</span>
+            <h2 className="text-3xl font-extrabold mb-2 text-blue-700 drop-shadow">Splash!</h2>
+            <div className="text-lg font-semibold text-gray-700 mb-1">{watersPlayer} has just earned a water</div>
+            <button
+              className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              onClick={() => {
+                setShowWatersPopup(false);
+                if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+                                </td>
+                                {/* Dog column */}
+                                <td className="border px-2 py-1 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!miniTableStats[name]?.dog}
+                                    onChange={e => {
+                                      if (e.target.checked) {
+                                        // Unset dog for all, set for this player
+                                        setMiniTableStats(stats => {
+                                          const newStats = {};
+                                          Object.keys(stats).forEach(playerName => {
+                                            newStats[playerName] = {
+                                              ...stats[playerName],
+                                              dog: false
+                                            };
+                                          });
+                                          newStats[name] = {
+                                            ...newStats[name],
+                                            dog: true
+                                          };
+                                          return newStats;
+                                        });
+                                        setDogPlayer(name);
+                                        setShowDogPopup(true);
+                                        if (dogTimeoutRef.current) clearTimeout(dogTimeoutRef.current);
+                                        dogTimeoutRef.current = setTimeout(() => setShowDogPopup(false), 30000);
+                                      } else {
+                                        setMiniTableStats(stats => ({
+                                          ...stats,
+                                          [name]: {
+                                            ...stats[name],
+                                            dog: false
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                  />
+                                </td>
+                                {/* 2 Clubs column */}
+                                <td className="border px-2 py-1 text-center">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                                    style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
+                                    value={miniTableStats[name]?.twoClubs || ''}
+                                    onChange={e => {
+                                      setMiniTableStats(stats => ({
+                                        ...stats,
+                                        [name]: {
+                                          ...stats[name],
+                                          twoClubs: e.target.value
+                                        }
+                                      }));
+                                    }}
+                                  />
+                                </td>
                               </tr>
                             );
                           })}
@@ -1078,7 +1222,7 @@ export default function Scorecard(props) {
                 </table>
               </div>
               {showResetModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                   <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-red-200">
                     <div className="flex flex-col items-center mb-4">
                       <span className="text-5xl mb-2" role="img" aria-label="Warning">⚠️</span>
