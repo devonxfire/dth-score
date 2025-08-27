@@ -79,6 +79,7 @@ export default function CompetitionInfo({ user }) {
               {comp.handicapallowance && (
                 <div><span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance}{typeof comp.handicapallowance === 'string' && comp.handicapallowance.includes('%') ? '' : '%'}</div>
               )}
+              <div><span className="font-semibold">Notes:</span> {comp.notes && comp.notes.trim() !== '' ? comp.notes : '-'}</div>
               {comp.teeBox && <div><span className="font-semibold">Tee Box:</span> {comp.teeBox}</div>}
             </div>
             {comp.groups && Array.isArray(comp.groups) && (

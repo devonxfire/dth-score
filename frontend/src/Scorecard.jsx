@@ -70,6 +70,21 @@ const defaultHoles = [
 
 
 export default function Scorecard(props) {
+  // Birdie popup state
+  const [showBirdie, setShowBirdie] = useState(false);
+  const [birdieHole, setBirdieHole] = useState(null);
+  const [birdiePlayer, setBirdiePlayer] = useState(null);
+  const birdieTimeoutRef = React.useRef(null);
+  // Eagle popup state
+  const [showEagle, setShowEagle] = useState(false);
+  const [eagleHole, setEagleHole] = useState(null);
+  const [eaglePlayer, setEaglePlayer] = useState(null);
+  const eagleTimeoutRef = React.useRef(null);
+  // Blowup popup state
+  const [showBlowup, setShowBlowup] = useState(false);
+  const [blowupHole, setBlowupHole] = useState(null);
+  const [blowupPlayer, setBlowupPlayer] = useState(null);
+  const blowupTimeoutRef = React.useRef(null);
   // Top menu for UI consistency (copied from ResultsMedal)
   const userMenu = (() => {
     try {
@@ -292,6 +307,40 @@ export default function Scorecard(props) {
     setScores(prev => {
       const updated = prev.map(row => [...row]);
       updated[playerIdx][holeIdx] = value;
+      // Birdie/Eagle/Blowup detection logic
+      const gross = parseInt(value, 10);
+      const hole = defaultHoles[holeIdx];
+      if (gross > 0 && hole) {
+        // Eagle: 2 under par
+        if (gross === hole.par - 2) {
+          setEagleHole(hole.number);
+          setEaglePlayer(groupPlayers[playerIdx]);
+          setShowEagle(true);
+          if (navigator.vibrate) {
+            navigator.vibrate([200, 100, 200, 100, 200]);
+          }
+          if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+          eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+        } else if (gross === hole.par - 1) {
+          setBirdieHole(hole.number);
+          setBirdiePlayer(groupPlayers[playerIdx]);
+          setShowBirdie(true);
+          if (navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]);
+          }
+          if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+          birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+        } else if (gross >= hole.par + 3) {
+          setBlowupHole(hole.number);
+          setBlowupPlayer(groupPlayers[playerIdx]);
+          setShowBlowup(true);
+          if (navigator.vibrate) {
+            navigator.vibrate([400, 100, 400]);
+          }
+          if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+          blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+        }
+      }
       return updated;
     });
     // Save scores for this player
@@ -335,6 +384,75 @@ export default function Scorecard(props) {
 
   return (
     <PageBackground>
+      {/* Birdie Celebration Popup */}
+      {showBirdie && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-green-300 animate-bounceIn">
+            <span className="text-6xl mb-2" role="img" aria-label="Birdie">🕊️</span>
+            <h2 className="text-3xl font-extrabold mb-2 text-green-700 drop-shadow">Birdie!</h2>
+            <div className="text-lg font-semibold text-gray-700 mb-1">For {birdiePlayer} on Hole {birdieHole}</div>
+            <button
+              className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              onClick={() => {
+                setShowBirdie(false);
+                if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Eagle Celebration Popup */}
+      {showEagle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-yellow-400">
+            <span className="text-6xl mb-2" role="img" aria-label="Eagle">🦅</span>
+            <h2 className="text-3xl font-extrabold mb-2 text-yellow-600 drop-shadow">Eagle!</h2>
+            <div className="text-lg font-semibold text-gray-700 mb-1">For {eaglePlayer} on Hole {eagleHole}</div>
+            <button
+              className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              onClick={() => {
+                setShowEagle(false);
+                if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Blowup Popup */}
+      {showBlowup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-red-500">
+            <span className="text-6xl mb-2" role="img" aria-label="Explosion">💥</span>
+            <h2 className="text-2xl font-extrabold mb-2 text-red-700 drop-shadow">How embarrassing.</h2>
+            <div className="text-lg font-semibold text-gray-700 mb-1">{blowupPlayer} just blew up on Hole {blowupHole}.</div>
+            <button
+              className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              onClick={() => {
+                setShowBlowup(false);
+                if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       <TopMenu />
       {/* Tee/Handicap Modal */}
       {showTeeModal && (
