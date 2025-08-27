@@ -15,7 +15,13 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
       if (!comp.date || !Array.isArray(comp.groups)) return false;
       const compDate = new Date(comp.date);
       const isOpen = compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const assigned = comp.groups.some(g => Array.isArray(g.players) && g.players.includes(user.name));
+      function nameMatch(a, b) {
+        if (!a || !b) return false;
+        const normA = a.trim().toLowerCase();
+        const normB = b.trim().toLowerCase();
+        return normA && normB && (normA === normB || normA.length > 1 && normB.includes(normA) || normB.length > 1 && normA.includes(normB));
+      }
+      const assigned = comp.groups.some(g => Array.isArray(g.players) && g.players.some(p => nameMatch(p, user.name)));
       return isOpen && assigned;
     });
     if (openComps.length > 0) {

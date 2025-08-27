@@ -132,16 +132,21 @@ export default function Scorecard(props) {
           body: JSON.stringify({ competitionId: competition.id, scores: Array(18).fill('') })
         });
       } catch (err) {
-        console.log('Failed to reset scores for', groupPlayers[pIdx], err);
       }
     }
   };
   // Modal state for reset confirmation
   const [showResetModal, setShowResetModal] = useState(false);
   // Helper to find groupForPlayer from competition and player
+  function nameMatch(a, b) {
+    if (!a || !b) return false;
+    const normA = a.trim().toLowerCase();
+    const normB = b.trim().toLowerCase();
+    return normA && normB && (normA === normB || normA.length > 1 && normB.includes(normA) || normB.length > 1 && normA.includes(normB));
+  }
   function getGroupForPlayer(competition, player) {
     if (competition && competition.groups && competition.groups.length > 0) {
-      let group = competition.groups.find(g => Array.isArray(g.players) && g.players.includes(player?.name));
+      let group = competition.groups.find(g => Array.isArray(g.players) && g.players.some(p => nameMatch(p, player?.name)));
       if (!group) group = competition.groups[0];
       return group;
     }
@@ -183,7 +188,6 @@ export default function Scorecard(props) {
       if (initialCompetition && initialCompetition.id) {
         setLoading(true);
         try {
-          console.log('Fetching competition by initialCompetition.id:', initialCompetition.id);
           const res = await fetch(`/api/competitions/${initialCompetition.id}`);
           if (res.ok) {
             const data = await res.json();
@@ -197,7 +201,6 @@ export default function Scorecard(props) {
       } else if (urlId) {
         setLoading(true);
         try {
-          console.log('Fetching competition by urlId:', urlId);
           const res = await fetch(`/api/competitions/${urlId}`);
           if (res.ok) {
             const data = await res.json();
@@ -210,7 +213,6 @@ export default function Scorecard(props) {
         }
       }
     }
-    console.log('Scorecard useEffect: urlId =', urlId, 'initialCompetition =', initialCompetition);
     fetchCompetition();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -267,23 +269,18 @@ export default function Scorecard(props) {
           if (user) userId = user.id || user.user_id || user.userId;
         }
         const url = `/api/teams/${groupTeamId}/users/${userId}/scores?competitionId=${competition.id}`;
-        console.log('GET scores URL:', url);
         if (!userId) return Array(18).fill('');
         try {
           const res = await fetch(url);
           if (!res.ok) {
-            console.log('GET scores failed:', res.status);
             return Array(18).fill('');
           }
           const data = await res.json();
-          console.log('GET scores response:', data);
           return Array.isArray(data.scores) && data.scores.length === 18 ? data.scores.map(v => v == null ? '' : v) : Array(18).fill('');
         } catch (err) {
-          console.log('GET scores error:', err);
           return Array(18).fill('');
         }
       }));
-      console.log('setScores with:', newScores);
       if (!cancelled) setScores(newScores);
       setScoresLoading(false);
     }
@@ -306,15 +303,12 @@ export default function Scorecard(props) {
       if (user) userId = user.id || user.user_id || user.userId;
     }
     if (!userId) {
-      console.log('No userId found for player', groupPlayers[playerIdx]);
       return;
     }
     // Prepare scores array for this player
     const playerScores = scores[playerIdx].map((v, idx) => idx === holeIdx ? value : v);
     const patchUrl = `/api/teams/${groupTeamId}/users/${userId}/scores`;
     const patchBody = { competitionId: competition.id, scores: playerScores.map(v => v === '' ? null : Number(v)) };
-    console.log('PATCH URL:', patchUrl);
-    console.log('PATCH BODY:', patchBody);
     try {
       const res = await fetch(patchUrl, {
         method: 'PATCH',
@@ -322,7 +316,6 @@ export default function Scorecard(props) {
         body: JSON.stringify(patchBody)
       });
       const result = await res.json();
-      console.log('PATCH response:', result);
     } catch (err) {
       console.error('PATCH error:', err);
     }
@@ -385,10 +378,6 @@ export default function Scorecard(props) {
                 setSavingTee(true);
                 try {
                   // Debug logs to help diagnose missing teamId
-                  console.log('DEBUG: player.name:', player?.name);
-                  console.log('DEBUG: competition.groups:', competition?.groups);
-                  console.log('DEBUG: groupForPlayer:', groupForPlayer);
-                  console.log('DEBUG: groupTeamId:', groupTeamId);
                   // PATCH to backend using groupTeamId
                   const teamId = groupTeamId;
                   const userId = player.id || player.user_id || player.userId;
@@ -399,8 +388,6 @@ export default function Scorecard(props) {
                   }
                   const patchUrl = `/api/teams/${teamId}/users/${userId}`;
                   const patchBody = { teebox: selectedTee, course_handicap: inputHandicap };
-                  console.log('PATCH URL:', patchUrl);
-                  console.log('PATCH BODY:', patchBody);
                   const res = await fetch(patchUrl, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
@@ -416,7 +403,6 @@ export default function Scorecard(props) {
                       const compRes = await fetch(`/api/competitions/${competition.id}`);
                       if (compRes.ok) {
                         const compData = await compRes.json();
-                        console.log('Fetched competition after PATCH:', compData);
                         setCompetition(compData);
                       }
                     } catch (e) {

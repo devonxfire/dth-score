@@ -1,13 +1,23 @@
 
 import { useState, useEffect } from 'react';
-import PageBackground from './PageBackground';
 
-export default function FourballAssignment({ fourballs, onAssign }) {
+export default function FourballAssignment({ fourballs, onAssign, initialGroups }) {
   // fourballs: number of 4balls
   // onAssign: callback with array of { players: [], teeTime: '' }
-  const [groups, setGroups] = useState(
-    Array.from({ length: fourballs }, () => ({ players: Array(4).fill(''), teeTime: '' }))
-  );
+  const [groups, setGroups] = useState(() => {
+    if (initialGroups && Array.isArray(initialGroups) && initialGroups.length > 0) {
+      // Pad or trim to match fourballs count
+      const filled = initialGroups.slice(0, fourballs).map(g => ({
+        players: Array.isArray(g.players) ? g.players.slice(0, 4).concat(Array(4).fill('')).slice(0, 4) : Array(4).fill(''),
+        teeTime: g.teeTime || ''
+      }));
+      while (filled.length < fourballs) {
+        filled.push({ players: Array(4).fill(''), teeTime: '' });
+      }
+      return filled;
+    }
+    return Array.from({ length: fourballs }, () => ({ players: Array(4).fill(''), teeTime: '' }));
+  });
   const [available, setAvailable] = useState([]);
   useEffect(() => {
     async function fetchUsers() {
@@ -25,9 +35,17 @@ export default function FourballAssignment({ fourballs, onAssign }) {
     fetchUsers();
   }, []);
   // Track guest names for each group/player slot
-  const [guestNames, setGuestNames] = useState(
-    Array.from({ length: fourballs }, () => Array(4).fill(''))
-  );
+  const [guestNames, setGuestNames] = useState(() => {
+    if (initialGroups && Array.isArray(initialGroups) && initialGroups.length > 0) {
+      // Extract guest names from initialGroups if present
+      return initialGroups.slice(0, fourballs).map(g =>
+        Array.isArray(g.players)
+          ? g.players.slice(0, 4).map(p => (typeof p === 'string' && p.startsWith('GUEST ') ? p.replace(/^GUEST\s*/i, '') : ''))
+          : Array(4).fill('')
+      ).concat(Array(Math.max(0, fourballs - initialGroups.length)).fill(Array(4).fill('')));
+    }
+    return Array.from({ length: fourballs }, () => Array(4).fill(''));
+  });
 
   function handlePlayerChange(groupIdx, playerIdx, value) {
     // If switching away from GUEST, clear guest name
@@ -86,12 +104,12 @@ export default function FourballAssignment({ fourballs, onAssign }) {
   }
 
   return (
-    <PageBackground>
-      <div className="flex flex-col items-center px-4 mt-12">
-        <h3 className="text-3xl font-bold text-white mb-6 drop-shadow-lg text-center">Assign Players to 4 Balls & Tee Times</h3>
+    <>
+      <div className="flex flex-col items-center">
+        <h3 className="text-3xl font-bold text-white mb-6 text-center">Assign Players to 4 Balls & Tee Times</h3>
       </div>
-      <div className="flex flex-col items-center px-4 mt-8">
-  <form onSubmit={handleSubmit} className="w-full max-w-4xl rounded-2xl bg-transparent text-white mx-auto px-8" style={{ background: 'none', boxShadow: 'none' }}>
+      <div className="flex flex-col items-center">
+        <form onSubmit={handleSubmit} className="w-full max-w-4xl rounded-2xl bg-transparent text-white mx-auto" style={{ background: 'none' }}>
           {groups.map((group, idx) => (
             <div key={idx} className="mb-6 border-b border-white/30 pb-4">
               <div className="mb-2 font-semibold">4 Ball {idx + 1}</div>
@@ -116,7 +134,7 @@ export default function FourballAssignment({ fourballs, onAssign }) {
                   >
                     <option value="">Select player</option>
                     {available.concat(player.startsWith('GUEST') ? 'GUEST' : player).map(
-                      name => name && <option key={name} value={name}>{name}</option>
+                      (name, optIdx) => name && <option key={`${name}-${idx}-${pIdx}-${optIdx}`} value={name}>{name}</option>
                     )}
                   </select>
                   {(player === 'GUEST' || player.startsWith('GUEST ')) && (
@@ -136,7 +154,7 @@ export default function FourballAssignment({ fourballs, onAssign }) {
           <button
             type="submit"
             className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg"
-            style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+            style={{ backgroundColor: '#1B3A6B', color: 'white' }}
             onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
             onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
           >
@@ -144,6 +162,6 @@ export default function FourballAssignment({ fourballs, onAssign }) {
           </button>
         </form>
       </div>
-    </PageBackground>
+    </>
   );
 }

@@ -4,7 +4,7 @@ function isAdmin(user) {
 }
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import PageBackground from './PageBackground';
 import OpenCompModal from './OpenCompModal';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -46,6 +46,8 @@ function generateJoinCode() {
 
 
 function CreateCompetition({ user }) {
+  // Today's date for minDate
+  const today = new Date();
   const location = useLocation();
   const [form, setForm] = useState({
     type: 'fourBbbStableford',
@@ -159,6 +161,44 @@ function CreateCompetition({ user }) {
     }
   }
 
+  if (created) {
+    return (
+      <PageBackground>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-green-200">
+            <div className="flex flex-col items-center mb-4">
+              <span className="text-5xl mb-2" role="img" aria-label="Success">✅</span>
+              <h2 className="text-2xl font-extrabold mb-2 drop-shadow" style={{ color: '#1B3A6B' }}>Competition Created!</h2>
+            </div>
+            <div className="mb-4 text-gray-700 text-center text-base font-medium">
+              <p className="mb-1">Type: <span className="font-bold" style={{ color: '#1B3A6B' }}>{COMP_TYPE_DISPLAY[form.type] || form.type}</span></p>
+              <p className="mb-1">Date: <span className="font-bold" style={{ color: '#1B3A6B' }}>{formatDate(form.date)}</span></p>
+              <p className="mb-1">Club: <span className="font-bold" style={{ color: '#1B3A6B' }}>{form.club}</span></p>
+              {form.fourballs && <p className="mb-1">4 Balls: <span className="font-bold" style={{ color: '#1B3A6B' }}>{form.fourballs}</span></p>}
+              {form.notes && <p className="mb-1">Notes: <span className="font-bold" style={{ color: '#1B3A6B' }}>{form.notes}</span></p>}
+            </div>
+            <div className="flex gap-4 mt-6">
+              <button
+                className="px-5 py-2 rounded-2xl bg-[#1B3A6B] hover:bg-[#22457F] text-white font-semibold shadow transition"
+                onClick={() => navigate('/dashboard')}
+              >
+                Dashboard
+              </button>
+              {compId && (
+                <button
+                  className="px-5 py-2 rounded-2xl bg-[#1B3A6B] hover:bg-[#22457F] text-white font-semibold shadow transition"
+                  onClick={() => navigate(`/competition/${compId}`)}
+                >
+                  View Competition
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </PageBackground>
+    );
+  }
+
   return (
     <PageBackground>
       <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
@@ -200,33 +240,9 @@ function CreateCompetition({ user }) {
           <h2 className="text-3xl font-bold text-white mb-2 drop-shadow-lg text-center">Create Competition</h2>
         </div>
       )}
-  <div className="relative z-10 flex flex-col items-center px-4 mt-8">
-  {/* Home button moved to bottom of form */}
-  <div className="w-full max-w-4xl rounded-2xl p-8 flex flex-col gap-6 px-8" style={{ background: 'none', boxShadow: 'none' }}>
-          {created ? (
-            <div className="text-white text-center p-6">
-              <h3 className="text-xl font-semibold mb-2">Competition Created!</h3>
-              <p className="mb-2">Type: <span className="font-medium">{
-                COMP_TYPE_DISPLAY[form.type] || form.type
-              }</span></p>
-              <p className="mb-2">Date: <span className="font-medium">{formatDate(form.date)}</span></p>
-              <p className="mb-2">Club: <span className="font-medium">{form.club}</span></p>
-              {form.fourballs && <p className="mb-2">4 Balls: <span className="font-medium">{form.fourballs}</span></p>}
-              {form.notes && <p className="mb-2">Notes: <span className="font-medium">{form.notes}</span></p>}
-              <p className="mb-2">Join Code: <span className="font-medium">{joinCode || '-'}</span></p>
-              <p className="mt-4 text-green-200 font-bold">Share the join code: <span className="bg-white/20 px-2 py-1 rounded text-white">{joinCode || '-'}</span></p>
-              <p className="mt-2 text-white/80">Invite others to join your competition by sending them the join code above.</p>
-              <button
-                className="mt-6 py-2 px-6 border border-white text-white font-semibold rounded-2xl transition text-lg"
-                style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                onClick={() => navigate('/dashboard')}
-                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-              >
-                Home
-              </button>
-            </div>
-          ) : showGroups ? (
+      <div className="relative z-10 flex flex-col items-center px-4 mt-8">
+        <div className="w-full max-w-4xl rounded-2xl p-8 flex flex-col gap-6 px-8" style={{ background: 'none', boxShadow: 'none' }}>
+          {showGroups ? (
             <FourballAssignment
               fourballs={parseInt(form.fourballs) || 1}
               onAssign={handleAssign}
@@ -247,6 +263,7 @@ function CreateCompetition({ user }) {
                     calendarClassName="bg-[#18181b] text-white border border-white"
                     dayClassName={() => 'text-white'}
                     wrapperClassName="w-full"
+                    minDate={today}
                     required
                   />
                   <svg
@@ -297,10 +314,10 @@ function CreateCompetition({ user }) {
                   onChange={handleTypeChange}
                   className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
                 >
-              <option value="fourBbbStableford">4BBB Stableford (2 Scores to Count)</option>
-              <option value="alliance">Alliance</option>
-              <option value="medalStrokeplay">Medal Strokeplay</option>
-              <option value="individualStableford">Individual Stableford</option>
+                  <option value="fourBbbStableford">4BBB Stableford (2 Scores to Count)</option>
+                  <option value="alliance">Alliance</option>
+                  <option value="medalStrokeplay">Medal Strokeplay</option>
+                  <option value="individualStableford">Individual Stableford</option>
                 </select>
               </div>
               <div className="mb-4">
@@ -353,7 +370,6 @@ function CreateCompetition({ user }) {
               >
                 Next: Assign 4 Balls
               </button>
-              {/* Footer menu removed, now at top */}
             </form>
           )}
         </div>

@@ -41,6 +41,7 @@ function AppRoutes({ user, setUser }) {
           <Route path="/join" element={<JoinCompetition user={user} />} />
           <Route path="/recent" element={<RecentCompetitions user={user} />} />
           <Route path="/competition/:id" element={<CompetitionInfo user={user} />} />
+          <Route path="/competition/:id/edit" element={<CreateCompetition user={user} />} />
           <Route path="/scorecard/:id" element={<Scorecard user={user} />} />
           <Route path="/leaderboard/:id" element={<Leaderboard user={user} />} />
           <Route path="/results/:id" element={<ResultsMedal />} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import OpenCompModal from './OpenCompModal';
-import { PlusIcon } from '@heroicons/react/24/solid';
+import { PlusIcon, EyeIcon, PencilSquareIcon, ScissorsIcon, XMarkIcon, TrashIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import PageBackground from './PageBackground';
@@ -134,19 +134,18 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                   <PlusIcon className="h-5 w-5 mr-1" />
                   Create New Competition
                 </button>
-                <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
               </div>
             )}
-          <table className="min-w-full border text-center mb-6">
-            <thead>
-              <tr className="bg-white/10">
-                <th className="border px-2 py-1">Date</th>
-                <th className="border px-2 py-1">Type</th>
-                <th className="border px-2 py-1">Course</th>
-                <th className="border px-2 py-1">Status</th>
-                {isAdmin(user) && <th className="border px-2 py-1">Action</th>}
-              </tr>
-            </thead>
+            <table className="w-full border-collapse text-base shadow-xl overflow-hidden bg-white/10">
+              <thead>
+                <tr>
+                  <th className="border px-2 py-1">Date</th>
+                  <th className="border px-2 py-1">Type</th>
+                  <th className="border px-2 py-1">Course</th>
+                  <th className="border px-2 py-1 w-[100px] text-center">Status</th>
+                  {isAdmin(user) && <th className="border border-white px-2 py-1 w-[260px]">Action</th>}
+                </tr>
+              </thead>
             <tbody>
               {competitionList.length === 0 ? (
                 <tr>
@@ -171,92 +170,116 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 return (
                   <tr key={keyBase + '-info'} className="border">
                     <td className="border px-2 py-1">{formatDate(comp.date)}</td>
-                    <td className="border px-2 py-1">{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</td>
-                    <td className="border px-2 py-1">{comp.club || comp.joinCode || comp.joincode || '-'}</td>
+                    <td className="border px-2 py-1 whitespace-nowrap">{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</td>
+                    <td className="border px-2 py-1 whitespace-nowrap">{comp.club || comp.joinCode || comp.joincode || '-'}</td>
                     <td className={
-                      `border px-2 py-1 font-semibold rounded ${
+                      `border border-white px-2 py-1 text-center align-middle w-[100px] ${
                         status === 'Open'
-                          ? 'bg-green-500/80 text-white'
+                          ? 'bg-[#1B3A6B] text-white'
                           : status === 'Closed'
-                            ? 'bg-red-500/80 text-white'
+                            ? 'text-white'
                             : ''
                       }`
                     }>
                       {status}
                     </td>
-                    <td className="border px-2 py-1">
-                      <div className="flex flex-row gap-2 justify-center items-center">
+                    <td className="border px-2 py-1 w-[260px]">
+                      <div className={`flex flex-row gap-2 items-center w-full ${status === 'Open' ? 'justify-between' : 'justify-center'}`}> 
+                        {/* Always render 4 buttons for alignment: Info, Edit, End/Re-open, Delete. Use invisible placeholders for non-admins. */}
                         <button
-                          className="py-1 px-3 border border-white text-white font-semibold rounded-2xl transition bg-[#1B3A6B] hover:bg-white hover:text-[#1B3A6B]"
+                          className="py-1 px-3 flex items-center gap-1 border border-[#1B3A6B] text-white font-semibold rounded-2xl transition bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white"
                           style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
                           onClick={() => navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}`, { state: { comp } })}
                         >
-                          Info
+                          <EyeIcon className="h-5 w-5 mr-1" /> Info
                         </button>
-                        {isAdmin(user) && (
+                        {isAdmin(user) ? (
                           <>
                             <button
-                              className="py-1 px-3 border border-blue-400 text-blue-900 font-semibold rounded-2xl transition bg-blue-100 hover:bg-blue-200"
-                              style={{ boxShadow: '0 2px 8px 0 rgba(33,150,243,0.10)' }}
+                              className="py-1 px-3 flex items-center gap-1 border border-[#1B3A6B] text-white font-semibold rounded-2xl transition bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white"
+                              style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
                               onClick={() => navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}/edit`, { state: { comp } })}
                             >
-                              Edit
+                              <ScissorsIcon className="h-5 w-5 mr-1" /> Edit
                             </button>
-                            {isAdmin(user) && (
-                              <button
-                                className="py-1 px-3 bg-yellow-400 text-[#1B3A6B] font-bold rounded-2xl border border-white transition hover:bg-yellow-500 shadow"
-                                style={{ boxShadow: '0 2px 8px 0 rgba(255,193,7,0.10)' }}
-                                onClick={async () => {
-                                  // Toggle comp status between Open and Closed
-                                  const newStatus = status === 'Open' ? 'Closed' : 'Open';
-                                  const apiUrl = `/api/competitions/${comp.id}`;
-                                  const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
-                                  if (!adminSecret) {
-                                    alert('Admin secret missing. Set REACT_APP_ADMIN_SECRET in your .env file.');
-                                    return;
-                                  }
-                                  try {
-                                    const res = await fetch(apiUrl, {
-                                      method: 'PATCH',
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-Admin-Secret': adminSecret
-                                      },
-                                      body: JSON.stringify({ status: newStatus })
-                                    });
-                                    const responseText = await res.text();
-                                    if (!res.ok) {
-                                      console.error('PATCH error:', res.status, responseText);
-                                      alert(`Failed to update competition status: [${res.status}] ${responseText}`);
+                            {(() => {
+                              const endBtnClass = "py-1 px-6 min-w-[115px] flex items-center gap-1 border border-[#1B3A6B] text-white font-semibold rounded-2xl transition bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white whitespace-nowrap";
+                              const reopenBtnClass = "py-1 px-3 min-w-[80px] flex items-center gap-1 border border-[#1B3A6B] text-white font-semibold rounded-2xl transition bg-[#1B3A6B] hover:bg-[#22457F] hover:text-white whitespace-nowrap";
+                              return (
+                                <button
+                                  className={status === 'Open' ? endBtnClass : reopenBtnClass}
+                                  style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                                  onClick={async () => {
+                                    // Toggle comp status between Open and Closed
+                                    const newStatus = status === 'Open' ? 'Closed' : 'Open';
+                                    const apiUrl = `/api/competitions/${comp.id}`;
+                                    const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+                                    if (!adminSecret) {
+                                      alert('Admin secret missing. Set REACT_APP_ADMIN_SECRET in your .env file.');
                                       return;
                                     }
-                                    let updated;
                                     try {
-                                      updated = JSON.parse(responseText);
-                                    } catch (e) {
-                                      updated = null;
+                                      const res = await fetch(apiUrl, {
+                                        method: 'PATCH',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'X-Admin-Secret': adminSecret
+                                        },
+                                        body: JSON.stringify({ status: newStatus })
+                                      });
+                                      const responseText = await res.text();
+                                      if (!res.ok) {
+                                        console.error('PATCH error:', res.status, responseText);
+                                        alert(`Failed to update competition status: [${res.status}] ${responseText}`);
+                                        return;
+                                      }
+                                      let updated;
+                                      try {
+                                        updated = JSON.parse(responseText);
+                                      } catch (e) {
+                                        updated = null;
+                                      }
+                                      // After successful toggle, re-fetch competitions to update openComps
+                                      await fetchCompetitions();
+                                    } catch (err) {
+                                      console.error('PATCH exception:', err);
+                                      alert('Error updating competition status: ' + (err?.message || err));
                                     }
-                                    console.log('PATCH success:', updated);
-                                    // After successful toggle, re-fetch competitions to update openComps
-                                    await fetchCompetitions();
-                                  } catch (err) {
-                                    console.error('PATCH exception:', err);
-                                    alert('Error updating competition status: ' + (err?.message || err));
-                                  }
-                                }}
-                                disabled={deleting}
-                              >
-                                {status === 'Open' ? 'End Comp' : 'Reopen'}
-                              </button>
-                            )}
+                                  }}
+                                  disabled={deleting}
+                                >
+                                  {status === 'Open' ? <XMarkIcon className="h-5 w-5 mr-1" /> : <ArrowPathIcon className="h-5 w-5 mr-1" />}
+                                  {status === 'Open' ? 'End' : 'Re-open'}
+                                </button>
+                              );
+                            })()}
                             <button
-                              className="py-1 px-3 bg-red-600 text-white font-bold rounded-2xl border border-white transition hover:bg-red-700 shadow"
-                              style={{ boxShadow: '0 2px 8px 0 rgba(255,0,0,0.10)' }}
+                              className="py-1 px-3 flex items-center gap-1 border text-white font-semibold rounded-2xl transition"
+                              style={{
+                                backgroundColor: '#dc2626', // Tailwind red-600
+                                borderColor: '#dc2626',
+                                boxShadow: '0 2px 8px 0 rgba(220,38,38,0.10)'
+                              }}
+                              onMouseOver={e => {
+                                e.currentTarget.style.backgroundColor = '#b91c1c'; // Tailwind red-700
+                                e.currentTarget.style.borderColor = '#b91c1c';
+                              }}
+                              onMouseOut={e => {
+                                e.currentTarget.style.backgroundColor = '#dc2626';
+                                e.currentTarget.style.borderColor = '#dc2626';
+                              }}
                               onClick={() => { setShowDeleteModal(true); setDeleteCompId(comp.id); }}
                               disabled={deleting}
                             >
-                              Delete
+                              <TrashIcon className="h-5 w-5 mr-1" /> Delete
                             </button>
+                          </>
+                        ) : (
+                          <>
+                            {/* Invisible placeholders for alignment */}
+                            <span className="py-1 px-3 min-w-[80px] flex items-center gap-1 opacity-0 select-none">Edit</span>
+                            <span className="py-1 px-3 min-w-[80px] flex items-center gap-1 opacity-0 select-none">End</span>
+                            <span className="py-1 px-3 min-w-[80px] flex items-center gap-1 opacity-0 select-none">Delete</span>
                           </>
                         )}
                       </div>

@@ -8,8 +8,8 @@ function formatDate(dateStr) {
   return `${day}/${month}/${year}`;
 }
 
-import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
 
@@ -24,10 +24,20 @@ const COMP_TYPE_DISPLAY = {
   'individual stableford': 'Individual Stableford',
 };
 
+
 export default function CompetitionInfo({ user }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const comp = location.state?.comp;
+  const params = useParams();
+  const [comp, setComp] = useState(location.state?.comp || null);
+  const compId = comp?.id || params.id;
+
+  useEffect(() => {
+    if (!compId) return;
+    fetch(`/api/competitions/${compId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setComp(data); });
+  }, [compId]);
 
   // For TopMenu: pass user and comp as userComp if user is a player in this comp
   const isPlayerInComp = user && comp && comp.groups && comp.groups.some(g => Array.isArray(g.players) && g.players.includes(user.name));

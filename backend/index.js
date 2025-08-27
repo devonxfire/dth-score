@@ -30,17 +30,26 @@ app.patch('/api/competitions/:id/groups', async (req, res) => {
       where: { id: Number(id) },
       data: { groups: groups },
     });
-    // For each group, ensure a team exists in the teams table
+
+    // Fetch all existing teams for this competition
+    const existingTeams = await prisma.teams.findMany({ where: { competition_id: Number(id) } });
+    // For each group, ensure a team exists in the teams table (preserve existing, only add new)
     for (const [i, group] of groups.entries()) {
       if (!Array.isArray(group.players) || group.players.length === 0) continue;
-      // Try to find an existing team for this comp with the same players
-      const existingTeam = await prisma.teams.findFirst({
-        where: {
-          competition_id: Number(id),
-          players: { equals: group.players }
+      // Try to find an existing team for this comp with the same players (order-insensitive)
+      const groupSet = new Set(group.players.map(p => p && p.trim && p.trim()));
+      let foundTeam = null;
+      for (const team of existingTeams) {
+        if (Array.isArray(team.players)) {
+          const teamSet = new Set(team.players.map(p => p && p.trim && p.trim()));
+          if (groupSet.size === teamSet.size && [...groupSet].every(p => teamSet.has(p))) {
+            foundTeam = team;
+            break;
+          }
         }
-      });
-      if (!existingTeam) {
+      }
+      if (!foundTeam) {
+        // Only create a new team if this group is truly new
         await prisma.teams.create({
           data: {
             competition_id: Number(id),
@@ -49,7 +58,9 @@ app.patch('/api/competitions/:id/groups', async (req, res) => {
           }
         });
       }
+      // If foundTeam exists, do nothing (preserve all data)
     }
+    // Do NOT delete or update any existing teams, scores, or player info
     res.json({ success: true, competition: updated });
   } catch (err) {
     console.error('Error updating groups:', err);
@@ -218,9 +229,6 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
     return res.status(400).json({ error: 'competitionId and 18 scores required' });
   }
   try {
-    console.log('PATCH /api/teams/:teamId/users/:userId/scores called');
-    console.log('Params:', req.params);
-    console.log('Body:', req.body);
     // Fetch holes for this competition, ordered by number (1-18)
     const holes = await prisma.holes.findMany({
       where: { competition_id: Number(competitionId) },
@@ -230,7 +238,6 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
       const strokes = scores[i];
       const hole = holes[i];
       if (!hole) {
-        console.log(`Skipping hole index ${i}: no hole found`);
         continue;
       }
       if (strokes == null || strokes === '') {
@@ -263,7 +270,6 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
           strokes: Number(strokes)
         }
       };
-      console.log(`Upserting score for hole #${i+1} (hole_id=${hole.id}):`, upsertData);
       await prisma.scores.upsert(upsertData);
     }
     res.json({ success: true });
@@ -280,26 +286,42 @@ app.delete('/api/competitions/:id', async (req, res) => {
 // Update competition status by ID (admin only)
 app.patch('/api/competitions/:id', async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
   const adminSecret = req.header('X-Admin-Secret');
-  console.log(`[PATCH /api/competitions/${id}] Requested status:`, status);
   if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
-    console.log('Admin secret invalid or missing');
     return res.status(403).json({ error: 'Forbidden: invalid admin secret' });
   }
-  if (!status || (status !== 'Open' && status !== 'Closed')) {
-    console.log('Invalid status value:', status);
-    return res.status(400).json({ error: 'Status must be "Open" or "Closed"' });
+  // Accept all editable fields
+  console.log('PATCH /api/competitions/:id body:', req.body);
+  const {
+    type,
+    date,
+    club,
+    handicapAllowance,
+    fourballs,
+    notes,
+    status
+  } = req.body;
+  // Build update data object dynamically
+  const updateData = {};
+  if (type !== undefined) updateData.type = type;
+  if (date !== undefined) updateData.date = date;
+  if (club !== undefined) updateData.club = club;
+  if (handicapAllowance !== undefined) updateData.handicapallowance = handicapAllowance;
+  if (fourballs !== undefined) updateData.fourballs = fourballs;
+  if (notes !== undefined) updateData.notes = notes;
+  if (status !== undefined) updateData.status = status;
+  console.log('PATCH /api/competitions/:id updateData:', updateData);
+  if (Object.keys(updateData).length === 0) {
+    return res.status(400).json({ error: 'No valid fields provided for update' });
   }
   try {
     const updated = await prisma.competitions.update({
       where: { id: Number(id) },
-      data: { status },
+      data: updateData,
     });
-    console.log(`[PATCH /api/competitions/${id}] Updated competition:`, updated);
     res.json({ success: true, competition: updated });
   } catch (err) {
-    console.error('Error updating competition status:', err);
+    console.error('Error updating competition:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
@@ -401,6 +423,13 @@ function generateJoinCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
+
+// Test PATCH endpoint for debugging
+app.patch('/api/test', (req, res) => {
+  console.log('Test PATCH hit');
+  res.json({ ok: true });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
@@ -409,7 +438,6 @@ app.listen(PORT, () => {
 
 // Create Competition endpoint
 app.post('/api/competitions', async (req, res) => {
-  console.log('POST /api/competitions body:', req.body);
   let { date, type, club, handicapAllowance, joinCode, notes, groups } = req.body;
   if (!date || !type || !handicapAllowance) {
     return res.status(400).json({ error: 'Missing required fields (date, type, or handicap allowance)'});

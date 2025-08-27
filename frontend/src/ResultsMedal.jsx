@@ -310,7 +310,6 @@ export default function ResultsMedal() {
               <button
                 onClick={() => {
                   const compId = competition?.id || competition?._id || competition?.joinCode || competition?.joincode || id;
-                  console.log('Navigating to Scorecard with compId:', compId, 'competition:', competition);
                   navigate(`/scorecard/${compId}`, { state: { competition } });
                 }}
                 className="py-2 px-4 w-44 bg-green-600 text-white font-semibold rounded-2xl hover:bg-green-700 border border-white transition"
