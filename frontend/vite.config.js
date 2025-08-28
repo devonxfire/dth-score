@@ -9,5 +9,6 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:5050',
     },
+    allowedHosts: ['f91a54fd4849.ngrok-free.app'],
   },
 })
