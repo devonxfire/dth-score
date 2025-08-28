@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import PageBackground from './PageBackground';
 import OpenCompModal from './OpenCompModal';
 import { useNavigate, useLocation } from 'react-router-dom';
+import TopMenu from './TopMenu';
 import FourballAssignment from './FourballAssignment';
 
 // Display mapping for all comp types
@@ -45,7 +46,7 @@ function generateJoinCode() {
 }
 
 
-function CreateCompetition({ user }) {
+function CreateCompetition({ user, onSignOut }) {
   // Today's date for minDate
   const today = new Date();
   const location = useLocation();
@@ -164,29 +165,32 @@ function CreateCompetition({ user }) {
   if (created) {
     return (
       <PageBackground>
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-green-200">
+        <TopMenu user={user} onSignOut={onSignOut} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-jiggle">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border-2 border-[#FFD700]">
             <div className="flex flex-col items-center mb-4">
               <span className="text-5xl mb-2" role="img" aria-label="Success">✅</span>
-              <h2 className="text-2xl font-extrabold mb-2 drop-shadow" style={{ color: '#1B3A6B' }}>Competition Created!</h2>
+              <h2 className="text-2xl font-extrabold mb-2 drop-shadow" style={{ color: '#1B3A6B', fontFamily: 'Merriweather, Georgia, serif' }}>Competition Created!</h2>
             </div>
-            <div className="mb-4 text-gray-700 text-center text-base font-medium">
-              <p className="mb-1">Type: <span className="font-bold" style={{ color: '#1B3A6B' }}>{COMP_TYPE_DISPLAY[form.type] || form.type}</span></p>
-              <p className="mb-1">Date: <span className="font-bold" style={{ color: '#1B3A6B' }}>{formatDate(form.date)}</span></p>
-              <p className="mb-1">Club: <span className="font-bold" style={{ color: '#1B3A6B' }}>{form.club}</span></p>
-              {form.fourballs && <p className="mb-1">4 Balls: <span className="font-bold" style={{ color: '#1B3A6B' }}>{form.fourballs}</span></p>}
-              {form.notes && <p className="mb-1">Notes: <span className="font-bold" style={{ color: '#1B3A6B' }}>{form.notes}</span></p>}
+            <div className="mb-4 text-[#1B3A6B] text-center text-base font-medium" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+              <p className="mb-1">Type: <span className="font-bold" style={{ color: '#FFD700' }}>{COMP_TYPE_DISPLAY[form.type] || form.type}</span></p>
+              <p className="mb-1">Date: <span className="font-bold" style={{ color: '#FFD700' }}>{formatDate(form.date)}</span></p>
+              <p className="mb-1">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{form.club}</span></p>
+              {form.fourballs && <p className="mb-1">4 Balls: <span className="font-bold" style={{ color: '#FFD700' }}>{form.fourballs}</span></p>}
+              {form.notes && <p className="mb-1">Notes: <span className="font-bold" style={{ color: '#FFD700' }}>{form.notes}</span></p>}
             </div>
             <div className="flex gap-4 mt-6">
               <button
                 className="px-5 py-2 rounded-2xl bg-[#1B3A6B] hover:bg-[#22457F] text-white font-semibold shadow transition"
+                style={{ fontFamily: 'Lato, Arial, sans-serif', fontWeight: 700, fontSize: '1.1rem' }}
                 onClick={() => navigate('/dashboard')}
               >
                 Dashboard
               </button>
               {compId && (
                 <button
-                  className="px-5 py-2 rounded-2xl bg-[#1B3A6B] hover:bg-[#22457F] text-white font-semibold shadow transition"
+                  className="px-5 py-2 rounded-2xl bg-[#FFD700] hover:bg-[#FFE066] text-[#1B3A6B] font-semibold shadow transition border border-[#1B3A6B]"
+                  style={{ fontFamily: 'Lato, Arial, sans-serif', fontWeight: 700, fontSize: '1.1rem' }}
                   onClick={() => navigate(`/competition/${compId}`)}
                 >
                   View Competition
@@ -201,47 +205,23 @@ function CreateCompetition({ user }) {
 
   return (
     <PageBackground>
+      <TopMenu user={user} onSignOut={onSignOut} />
       <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
-      {/* Top nav menu */}
-      <div className="flex flex-wrap justify-between items-center mt-8 mb-4 w-full max-w-2xl mx-auto px-8">
-        <button
-          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
-          style={location.pathname === '/dashboard' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => navigate('/dashboard')}
-        >
-          Dashboard
-        </button>
-        <button
-          className={`text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
-          style={location.pathname === '/recent' ? { borderColor: '#1B3A6B', borderBottomWidth: 2, background: 'none', borderStyle: 'solid', boxShadow: 'none' } : { background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => navigate('/recent')}
-        >
-          Competitions
-        </button>
-        <span
-          className="text-sm text-white font-semibold opacity-80 bg-transparent border-none outline-none px-2 py-1 cursor-default select-none"
-          style={{ background: 'none', border: 'none', boxShadow: 'none', lineHeight: '2.25rem' }}
-        >
-          Welcome, {(user?.name?.split(' ')[0]) || 'Player'}
-        </span>
-        <button
-          className="text-sm text-white font-semibold opacity-80 hover:opacity-100 hover:underline focus:underline bg-transparent border-none outline-none px-2 py-1 cursor-pointer"
-          style={{ background: 'none', border: 'none', boxShadow: 'none' }}
-          onClick={() => {
-            if (typeof window.onSignOut === 'function') window.onSignOut();
-            else if (typeof window.signOut === 'function') window.signOut();
-          }}
-        >
-          Sign Out
-        </button>
-      </div>
       {(!showGroups) && (
         <div className="flex flex-col items-center px-4 mt-12">
-          <h2 className="text-3xl font-bold text-white mb-2 drop-shadow-lg text-center">Create Competition</h2>
+          <div className="mb-10 w-full flex flex-col items-center">
+            <h1
+              className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2"
+              style={{ color: '#1B3A6B', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}
+            >
+              Create Competition
+            </h1>
+            <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, width: '100%', background: 'white', opacity: 0.7, borderRadius: 2}}></div>
+          </div>
         </div>
       )}
-      <div className="relative z-10 flex flex-col items-center px-4 mt-8">
-        <div className="w-full max-w-4xl rounded-2xl p-8 flex flex-col gap-6 px-8" style={{ background: 'none', boxShadow: 'none' }}>
+  <div className="relative z-10 flex flex-col items-center px-4 mt-2">
+  <div className="w-full max-w-2xl rounded-2xl shadow-lg p-8 flex flex-col gap-6" style={{ background: 'rgba(0,47,95,0.95)', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}>
           {showGroups ? (
             <FourballAssignment
               fourballs={parseInt(form.fourballs) || 1}
@@ -250,7 +230,7 @@ function CreateCompetition({ user }) {
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
               <div className="mb-4">
-                <label className="block mb-1 font-medium text-white" htmlFor="date">Date</label>
+                <label className="block mb-1 font-bold" htmlFor="date" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>Date</label>
                 <div className="relative">
                   <DatePicker
                     id="date"
@@ -288,14 +268,14 @@ function CreateCompetition({ user }) {
                       border-bottom: 1px solid #fff;
                     }
                     .react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
-                      background: #fff;
+                      background: #FFD700;
                       color: #18181b;
                     }
                   `}</style>
                 </div>
               </div>
               <div className="mb-4">
-                <label className="block mb-1 font-medium text-white" htmlFor="club">Club</label>
+                <label className="block mb-1 font-bold" htmlFor="club" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>Club</label>
                 <input
                   id="club"
                   name="club"
@@ -303,16 +283,18 @@ function CreateCompetition({ user }) {
                   value={form.club}
                   onChange={handleChange}
                   className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                  style={{ fontFamily: 'Lato, Arial, sans-serif' }}
                 />
               </div>
               <div className="mb-4">
-                <label className="block mb-1 font-medium text-white" htmlFor="type">Competition Type</label>
+                <label className="block mb-1 font-bold" htmlFor="type" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>Competition Type</label>
                 <select
                   id="type"
                   name="type"
                   value={form.type}
                   onChange={handleTypeChange}
                   className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
+                  style={{ fontFamily: 'Lato, Arial, sans-serif' }}
                 >
                   <option value="fourBbbStableford">4BBB Stableford (2 Scores to Count)</option>
                   <option value="alliance">Alliance</option>
@@ -321,13 +303,14 @@ function CreateCompetition({ user }) {
                 </select>
               </div>
               <div className="mb-4">
-                <label className="block mb-1 font-medium text-white" htmlFor="handicapAllowance">Competition Handicap Allowance</label>
+                <label className="block mb-1 font-bold" htmlFor="handicapAllowance" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>Competition Handicap Allowance</label>
                 <select
                   id="handicapAllowance"
                   name="handicapAllowance"
                   value={form.handicapAllowance}
                   onChange={handleChange}
                   className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
+                  style={{ fontFamily: 'Lato, Arial, sans-serif' }}
                 >
                   <option value="85">85%</option>
                   <option value="90">90%</option>
@@ -336,7 +319,7 @@ function CreateCompetition({ user }) {
                 </select>
               </div>
               <div className="mb-4">
-                <label className="block mb-1 font-medium text-white" htmlFor="fourballs">How many 4 Balls are playing today?</label>
+                <label className="block mb-1 font-bold" htmlFor="fourballs" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>How many 4 Balls are playing today?</label>
                 <input
                   id="fourballs"
                   name="fourballs"
@@ -346,11 +329,12 @@ function CreateCompetition({ user }) {
                   value={form.fourballs}
                   onChange={handleChange}
                   className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                  style={{ fontFamily: 'Lato, Arial, sans-serif' }}
                   placeholder="e.g. 3"
                 />
               </div>
               <div className="mb-6">
-                <label className="block mb-1 font-medium text-white" htmlFor="notes">Notes</label>
+                <label className="block mb-1 font-bold" htmlFor="notes" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>Notes</label>
                 <textarea
                   id="notes"
                   name="notes"
@@ -358,15 +342,16 @@ function CreateCompetition({ user }) {
                   value={form.notes}
                   onChange={handleChange}
                   className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                  style={{ fontFamily: 'Lato, Arial, sans-serif' }}
                   placeholder="Optional notes (e.g. special rules, sponsor etc.)"
                 />
               </div>
               <button
                 type="submit"
-                className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg"
-                style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+                className="w-full py-3 px-4 border border-white text-white font-extrabold rounded-2xl transition text-lg"
+                style={{ backgroundColor: '#FFD700', color: '#1B3A6B', boxShadow: '0 2px 8px 0 rgba(255,215,0,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#FFE066'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
               >
                 Next: Assign 4 Balls
               </button>
