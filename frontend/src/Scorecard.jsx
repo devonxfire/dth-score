@@ -493,36 +493,37 @@ export default function Scorecard(props) {
       />
       {/* Tee/Handicap Modal */}
       {showTeeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="w-full max-w-sm flex flex-col items-center rounded-2xl shadow-lg border border-white bg-transparent p-8" style={{background: 'rgba(0,0,0,0.35)'}}>
-            <h2 className="text-2xl font-bold mb-4 text-white drop-shadow">Set Your Tee & Handicap</h2>
-            <label className="mb-2 w-full text-left text-white font-semibold">Tee Box</label>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-sm flex flex-col items-center rounded-2xl shadow-2xl border-4 border-[#FFD700] bg-[#002F5F] p-8">
+            <h2 className="text-3xl font-extrabold mb-4 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Set Your Tee & Handicap</h2>
+            <label className="mb-2 w-full text-left text-white font-semibold" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>Tee Box</label>
             <select
               className="mb-4 w-full p-2 border border-white bg-transparent text-white rounded focus:outline-none"
               value={selectedTee}
               onChange={e => setSelectedTee(e.target.value)}
+              style={{ fontFamily: 'Lato, Arial, sans-serif' }}
             >
               <option value="">Select Tee</option>
               <option value="White">White</option>
               <option value="Yellow">Yellow</option>
               <option value="Red">Red</option>
             </select>
-            <label className="mb-2 w-full text-left text-white font-semibold">FULL Course Handicap</label>
+            <label className="mb-2 w-full text-left text-white font-semibold" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>FULL Course Handicap</label>
             <input
               type="number"
               className="mb-4 w-full p-2 border border-white bg-transparent text-white rounded focus:outline-none"
               value={inputHandicap}
-    // (removed duplicate/misplaced useEffect for modal logic)
               onChange={e => setInputHandicap(e.target.value)}
               min="0"
               max="54"
+              style={{ fontFamily: 'Lato, Arial, sans-serif' }}
             />
-            {teeError && <div className="text-red-300 mb-2 font-semibold">{teeError}</div>}
+            {teeError && <div className="text-red-300 mb-2 font-semibold" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{teeError}</div>}
             <button
-              className="w-full py-2 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg"
-              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+              className="w-full py-2 px-4 border border-white text-white font-bold rounded-2xl transition text-lg"
+              style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
               disabled={savingTee}
               onClick={async () => {
                 setTeeError('');

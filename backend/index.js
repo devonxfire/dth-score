@@ -290,8 +290,6 @@ app.patch('/api/competitions/:id', async (req, res) => {
   if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
     return res.status(403).json({ error: 'Forbidden: invalid admin secret' });
   }
-  // Accept all editable fields
-  console.log('PATCH /api/competitions/:id body:', req.body);
   const {
     type,
     date,
@@ -310,7 +308,6 @@ app.patch('/api/competitions/:id', async (req, res) => {
   if (fourballs !== undefined) updateData.fourballs = fourballs;
   if (notes !== undefined) updateData.notes = notes;
   if (status !== undefined) updateData.status = status;
-  console.log('PATCH /api/competitions/:id updateData:', updateData);
   if (Object.keys(updateData).length === 0) {
     return res.status(400).json({ error: 'No valid fields provided for update' });
   }
@@ -321,7 +318,6 @@ app.patch('/api/competitions/:id', async (req, res) => {
     });
     res.json({ success: true, competition: updated });
   } catch (err) {
-    console.error('Error updating competition:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });

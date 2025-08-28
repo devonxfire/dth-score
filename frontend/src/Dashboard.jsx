@@ -129,12 +129,13 @@ export default function Dashboard({ user, onSignOut }) {
               <SignalIcon className="h-6 w-6 text-white" aria-hidden="true" />
               {`My Scorecard for ${formatDate(userComp.date)}`}
             </button>
+            
           )}
           {/* Only show button if admin and there are no open competitions */}
           {user?.isadmin && comps.filter(comp => comp.status === 'Open').length === 0 && (
             <button
-              className="w-full py-3 px-4 border border-white text-white font-semibold rounded-2xl transition text-lg flex items-center justify-center gap-2"
-              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              className="w-full py-3 px-4 border border-white text-white font-extrabold rounded-2xl transition text-lg flex items-center justify-center gap-2"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
               onClick={() => navigate('/create')}
               onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
               onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
