@@ -76,7 +76,7 @@ export default function CompetitionInfo({ user }) {
             </h1>
             <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
           </div>
-  <div className="w-full max-w-4xl rounded-2xl bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none', marginTop: 0, fontFamily: 'Lato, Arial, sans-serif', color: 'white', borderColor: '#FFD700' }}>
+  <div className="w-full max-w-4xl rounded-2xl bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none', fontFamily: 'Lato, Arial, sans-serif', color: 'white', borderColor: '#FFD700', marginTop: '-2.5rem' }}>
           <div className="mb-4">
               <div><span className="font-semibold">Date:</span> {formatDate(comp.date)}</div>
               <div><span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</div>
@@ -98,7 +98,7 @@ export default function CompetitionInfo({ user }) {
                   </thead>
                   <tbody>
                     {comp.groups.map((group, idx) => (
-                      <tr key={idx}>
+                      <tr key={idx} style={idx === 0 ? { background: '#00204A' } : {}}>
                         <td className="border px-2 py-1">{group.name || idx + 1}</td>
                         <td className="border px-2 py-1">{group.teeTime || "-"}</td>
                         <td className="border px-2 py-1">
@@ -110,14 +110,14 @@ export default function CompetitionInfo({ user }) {
                                   const parts = name.trim().split(/\s+/);
                                   if (parts.length > 1) {
                                     initial = parts[0][0].toUpperCase();
-                                    surname = parts[parts.length - 1];
+                                    surname = parts[parts.length - 1].toUpperCase();
                                   } else {
                                     initial = parts[0][0].toUpperCase();
                                     surname = '';
                                   }
                                 }
                                 return (
-                                  <span key={i}>
+                                  <span key={i} style={{ whiteSpace: 'nowrap' }}>
                                     {initial}{surname && '. '}{surname}{i < arr.length - 1 ? ', ' : ''}
                                   </span>
                                 );
@@ -149,7 +149,7 @@ export default function CompetitionInfo({ user }) {
                 onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
                 onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
               >
-                <TrophyIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
+                <TrophyIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" style={{ color: '#FFD700' }} />
                 Leaderboard
               </button>
             </div>

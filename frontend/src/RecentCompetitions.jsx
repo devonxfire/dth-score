@@ -305,16 +305,17 @@ function RecentCompetitions({ user = {}, comps = [] }) {
         </div>
         {/* Delete Competition Modal */}
         {showDeleteModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-red-200">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border-4 border-[#FFD700]">
               <div className="flex flex-col items-center mb-4">
                 <span className="text-5xl mb-2" role="img" aria-label="Warning">⚠️</span>
-                <h2 className="text-2xl font-extrabold mb-2 drop-shadow" style={{ color: '#1B3A6B' }}>Delete Competition?</h2>
+                <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Delete Competition?</h2>
               </div>
-              <p className="mb-6 text-gray-700 text-center text-base font-medium">This will <span className='font-bold' style={{ color: '#1B3A6B' }}>permanently delete this competition and all its data</span>.<br/>This action cannot be undone.<br/><br/>Are you sure you want to delete?</p>
+              <p className="mb-6 text-white text-center text-base font-medium" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>This will <span className='font-bold' style={{ color: '#FFD700' }}>permanently delete this competition and all its data</span>.<br/>This action cannot be undone.<br/><br/>Are you sure you want to delete?</p>
               <div className="flex gap-4 w-full justify-center">
                 <button
-                  className="px-5 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold shadow"
+                  className="px-5 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+                  style={{ backgroundColor: '#888', color: 'white', fontFamily: 'Lato, Arial, sans-serif' }}
                   onClick={() => { setShowDeleteModal(false); setDeleteCompId(null); }}
                   disabled={deleting}
                 >
@@ -322,9 +323,9 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 </button>
                 <button
                   className="px-5 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
-                  style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+                  style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
                   onClick={() => handleDelete(deleteCompId)}
                   disabled={deleting}
                 >

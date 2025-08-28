@@ -281,7 +281,7 @@ export default function ResultsMedal() {
               {players.map((p, idx) => (
                 <tr key={p.name} style={{ background: idx % 2 === 0 ? '#f7f7f7' : '#fff' }}>
                   <td style={{ border: '1px solid #222', padding: 4, fontWeight: 'bold', textAlign: 'center' }}>{p.position}</td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.name}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, textTransform: 'uppercase' }}>{p.name.toUpperCase()}</td>
                   <td style={{ border: '1px solid #222', padding: 4 }}>{p.thru}</td>
                   <td style={{ border: '1px solid #222', padding: 4 }}>{p.gross}</td>
                   <td style={{ border: '1px solid #222', padding: 4 }}>{p.net}</td>
@@ -303,7 +303,7 @@ export default function ResultsMedal() {
                 {goodScores.length === 0
                   ? <div>No one. Everyone shit.</div>
                   : goodScores.map(p => (
-                      <div key={p.name}>{p.name}: Net {p.dthNet}</div>
+                      <div key={p.name}>{p.name.toUpperCase()}: Net {p.dthNet}</div>
                     ))}
               </div>
             );
@@ -348,7 +348,7 @@ export default function ResultsMedal() {
                       {players.map((p, idx) => (
                         <tr key={p.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
                           <td className="border px-2 py-0.5 font-bold">{p.position}</td>
-                          <td className="border px-2 py-0.5 text-left">{p.name}</td>
+                          <td className="border px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>{p.name.toUpperCase()}</td>
                           <td className="border px-2 py-0.5">{p.thru}</td>
                           <td className="border px-2 py-0.5">{p.gross}</td>
                           <td className="border px-2 py-0.5">{p.net}</td>
@@ -397,7 +397,7 @@ export default function ResultsMedal() {
                       {goodScores.length === 0
                         ? <div style={{marginLeft: 0}}>No one. Everyone shit.</div>
                         : goodScores.map(p => (
-                            <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{p.name}: Net {p.dthNet}</div>
+                            <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{p.name.toUpperCase()}: Net {p.dthNet}</div>
                           ))}
                     </div>
                   );
