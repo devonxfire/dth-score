@@ -167,12 +167,15 @@ function CreateCompetition({ user, onSignOut }) {
       <PageBackground>
         <TopMenu user={user} onSignOut={onSignOut} />
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-jiggle">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border-2 border-[#FFD700]">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-[#FFD700]">
             <div className="flex flex-col items-center mb-4">
-              <span className="text-5xl mb-2" role="img" aria-label="Success">✅</span>
-              <h2 className="text-2xl font-extrabold mb-2 drop-shadow" style={{ color: '#1B3A6B', fontFamily: 'Merriweather, Georgia, serif' }}>Competition Created!</h2>
+              <svg className="mb-2" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="24" cy="24" r="24" fill="#FFD700"/>
+                <path d="M16 25.5L22 31.5L33 18.5" stroke="#002F5F" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <h2 className="text-2xl font-extrabold mb-2 drop-shadow text-center whitespace-nowrap" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif' }}>Competition Created!</h2>
             </div>
-            <div className="mb-4 text-[#1B3A6B] text-center text-base font-medium" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+            <div className="mb-4 text-white text-center text-base font-medium" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
               <p className="mb-1">Type: <span className="font-bold" style={{ color: '#FFD700' }}>{COMP_TYPE_DISPLAY[form.type] || form.type}</span></p>
               <p className="mb-1">Date: <span className="font-bold" style={{ color: '#FFD700' }}>{formatDate(form.date)}</span></p>
               <p className="mb-1">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{form.club}</span></p>
@@ -181,16 +184,16 @@ function CreateCompetition({ user, onSignOut }) {
             </div>
             <div className="flex gap-4 mt-6">
               <button
-                className="px-5 py-2 rounded-2xl bg-[#1B3A6B] hover:bg-[#22457F] text-white font-semibold shadow transition"
-                style={{ fontFamily: 'Lato, Arial, sans-serif', fontWeight: 700, fontSize: '1.1rem' }}
+                className="px-5 py-2 rounded-lg bg-[#FFD700] hover:bg-[#F5D06F] text-[#002F5F] font-extrabold shadow"
+                style={{ fontFamily: 'Merriweather, Georgia, serif' }}
                 onClick={() => navigate('/dashboard')}
               >
                 Dashboard
               </button>
               {compId && (
                 <button
-                  className="px-5 py-2 rounded-2xl bg-[#FFD700] hover:bg-[#FFE066] text-[#1B3A6B] font-semibold shadow transition border border-[#1B3A6B]"
-                  style={{ fontFamily: 'Lato, Arial, sans-serif', fontWeight: 700, fontSize: '1.1rem' }}
+                  className="px-5 py-2 rounded-lg bg-[#FFD700] hover:bg-[#F5D06F] text-[#002F5F] font-extrabold shadow border border-[#002F5F] whitespace-nowrap"
+                  style={{ fontFamily: 'Merriweather, Georgia, serif', whiteSpace: 'nowrap' }}
                   onClick={() => navigate(`/competition/${compId}`)}
                 >
                   View Competition
