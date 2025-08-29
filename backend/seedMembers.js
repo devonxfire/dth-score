@@ -26,12 +26,20 @@ async function main() {
     { name: "Stephen 'Skollie' Kelly", username: "stephen", password: "kelly", isadmin: false },
     { name: "Stevie 'Wondie' Steenkamp", username: "stevie", password: "steenkamp", isadmin: false },
     { name: "Storm 'Beefy' Currie", username: "storm", password: "currie", isadmin: false },
+    // Guest accounts
+    { name: "Guest 1", username: "guest1", password: "guest1", isadmin: false },
+    { name: "Guest 2", username: "guest2", password: "guest2", isadmin: false },
+    { name: "Guest 3", username: "guest3", password: "guest3", isadmin: false },
   ];
 
   for (const member of members) {
-    await prisma.users.create({ data: member });
+    await prisma.users.upsert({
+      where: { username: member.username },
+      update: {}, // No update, just skip if exists
+      create: member
+    });
   }
-  console.log('Members seeded!');
+  console.log('Members seeded or already present!');
 }
 
 main()

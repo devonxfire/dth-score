@@ -9,7 +9,7 @@ function formatDate(dateStr) {
 }
 
 import React, { useEffect, useState } from "react";
-import { ArrowLeftIcon, ChartBarIcon, TrophyIcon } from '@heroicons/react/24/solid';
+import { ArrowLeftIcon, ChartBarIcon, TrophyIcon, SignalIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
@@ -105,9 +105,22 @@ export default function CompetitionInfo({ user }) {
                           {Array.isArray(group.players) && group.players.length > 0 ? (
                             <div className="flex flex-row items-center gap-2 justify-center">
                               {group.players.map((name, i, arr) => {
-                                let initial = '', surname = '';
-                                if (typeof name === 'string') {
+                                // If this is a guest slot and displayNames is present, show the display name
+                                if (['Guest 1','Guest 2','Guest 3'].includes(name) && Array.isArray(group.displayNames) && group.displayNames[i]) {
+                                  return (
+                                    <span key={i} style={{ whiteSpace: 'nowrap', color: 'white', fontWeight: 700 }}>
+                                      GUEST - {group.displayNames[i]}{i < arr.length - 1 ? ', ' : ''}
+                                    </span>
+                                  );
+                                } else if (['Guest 1','Guest 2','Guest 3'].includes(name)) {
+                                  return (
+                                    <span key={i} style={{ whiteSpace: 'nowrap', color: 'white', fontWeight: 700 }}>
+                                      {name}{i < arr.length - 1 ? ', ' : ''}
+                                    </span>
+                                  );
+                                } else if (typeof name === 'string') {
                                   const parts = name.trim().split(/\s+/);
+                                  let initial = '', surname = '';
                                   if (parts.length > 1) {
                                     initial = parts[0][0].toUpperCase();
                                     surname = parts[parts.length - 1].toUpperCase();
@@ -115,12 +128,14 @@ export default function CompetitionInfo({ user }) {
                                     initial = parts[0][0].toUpperCase();
                                     surname = '';
                                   }
+                                  return (
+                                    <span key={i} style={{ whiteSpace: 'nowrap' }}>
+                                      {initial}{surname && '. '}{surname}{i < arr.length - 1 ? ', ' : ''}
+                                    </span>
+                                  );
+                                } else {
+                                  return null;
                                 }
-                                return (
-                                  <span key={i} style={{ whiteSpace: 'nowrap' }}>
-                                    {initial}{surname && '. '}{surname}{i < arr.length - 1 ? ', ' : ''}
-                                  </span>
-                                );
                               })}
                             </div>
                           ) : null}
@@ -142,6 +157,18 @@ export default function CompetitionInfo({ user }) {
                 <ArrowLeftIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
                 Back to Competitions
               </button>
+              {isPlayerInComp && (
+                <button
+                  className="py-2 px-4 border border-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap scorecard-pulse"
+                  style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                  onClick={() => navigate(`/scorecard/${compId}`)}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
+                >
+                  <SignalIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" style={{ color: '#002F5F' }} />
+                  My Scorecard
+                </button>
+              )}
               <button
                 className="py-2 px-4 border border-white text-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap"
                 style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}

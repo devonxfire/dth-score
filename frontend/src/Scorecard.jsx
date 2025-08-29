@@ -670,9 +670,18 @@ export default function Scorecard(props) {
                             if (teebox === 'White') teeBg = 'bg-white text-black border-white';
                             else if (teebox === 'Red') teeBg = 'bg-red-500 text-white';
                             else if (teebox === 'Yellow') teeBg = 'bg-yellow-300 text-black border-white';
-                            // Format player name as first initial + surname (ignore nickname)
+                            // Format player name as first initial + surname (ignore nickname), or show guest display name if present
                             let displayName = name;
-                            if (name && typeof name === 'string') {
+                            const guestIdx = ['Guest 1','Guest 2','Guest 3'].indexOf(name);
+                            let guestDisplay = null;
+                            if (guestIdx !== -1 && Array.isArray(groupForPlayer?.displayNames) && groupForPlayer.displayNames[guestIdx]) {
+                              guestDisplay = `GUEST - ${groupForPlayer.displayNames[guestIdx]}`;
+                            }
+                            if (guestDisplay) {
+                              displayName = guestDisplay;
+                            } else if (guestIdx !== -1) {
+                              displayName = name;
+                            } else if (name && typeof name === 'string') {
                               const parts = name.trim().split(' ');
                               if (parts.length > 1) {
                                 displayName = parts[0][0] + '. ' + parts[parts.length - 1];
@@ -928,9 +937,29 @@ export default function Scorecard(props) {
                           ph = group.handicaps[name];
                         }
                       }
+                      // Guest display name logic
+                      let displayName = name;
+                      const group = competition.groups?.find(g => g.players?.includes(name));
+                      const guestIdx = ['Guest 1','Guest 2','Guest 3'].indexOf(name);
+                      let guestDisplay = null;
+                      if (guestIdx !== -1 && Array.isArray(group?.displayNames) && group.displayNames[guestIdx]) {
+                        guestDisplay = `GUEST - ${group.displayNames[guestIdx]}`;
+                      }
+                      if (guestDisplay) {
+                        displayName = guestDisplay;
+                      } else if (guestIdx !== -1) {
+                        displayName = name;
+                      } else if (name && typeof name === 'string') {
+                        const parts = name.trim().split(' ');
+                        if (parts.length > 1) {
+                          displayName = parts[0][0] + '. ' + parts[parts.length - 1];
+                        } else {
+                          displayName = name;
+                        }
+                      }
                       return (
                         <li key={name} className="mb-1">
-                          <span className="font-semibold">{name}</span>
+                          <span className="font-semibold">{displayName}</span>
                           {ph !== '' ? (
                             <span className="ml-2 text-green-200">Playing Handicap: {ph}</span>
                           ) : (
@@ -985,7 +1014,9 @@ export default function Scorecard(props) {
                             <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                               <div className="flex items-center justify-center">
                                 {(() => {
-                                  const gross = parseInt(scores[pIdx][hIdx], 10);
+                                  const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
+                                  const val = row[hIdx];
+                                  const gross = parseInt(val, 10);
                                   const isEagleOrBetter = gross > 0 && gross <= hole.par - 2;
                                   const isBirdie = gross > 0 && gross === hole.par - 1;
                                   const isBogey = gross > 0 && gross === hole.par + 1;
@@ -1003,7 +1034,7 @@ export default function Scorecard(props) {
                                       type="number"
                                       min="0"
                                       max="20"
-                                      value={scores[pIdx][hIdx]}
+                                      value={val === undefined ? '' : val}
                                       onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
                                       className={inputClass}
                                       inputMode="numeric"
@@ -1014,7 +1045,7 @@ export default function Scorecard(props) {
                               </div>
                             </td>
                           ))}
-                          <td className="border px-2 py-1 font-bold text-base">{scores[pIdx].slice(0,9).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0)}</td>
+                          <td className="border px-2 py-1 font-bold text-base">{Array.isArray(scores[pIdx]) ? scores[pIdx].slice(0,9).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''}</td>
                         </tr>
                         {/* Net row (no player label cell) */}
                         <tr key={name + '-net-front'}>
@@ -1030,6 +1061,7 @@ export default function Scorecard(props) {
                               }
                             }
                             let netFrontTotal = 0;
+                            const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
                             return defaultHoles.slice(0,9).map((hole, hIdx) => {
                               const strokeIdx = hole.index;
                               let strokesReceived = 0;
@@ -1042,7 +1074,7 @@ export default function Scorecard(props) {
                                   strokesReceived = 1;
                                 }
                               }
-                              const gross = parseInt(scores[pIdx][hIdx], 10) || 0;
+                              const gross = parseInt(row[hIdx], 10) || 0;
                               const net = gross ? gross - strokesReceived : '';
                               if (typeof net === 'number') netFrontTotal += net;
                               return (
@@ -1065,6 +1097,7 @@ export default function Scorecard(props) {
                                 }
                               }
                               let netFrontTotal = 0;
+                              const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
                               defaultHoles.slice(0,9).forEach((hole, hIdx) => {
                                 const strokeIdx = hole.index;
                                 let strokesReceived = 0;
@@ -1077,7 +1110,7 @@ export default function Scorecard(props) {
                                     strokesReceived = 1;
                                   }
                                 }
-                                const gross = parseInt(scores[pIdx][hIdx], 10) || 0;
+                                const gross = parseInt(row[hIdx], 10) || 0;
                                 const net = gross ? gross - strokesReceived : 0;
                                 if (typeof net === 'number') netFrontTotal += net;
                               });
@@ -1134,7 +1167,9 @@ export default function Scorecard(props) {
                             <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                               <div className="flex items-center justify-center">
                                 {(() => {
-                                  const gross = parseInt(scores[pIdx][hIdx+9], 10);
+                                  const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
+                                  const val = row[hIdx+9];
+                                  const gross = parseInt(val, 10);
                                   const isEagleOrBetter = gross > 0 && gross <= hole.par - 2;
                                   const isBirdie = gross > 0 && gross === hole.par - 1;
                                   const isBogey = gross > 0 && gross === hole.par + 1;
@@ -1152,7 +1187,7 @@ export default function Scorecard(props) {
                                       type="number"
                                       min="0"
                                       max="20"
-                                      value={scores[pIdx][hIdx+9]}
+                                      value={val === undefined ? '' : val}
                                       onChange={e => handleScoreChange(hIdx+9, e.target.value, pIdx)}
                                       className={inputClass}
                                       inputMode="numeric"
@@ -1164,8 +1199,8 @@ export default function Scorecard(props) {
                             </td>
                           ))}
 
-                          <td className="border px-2 py-1 font-bold text-base">{scores[pIdx].slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0)}</td>
-                          <td className="border px-2 py-1 font-bold text-base">{scores[pIdx].reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0)}</td>
+                          <td className="border px-2 py-1 font-bold text-base">{Array.isArray(scores[pIdx]) ? scores[pIdx].slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''}</td>
+                          <td className="border px-2 py-1 font-bold text-base">{Array.isArray(scores[pIdx]) ? scores[pIdx].reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''}</td>
                         </tr>
                         {/* Net row (no player label cell) */}
                         <tr key={name + '-net-back'}>
@@ -1181,6 +1216,7 @@ export default function Scorecard(props) {
                               }
                             }
                             let netBackTotal = 0;
+                            const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
                             return defaultHoles.slice(9,18).map((hole, hIdx) => {
                               const strokeIdx = hole.index;
                               let strokesReceived = 0;
@@ -1193,7 +1229,7 @@ export default function Scorecard(props) {
                                   strokesReceived = 1;
                                 }
                               }
-                              const gross = parseInt(scores[pIdx][hIdx+9], 10) || 0;
+                              const gross = parseInt(row[hIdx+9], 10) || 0;
                               const net = gross ? gross - strokesReceived : '';
                               if (typeof net === 'number') netBackTotal += net;
                               return (
@@ -1216,6 +1252,7 @@ export default function Scorecard(props) {
                                 }
                               }
                               let netBackTotal = 0;
+                              const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
                               defaultHoles.slice(9,18).forEach((hole, hIdx) => {
                                 const strokeIdx = hole.index;
                                 let strokesReceived = 0;
@@ -1228,7 +1265,7 @@ export default function Scorecard(props) {
                                     strokesReceived = 1;
                                   }
                                 }
-                                const gross = parseInt(scores[pIdx][hIdx+9], 10) || 0;
+                                const gross = parseInt(row[hIdx+9], 10) || 0;
                                 const net = gross ? gross - strokesReceived : 0;
                                 if (typeof net === 'number') netBackTotal += net;
                               });
@@ -1247,6 +1284,7 @@ export default function Scorecard(props) {
                                 }
                               }
                               let netTotal = 0;
+                              const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
                               defaultHoles.forEach((hole, hIdx) => {
                                 const strokeIdx = hole.index;
                                 let strokesReceived = 0;
@@ -1259,7 +1297,7 @@ export default function Scorecard(props) {
                                     strokesReceived = 1;
                                   }
                                 }
-                                const gross = parseInt(scores[pIdx][hIdx], 10) || 0;
+                                const gross = parseInt(row[hIdx], 10) || 0;
                                 const net = gross ? gross - strokesReceived : 0;
                                 if (typeof net === 'number') netTotal += net;
                               });

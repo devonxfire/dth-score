@@ -34,13 +34,13 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
     }
     fetchUsers();
   }, []);
-  // Track guest names for each group/player slot
+  // Track guest display names for each group/player slot
   const [guestNames, setGuestNames] = useState(() => {
     if (initialGroups && Array.isArray(initialGroups) && initialGroups.length > 0) {
-      // Extract guest names from initialGroups if present
+      // Extract guest display names from initialGroups if present
       return initialGroups.slice(0, fourballs).map(g =>
-        Array.isArray(g.players)
-          ? g.players.slice(0, 4).map(p => (typeof p === 'string' && p.startsWith('GUEST ') ? p.replace(/^GUEST\s*/i, '') : ''))
+        Array.isArray(g.displayNames)
+          ? g.displayNames.slice(0, 4).concat(Array(4).fill('')).slice(0, 4)
           : Array(4).fill('')
       ).concat(Array(Math.max(0, fourballs - initialGroups.length)).fill(Array(4).fill('')));
     }
@@ -49,25 +49,33 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
 
   function handlePlayerChange(groupIdx, playerIdx, value) {
     // If switching away from GUEST, clear guest name
-    if (groups[groupIdx].players[playerIdx] === 'GUEST' && value !== 'GUEST') {
+    if (groups[groupIdx].players[playerIdx] && groups[groupIdx].players[playerIdx].startsWith('Guest') && !value.startsWith('Guest')) {
       setGuestNames(prev => {
         const updated = prev.map(arr => arr.slice());
         updated[groupIdx][playerIdx] = '';
         return updated;
       });
     }
+    // If selecting a guest, assign Guest 1/2/3 based on first available
+    let assignedValue = value;
+    if (value === 'GUEST') {
+      // Find which GuestX is not already used in this comp
+      const allAssigned = groups.flatMap(g => g.players);
+      const guestOptions = ['Guest 1', 'Guest 2', 'Guest 3'];
+      assignedValue = guestOptions.find(g => !allAssigned.includes(g)) || 'Guest 1';
+    }
     const newGroups = groups.map((g, i) =>
       i === groupIdx
         ? {
             ...g,
-            players: g.players.map((p, j) => (j === playerIdx ? value : p)),
+            players: g.players.map((p, j) => (j === playerIdx ? assignedValue : p)),
           }
         : g
     );
     setGroups(newGroups);
     // Remove from available if selected, add back if deselected
     const selected = newGroups.flatMap(g => g.players).filter(Boolean);
-  setAvailable(prevAvailable => prevAvailable.filter(name => !selected.includes(name)));
+    setAvailable(prevAvailable => prevAvailable.filter(name => !selected.includes(name)));
   }
 
   function handleGuestNameChange(groupIdx, playerIdx, value) {
@@ -76,17 +84,7 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
       updated[groupIdx][playerIdx] = value;
       return updated;
     });
-    // Update the player name in groups to be 'GUEST ' + value
-    setGroups(prevGroups => prevGroups.map((g, i) =>
-      i === groupIdx
-        ? {
-            ...g,
-            players: g.players.map((p, j) =>
-              j === playerIdx ? (value ? `GUEST ${value}` : 'GUEST') : p
-            ),
-          }
-        : g
-    ));
+    // Do NOT update the player name, just store display name
   }
 
 
@@ -100,7 +98,9 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
 
   function handleSubmit(e) {
     e.preventDefault();
-    onAssign(groups);
+    // Attach displayNames to each group for frontend use
+    const groupsWithDisplay = groups.map((g, i) => ({ ...g, displayNames: guestNames[i] }));
+    onAssign(groupsWithDisplay);
   }
 
   return (
@@ -121,38 +121,41 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
               <div className="mb-2 font-extrabold" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.2rem' }}>4 Ball {idx + 1}</div>
               <div className="mb-2">
                 <label className="block mb-1 font-bold" htmlFor={`teeTime-${idx}`} style={{ color: '#FFD700', fontFamily: 'Lato, Arial, sans-serif' }}>Tee Time</label>
-                <input
-                  id={`teeTime-${idx}`}
-                  type="time"
-                  value={group.teeTime}
-                  onChange={e => handleTeeTimeChange(idx, e.target.value)}
-                  className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
-                  style={{ fontFamily: 'Lato, Arial, sans-serif' }}
-                  required
-                />
+                <div className="relative flex items-center">
+                  <input
+                    id={`teeTime-${idx}`}
+                    type="time"
+                    value={group.teeTime}
+                    onChange={e => handleTeeTimeChange(idx, e.target.value)}
+                    className="border border-white bg-transparent rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
+                    style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}
+                    required
+                  />
+                  
+                </div>
               </div>
               {group.players.map((player, pIdx) => (
                 <div key={pIdx} className="mb-2 flex items-center">
                   <select
-                    value={player.startsWith('GUEST') ? 'GUEST' : player}
+                    value={['Guest 1','Guest 2','Guest 3'].includes(player) ? 'GUEST' : player}
                     onChange={e => handlePlayerChange(idx, pIdx, e.target.value)}
                     className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
                     style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700 }}
                     required
                   >
                     <option value="" style={{ color: '#1B3A6B', fontWeight: 700 }}>Select player</option>
-                    {available.concat(player.startsWith('GUEST') ? 'GUEST' : player).map(
+                    {available.concat(['Guest 1','Guest 2','Guest 3'].includes(player) ? 'GUEST' : player).map(
                       (name, optIdx) => name && <option key={`${name}-${idx}-${pIdx}-${optIdx}`} value={name} style={{ color: '#1B3A6B', fontWeight: 700 }}>{name}</option>
                     )}
                   </select>
-                  {(player === 'GUEST' || player.startsWith('GUEST ')) && (
+                  {(['Guest 1','Guest 2','Guest 3'].includes(player)) && (
                     <input
                       type="text"
-                      className="border border-white bg-transparent text-white rounded px-2 py-1 ml-2 focus:outline-none focus:ring-2 focus:ring-white"
-                      style={{ fontFamily: 'Lato, Arial, sans-serif' }}
+                      className="border border-white bg-transparent rounded px-2 py-1 ml-2 focus:outline-none focus:ring-2 focus:ring-white"
+                      style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}
                       placeholder="Enter guest name"
                       value={guestNames[idx][pIdx]}
-                      onChange={e => handleGuestNameChange(idx, pIdx, e.target.value.replace(/^GUEST\s*/i, ''))}
+                      onChange={e => handleGuestNameChange(idx, pIdx, e.target.value)}
                       required
                     />
                   )}
