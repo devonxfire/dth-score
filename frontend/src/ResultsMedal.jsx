@@ -1,12 +1,14 @@
 import './pdfExportPlain.css';
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { TrophyIcon, ArrowLeftIcon, ArrowDownTrayIcon, EnvelopeIcon } from '@heroicons/react/24/solid';
+import './pdfExportPlain.css';
+
 // Helper: check if user is admin
 function isAdmin(user) {
   return user && (user.role === 'admin' || user.isAdmin || user.isadmin);
 }
 import PageBackground from './PageBackground';
-import { TrophyIcon, ArrowLeftIcon, ArrowDownTrayIcon, EnvelopeIcon } from '@heroicons/react/24/solid';
 import TopMenu from './TopMenu';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -448,6 +450,7 @@ export default function ResultsMedal() {
                 <ArrowDownTrayIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
                 Download PDF
               </button>
+
               <button
                 onClick={() => setShowEmailModal(true)}
                 className="py-2 px-4 min-w-[180px] bg-[#1B3A6B] text-white font-semibold rounded-2xl border border-white transition hover:bg-white hover:text-[#1B3A6B] mt-2 flex items-center justify-center whitespace-nowrap"

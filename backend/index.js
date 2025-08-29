@@ -297,7 +297,8 @@ app.patch('/api/competitions/:id', async (req, res) => {
     handicapAllowance,
     fourballs,
     notes,
-    status
+    status,
+    groups
   } = req.body;
   // Build update data object dynamically
   const updateData = {};
@@ -308,6 +309,7 @@ app.patch('/api/competitions/:id', async (req, res) => {
   if (fourballs !== undefined) updateData.fourballs = fourballs;
   if (notes !== undefined) updateData.notes = notes;
   if (status !== undefined) updateData.status = status;
+  if (groups !== undefined) updateData.groups = groups;
   if (Object.keys(updateData).length === 0) {
     return res.status(400).json({ error: 'No valid fields provided for update' });
   }

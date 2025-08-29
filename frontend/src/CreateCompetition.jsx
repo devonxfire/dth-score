@@ -50,15 +50,29 @@ function CreateCompetition({ user, onSignOut }) {
   // Today's date for minDate
   const today = new Date();
   const location = useLocation();
-  const [form, setForm] = useState({
-    type: 'fourBbbStableford',
-    date: null,
-    club: 'Westlake Golf Club',
-    handicapAllowance: '95',
-    fourballs: '',
-    notes: '',
+  const navigate = useNavigate();
+  // Detect if editing
+  const editingComp = location.state?.comp;
+  const [form, setForm] = useState(() => {
+    if (editingComp) {
+      return {
+        type: editingComp.type || 'fourBbbStableford',
+        date: editingComp.date ? new Date(editingComp.date) : null,
+        club: editingComp.club || 'Westlake Golf Club',
+        handicapAllowance: editingComp.handicapAllowance || '95',
+        fourballs: editingComp.fourballs || '',
+        notes: editingComp.notes || '',
+      };
+    }
+    return {
+      type: 'fourBbbStableford',
+      date: null,
+      club: 'Westlake Golf Club',
+      handicapAllowance: '95',
+      fourballs: '',
+      notes: '',
+    };
   });
-
   // Set default allowance based on comp type
   function handleTypeChange(e) {
     const type = e.target.value;
@@ -71,13 +85,13 @@ function CreateCompetition({ user, onSignOut }) {
     setForm(prev => ({ ...prev, type, handicapAllowance: allowance }));
   }
   const [created, setCreated] = useState(false);
-  const [joinCode, setJoinCode] = useState('');
-  const [compId, setCompId] = useState(null);
+  const [joinCode, setJoinCode] = useState(editingComp?.joinCode || editingComp?.joincode || '');
+  const [compId, setCompId] = useState(editingComp?.id || null);
   const [showGroups, setShowGroups] = useState(false);
-  const [groups, setGroups] = useState([]);
+  // Preload groups if editing
+  const [groups, setGroups] = useState(editingComp?.groups || []);
   const [openComps, setOpenComps] = useState([]);
   const [showOpenCompModal, setShowOpenCompModal] = useState(false);
-  const navigate = useNavigate();
 
   // Fetch open competitions on mount
   useEffect(() => {
@@ -97,9 +111,46 @@ function CreateCompetition({ user, onSignOut }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    // Only admins/captains are blocked
-    if (isAdmin(user) && openComps.length > 0) {
+    // Only block for new comp creation, not editing
+    if (!editingComp && isAdmin(user) && openComps.length > 0) {
       setShowOpenCompModal(true);
+      return;
+    }
+    // If editing, PATCH the competition
+    if (editingComp) {
+      // If fourballs entered, show group assignment
+      if (form.fourballs && !showGroups) {
+        setShowGroups(true);
+        return;
+      }
+      // Save changes to backend
+      try {
+        const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+        // Normalize field names to match backend/DB
+        const updateData = {
+          type: form.type,
+          date: form.date,
+          club: form.club,
+          handicapallowance: form.handicapAllowance, // DB expects lowercase
+          fourballs: form.fourballs,
+          notes: form.notes
+        };
+        const res = await fetch(`/api/competitions/${editingComp.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Secret': adminSecret
+          },
+          body: JSON.stringify(updateData)
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error('Failed to update competition: ' + errText);
+        }
+        setCreated(true);
+      } catch (err) {
+        alert('Error updating competition: ' + err.message);
+      }
       return;
     }
     // If fourballs entered, create comp in backend and then show group assignment
@@ -144,13 +195,42 @@ function CreateCompetition({ user, onSignOut }) {
 
   async function handleAssign(groupsData) {
     setGroups(groupsData);
-    // Save comp with groups to backend using numeric id
-    if (!compId) {
-      alert('Competition join code not found. Please create the competition first.');
+    const idToUse = compId || editingComp?.id;
+    if (!idToUse) {
+      alert('Competition id not found. Please create the competition first.');
       return;
     }
     try {
-      const res = await fetch(`/api/competitions/${compId}/groups`, {
+      // If editing, PATCH main fields as well as groups
+      if (editingComp) {
+        const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+        // Normalize field names to match backend/DB
+        const updateData = {
+          type: form.type,
+          date: form.date,
+          club: form.club,
+          handicapallowance: form.handicapAllowance,
+          fourballs: form.fourballs,
+          notes: form.notes,
+          groups: groupsData
+        };
+        const res = await fetch(`/api/competitions/${idToUse}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Secret': adminSecret
+          },
+          body: JSON.stringify(updateData)
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error('Failed to update competition: ' + errText);
+        }
+        setCreated(true);
+        return;
+      }
+      // Otherwise, just update groups (new comp flow)
+      const res = await fetch(`/api/competitions/${idToUse}/groups`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ groups: groupsData })
@@ -229,6 +309,7 @@ function CreateCompetition({ user, onSignOut }) {
             <FourballAssignment
               fourballs={parseInt(form.fourballs) || 1}
               onAssign={handleAssign}
+              initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
             />
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
