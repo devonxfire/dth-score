@@ -265,31 +265,31 @@ export default function ResultsMedal() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
             <thead>
               <tr style={{ background: '#eee' }}>
-                <th style={{ border: '1px solid #222', padding: 4 }}>Pos</th>
-                <th style={{ border: '1px solid #222', padding: 4 }}>Name</th>
-                <th style={{ border: '1px solid #222', padding: 4 }}>Thru</th>
-                <th style={{ border: '1px solid #222', padding: 4 }}>Gross</th>
-                <th style={{ border: '1px solid #222', padding: 4 }}>Net</th>
-                <th style={{ border: '1px solid #222', padding: 4 }}>DTH Net</th>
-                <th style={{ border: '1px solid #222', padding: 4 }}>Dog</th>
-                <th style={{ border: '1px solid #222', padding: 4 }}>Waters</th>
-                <th style={{ border: '1px solid #222', padding: 4 }}>2 Clubs</th>
-                <th style={{ border: '1px solid #222', padding: 4 }}>Fines</th>
+                <th style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>Pos</th>
+                <th style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>Name</th>
+                <th style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>Thru</th>
+                <th style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>Gross</th>
+                <th style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>Net</th>
+                <th style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>DTH Net</th>
+                <th style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>Dog</th>
+                <th style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>Waters</th>
+                <th style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>2 Clubs</th>
+                <th style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>Fines</th>
               </tr>
             </thead>
             <tbody>
               {players.map((p, idx) => (
                 <tr key={p.name} style={{ background: idx % 2 === 0 ? '#f7f7f7' : '#fff' }}>
-                  <td style={{ border: '1px solid #222', padding: 4, fontWeight: 'bold', textAlign: 'center' }}>{p.position}</td>
-                  <td style={{ border: '1px solid #222', padding: 4, textTransform: 'uppercase' }}>{p.name.toUpperCase()}</td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.thru}</td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.gross}</td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.net}</td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.dthNet}</td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.dog ? '🐶' : ''}</td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.waters || ''}</td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.twoClubs || ''}</td>
-                  <td style={{ border: '1px solid #222', padding: 4 }}>{p.fines || ''}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, fontWeight: 'bold', textAlign: 'center', verticalAlign: 'middle' }}>{p.position}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, textTransform: 'uppercase', textAlign: 'center', verticalAlign: 'middle' }}>{p.name.toUpperCase()}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>{p.thru}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>{p.gross}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>{p.net}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>{p.dthNet}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>{p.dog ? '🐶' : ''}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>{p.waters || ''}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>{p.twoClubs || ''}</td>
+                  <td style={{ border: '1px solid #222', padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>{p.fines || ''}</td>
                 </tr>
               ))}
             </tbody>

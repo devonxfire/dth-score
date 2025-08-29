@@ -11,4 +11,15 @@
 }
 .pdf-export-plain th {
   font-weight: bold !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  height: 32px !important;
+  line-height: 32px !important;
+}
+
+.pdf-export-plain td {
+  text-align: center !important;
+  vertical-align: middle !important;
+  height: 32px !important;
+  line-height: 32px !important;
 }
