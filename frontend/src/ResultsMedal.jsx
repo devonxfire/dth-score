@@ -73,19 +73,23 @@ export default function ResultsMedal() {
   });
   // Fines state: { [playerName]: number }
   const [fines, setFines] = useState({});
+  // Map of playerName to { teamId, userId }
+  const [playerTeamUserMap, setPlayerTeamUserMap] = useState({});
 
   useEffect(() => {
-    async function fetchResults() {
+  async function fetchResults() {
       setLoading(true);
       setError(null);
-      try {
+  try {
         // 1. Fetch competition data
         const res = await fetch(`/api/competitions/${id}`);
         if (!res.ok) throw new Error('Competition not found');
         const comp = await res.json();
         setCompetition(comp);
         // 2. Gather all players from all groups
-        let playerRows = [];
+  let playerRows = [];
+  let finesObj = {};
+  let ptumap = {};
         if (comp.groups && comp.users) {
           for (const group of comp.groups) {
             if (!Array.isArray(group.players) || !group.teamId) continue;
@@ -99,10 +103,11 @@ export default function ResultsMedal() {
                 const scoreData = await scoreRes.json();
                 scores = Array.isArray(scoreData.scores) ? scoreData.scores : [];
               }
-              // Fetch Waters, Dog, 2 Clubs for this player
+              // Fetch Waters, Dog, 2 Clubs, Fines for this player
               let waters = '';
               let dog = false;
               let twoClubs = '';
+              let finesVal = '';
               try {
                 const statRes = await fetch(`/api/teams/${group.teamId}/users/${user.id}`);
                 if (statRes.ok) {
@@ -110,8 +115,11 @@ export default function ResultsMedal() {
                   waters = statData.waters ?? '';
                   dog = !!statData.dog;
                   twoClubs = statData.two_clubs ?? '';
+                  finesVal = statData.fines ?? '';
                 }
               } catch {}
+              finesObj[playerName] = finesVal;
+              ptumap[playerName] = { teamId: group.teamId, userId: user.id };
               // 4. Compute gross (sum of all entered scores)
               const gross = scores.reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0);
               // 5. Get PH (Playing Handicap) with allowance, and CH (Course Handicap)
@@ -151,7 +159,8 @@ export default function ResultsMedal() {
                 thru,
                 waters,
                 dog,
-                twoClubs
+                twoClubs,
+                fines: finesVal
               });
             }
           }
@@ -166,7 +175,9 @@ export default function ResultsMedal() {
           return a.net - b.net; // then by net
         });
         playerRows.forEach((p, i) => (p.position = i + 1));
-        setPlayers(playerRows);
+  setPlayers(playerRows);
+  setFines(finesObj);
+  setPlayerTeamUserMap(ptumap);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -363,9 +374,19 @@ export default function ResultsMedal() {
                                 min="0"
                                 className="w-14 h-8 text-center text-white bg-transparent rounded mx-auto block font-bold text-base no-spinner px-0"
                                 value={fines[p.name] || ''}
-                                onChange={e => {
+                                onChange={async e => {
                                   const val = e.target.value;
-                                  setFines(f => ({ ...f, [p.name]: val === '' ? '' : Math.max(0, parseInt(val, 10) || 0) }));
+                                  const newFine = val === '' ? '' : Math.max(0, parseInt(val, 10) || 0);
+                                  setFines(f => ({ ...f, [p.name]: newFine }));
+                                  // Persist to backend
+                                  const ids = playerTeamUserMap[p.name];
+                                  if (ids) {
+                                    await fetch(`/api/teams/${ids.teamId}/users/${ids.userId}`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ fines: newFine })
+                                    });
+                                  }
                                 }}
                                 placeholder="0"
                                 inputMode="numeric"

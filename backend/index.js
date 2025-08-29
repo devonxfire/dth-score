@@ -360,7 +360,7 @@ app.post('/api/login', async (req, res) => {
 // Update a player's tee and course handicap for a team
 app.patch('/api/teams/:teamId/users/:userId', async (req, res) => {
   const { teamId, userId } = req.params;
-  const { teebox, course_handicap, waters, dog, two_clubs } = req.body;
+  const { teebox, course_handicap, waters, dog, two_clubs, fines } = req.body;
   try {
     let record = await prisma.teams_users.findFirst({
       where: {
@@ -373,7 +373,8 @@ app.patch('/api/teams/:teamId/users/:userId', async (req, res) => {
       course_handicap: course_handicap !== undefined ? Number(course_handicap) : undefined,
       waters: waters !== undefined ? Number(waters) : undefined,
       dog: dog !== undefined ? Boolean(dog) : undefined,
-      two_clubs: two_clubs !== undefined ? Number(two_clubs) : undefined
+      two_clubs: two_clubs !== undefined ? Number(two_clubs) : undefined,
+      fines: fines !== undefined ? Number(fines) : undefined
     };
     // Remove undefined fields so Prisma doesn't overwrite with null
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
@@ -412,7 +413,8 @@ app.get('/api/teams/:teamId/users/:userId', async (req, res) => {
         course_handicap: true,
         waters: true,
         dog: true,
-        two_clubs: true
+        two_clubs: true,
+        fines: true
       }
     });
     if (!record) return res.status(404).json({ error: 'Not found' });
