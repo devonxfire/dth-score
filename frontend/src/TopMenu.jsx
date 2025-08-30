@@ -44,17 +44,39 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
       >
         Dashboard
       </button>
-      {scorecardComp && (
-        <button
-          className={`text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150 ${location.pathname.startsWith('/scorecard') ? 'border-b-4 scorecard-pulse' : ''}`}
-          style={location.pathname.startsWith('/scorecard')
-            ? { borderColor: '#FFD700', borderBottomWidth: 3, background: 'none', borderStyle: 'solid', fontFamily: 'Merriweather, Georgia, serif' }
-            : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
-          onClick={() => navigate(`/scorecard/${compId}`, { state: { competition: scorecardComp } })}
-        >
-          My Scorecard
-        </button>
-      )}
+      <button
+        className="text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150 "
+        style={{ color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
+        onClick={() => {
+          if (scorecardComp && compId && user && user.name) {
+            // Find the group and player object for this user
+            let group = null;
+            let playerObj = null;
+            if (scorecardComp.groups) {
+              group = scorecardComp.groups.find(g => Array.isArray(g.players) && g.players.includes(user.name));
+              if (group && Array.isArray(group.members)) {
+                playerObj = group.members.find(m => m.name === user.name) || null;
+              }
+              if (!playerObj) {
+                const teamId = group?.teamId || group?.id || group?.team_id || group?.group_id;
+                playerObj = {
+                  name: user.name,
+                  id: user.id,
+                  user_id: user.id,
+                  team_id: teamId,
+                  teebox: group?.teeboxes?.[user.name] || '',
+                  course_handicap: group?.handicaps?.[user.name] || '',
+                };
+              }
+            }
+            navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: scorecardComp } });
+          } else {
+            navigate('/dashboard');
+          }
+        }}
+      >
+        My Scorecard
+      </button>
       <button
   className={`text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150 ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
   style={location.pathname === '/recent' ? { color: '#FFD700', borderColor: '#FFD700', borderBottomWidth: 3, background: 'none', borderStyle: 'solid', fontFamily: 'Merriweather, Georgia, serif' } : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}

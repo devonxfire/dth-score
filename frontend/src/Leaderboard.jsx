@@ -76,20 +76,44 @@ function Leaderboard() {
   const isStableford = comp.toLowerCase().includes('stableford');
   const isAlliance = comp.toLowerCase().includes('alliance');
   // Alliance (2 scores to count) team logic
+  const [groups, setGroups] = useState([]);
+  const [compId, setCompId] = useState(null);
+
+  // Fetch latest comp groups from backend
+  useEffect(() => {
+    // Try to get compId from entries
+    const joinCode = entries[0]?.player?.joinCode || entries[0]?.player?.joincode;
+    if (!joinCode) return;
+    // Fetch all competitions, find matching joinCode
+    fetch('/api/competitions')
+      .then(res => res.json())
+      .then(data => {
+        const comp = data.find(c => c.joincode === joinCode || c.joinCode === joinCode);
+        if (comp) {
+          setCompId(comp.id);
+          fetch(`/api/competitions/${comp.id}`)
+            .then(res => res.json())
+            .then(cdata => setGroups(cdata.groups || []));
+        }
+      });
+  }, [entries]);
+
   function getAllianceTeams() {
-    // Get groups from comp data (from CreateCompetition)
-    let groups = [];
-    try {
-  const compData = JSON.parse(localStorage.getItem(`comp_${entries[0]?.player?.joinCode || entries[0]?.player?.joincode}`));
-      groups = compData?.groups || [];
-    } catch {}
-    // Map group: { players: [names], teeTime }
-    // For each group, find player entries
+    // Use latest groups from backend
     return groups.map((group, idx) => {
-      // Find player entries for this group
-      const groupEntries = (group.players || [])
-        .map(name => entries.find(e => e.player?.name === name))
-        .filter(Boolean);
+      // Find player entries for this group (case-insensitive, trimmed match, support guest display names)
+      const groupEntries = (group.players || []).map((name, i) => {
+        if (["Guest 1","Guest 2","Guest 3"].includes(name) && Array.isArray(group.displayNames) && group.displayNames[i]) {
+          // Try to match guest by display name
+          const guestName = group.displayNames[i].trim().toLowerCase();
+          return entries.find(e => e.player?.name?.trim().toLowerCase() === guestName);
+        } else if (typeof name === 'string') {
+          const norm = name.trim().toLowerCase();
+          return entries.find(e => e.player?.name?.trim().toLowerCase() === norm);
+        } else {
+          return undefined;
+        }
+      }).filter(Boolean);
       // For each hole, get best 2 stableford points
       const holes = 18;
       let teamPoints = 0;

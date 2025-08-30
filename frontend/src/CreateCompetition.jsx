@@ -201,38 +201,14 @@ function CreateCompetition({ user, onSignOut }) {
       return;
     }
     try {
-      // If editing, PATCH main fields as well as groups
-      if (editingComp) {
-        const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
-        // Normalize field names to match backend/DB
-        const updateData = {
-          type: form.type,
-          date: form.date,
-          club: form.club,
-          handicapallowance: form.handicapAllowance,
-          fourballs: form.fourballs,
-          notes: form.notes,
-          groups: groupsData
-        };
-        const res = await fetch(`/api/competitions/${idToUse}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Admin-Secret': adminSecret
-          },
-          body: JSON.stringify(updateData)
-        });
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error('Failed to update competition: ' + errText);
-        }
-        setCreated(true);
-        return;
-      }
-      // Otherwise, just update groups (new comp flow)
+      // Always PATCH groups endpoint so teams table is updated
+      const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
       const res = await fetch(`/api/competitions/${idToUse}/groups`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Secret': adminSecret
+        },
         body: JSON.stringify({ groups: groupsData })
       });
       if (!res.ok) throw new Error('Failed to save groups');
@@ -243,6 +219,7 @@ function CreateCompetition({ user, onSignOut }) {
   }
 
   if (created) {
+    const isEdit = !!editingComp;
     return (
       <PageBackground>
         <TopMenu user={user} onSignOut={onSignOut} />
@@ -253,7 +230,7 @@ function CreateCompetition({ user, onSignOut }) {
                 <circle cx="24" cy="24" r="24" fill="#FFD700"/>
                 <path d="M16 25.5L22 31.5L33 18.5" stroke="#002F5F" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <h2 className="text-2xl font-extrabold mb-2 drop-shadow text-center whitespace-nowrap" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif' }}>Competition Created!</h2>
+              <h2 className="text-2xl font-extrabold mb-2 drop-shadow text-center whitespace-nowrap" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif' }}>{isEdit ? 'Competition Updated!' : 'Competition Created!'}</h2>
             </div>
             <div className="mb-4 text-white text-center text-base font-medium" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
               <p className="mb-1">Type: <span className="font-bold" style={{ color: '#FFD700' }}>{COMP_TYPE_DISPLAY[form.type] || form.type}</span></p>
@@ -276,7 +253,7 @@ function CreateCompetition({ user, onSignOut }) {
                   style={{ fontFamily: 'Merriweather, Georgia, serif', whiteSpace: 'nowrap' }}
                   onClick={() => navigate(`/competition/${compId}`)}
                 >
-                  View Competition
+                  {isEdit ? 'View Competition' : 'View Competition'}
                 </button>
               )}
             </div>

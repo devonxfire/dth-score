@@ -68,7 +68,7 @@ export default function CompetitionInfo({ user }) {
   return (
     <PageBackground>
       <div>
-        <TopMenu user={user} userComp={isPlayerInComp ? comp : null} isPlayerInComp={isPlayerInComp} />
+        <TopMenu user={user} userComp={isPlayerInComp ? comp : null} isPlayerInComp={isPlayerInComp} competitionList={comp ? [comp] : []} />
         <div className="flex flex-col items-center px-4 mt-12">
           <div className="mb-10">
             <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
@@ -79,6 +79,7 @@ export default function CompetitionInfo({ user }) {
   <div className="w-full max-w-4xl rounded-2xl bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none', fontFamily: 'Lato, Arial, sans-serif', color: 'white', borderColor: '#FFD700', marginTop: '-2.5rem' }}>
           <div className="mb-4">
               <div><span className="font-semibold">Date:</span> {formatDate(comp.date)}</div>
+              <div><span className="font-semibold">Course:</span> {comp.club || '-'}</div>
               <div><span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</div>
               {comp.handicapallowance && (
                 <div><span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance}{typeof comp.handicapallowance === 'string' && comp.handicapallowance.includes('%') ? '' : '%'}</div>

@@ -62,22 +62,51 @@ function RecentCompetitions({ user = {}, comps = [] }) {
     fetchCompetitions();
   }, []);
 
-  // Check if user is a player in any competition (must be after competitionList is declared)
-  const isPlayerInComp = competitionList.some(comp => {
-    if (!user?.name || !comp?.users) return false;
-    return comp.users.some(u => u.name === user.name);
-  });
+  // Find the comp the user is a player in (robust, like CompetitionInfo)
+  let userComp = null;
+  if (user && user.name && competitionList.length) {
+    const today = new Date();
+    function nameMatch(a, b) {
+      if (!a || !b) return false;
+      const normA = a.trim().toLowerCase();
+      const normB = b.trim().toLowerCase();
+      return normA && normB && (normA === normB || (normA.length > 1 && normB.includes(normA)) || (normB.length > 1 && normA.includes(normB)));
+    }
+    // Find any comp (open or closed) where user is in a group (players or displayNames)
+    const compsWithUser = competitionList.filter(comp => {
+      if (!Array.isArray(comp.groups)) return false;
+      return comp.groups.some(g =>
+        (Array.isArray(g.players) && g.players.some(p => nameMatch(p, user.name))) ||
+        (Array.isArray(g.displayNames) && g.displayNames.some(p => nameMatch(p, user.name)))
+      );
+    });
+    if (compsWithUser.length > 0) {
+      // Prefer open comps, then most recent
+      const openComps = compsWithUser.filter(comp => {
+        if (!comp.date) return false;
+        const compDate = new Date(comp.date);
+        return compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      });
+      if (openComps.length > 0) {
+        openComps.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        userComp = openComps[0];
+      } else {
+        compsWithUser.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        userComp = compsWithUser[0];
+      }
+    } else {
+      userComp = competitionList.find(comp => comp.users && comp.users.some(u => nameMatch(u.name, user.name)));
+    }
+  }
 
   // Actually delete competition from DB
   async function handleDelete(id) {
     if (!id) return;
     setDeleting(true);
     try {
-  // Always use relative URL so Vite proxy works in dev
-  const apiUrl = `/api/competitions/${id}`;
-  // IMPORTANT: Set REACT_APP_ADMIN_SECRET in your .env file (must start with REACT_APP_)
-  // and restart the frontend. Vite exposes these as import.meta.env.VITE_*
-  const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+      // Always use relative URL so Vite proxy works in dev
+      const apiUrl = `/api/competitions/${id}`;
+      const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
       if (!adminSecret) {
         alert('Admin secret missing. Set REACT_APP_ADMIN_SECRET in your .env file.');
         setDeleting(false);
@@ -100,6 +129,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
       setCompetitionList(prev => prev.filter(c => c.id !== id));
       setShowDeleteModal(false);
       setDeleteCompId(null);
+      // Immediately re-fetch competitions to update openComps
+      await fetchCompetitions();
     } catch (err) {
       alert('Error deleting competition: ' + (err?.message || err));
     } finally {
@@ -123,7 +154,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
   {/* Modal for open competition block */}
   <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
         {/* Top nav menu */}
-        <TopMenu user={user} isPlayerInComp={isPlayerInComp} competitionList={competitionList} />
+  <TopMenu user={user} userComp={userComp} competitionList={competitionList} />
   <div className="flex flex-col items-center px-4 mt-12">
           <div className="mb-10">
             <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>

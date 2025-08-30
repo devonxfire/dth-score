@@ -22,6 +22,7 @@ function formatDate(dateStr) {
 import { PlusIcon, EyeIcon, SignalIcon } from '@heroicons/react/24/solid';
 import './scorecardPulse.css';
 import './scorecardPulse.css';
+
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import westlakeLogo from './assets/westlake-logo2.png';
@@ -39,7 +40,6 @@ export default function Dashboard({ user, onSignOut }) {
       .then(res => res.json())
       .then(data => {
         setComps(Array.isArray(data) ? data : []);
-        // Debug: log competitions
       })
       .catch(() => setComps([]));
   }, []);
@@ -50,32 +50,45 @@ export default function Dashboard({ user, onSignOut }) {
       return;
     }
     const today = new Date();
-    // Find most recent open comp where user is assigned to a group
-    const openComps = comps.filter(comp => {
-      if (!comp.date || !Array.isArray(comp.groups)) return false;
-      const compDate = new Date(comp.date);
-      const isOpen = compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const assigned = comp.groups.some(g => Array.isArray(g.players) && g.players.some(p => nameMatch(p, user.name)));
-      // Debug: log group player names and assignment check
-      if (isOpen) {
-        comp.groups.forEach((g, idx) => {
-        });
-      }
-      return isOpen && assigned;
-    });
-    if (!openComps.length) {
-      setUserComp(null);
-      return;
+    function nameMatch(a, b) {
+      if (!a || !b) return false;
+      const normA = a.trim().toLowerCase();
+      const normB = b.trim().toLowerCase();
+      return normA && normB && (normA === normB || (normA.length > 1 && normB.includes(normA)) || (normB.length > 1 && normA.includes(normB)));
     }
-    // Sort by date descending and pick most recent
-    openComps.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    setUserComp(openComps[0]);
+    // Find any comp (open or closed) where user is in a group (players or displayNames)
+    const compsWithUser = comps.filter(comp => {
+      if (!Array.isArray(comp.groups)) return false;
+      return comp.groups.some(g =>
+        (Array.isArray(g.players) && g.players.some(p => nameMatch(p, user.name))) ||
+        (Array.isArray(g.displayNames) && g.displayNames.some(p => nameMatch(p, user.name)))
+      );
+    });
+    let scorecardComp = null;
+    if (compsWithUser.length > 0) {
+      // Prefer open comps, then most recent
+      const openComps = compsWithUser.filter(comp => {
+        if (!comp.date) return false;
+        const compDate = new Date(comp.date);
+        return compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      });
+      if (openComps.length > 0) {
+        openComps.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        scorecardComp = openComps[0];
+      } else {
+        compsWithUser.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        scorecardComp = compsWithUser[0];
+      }
+    } else {
+      scorecardComp = comps.find(comp => comp.users && comp.users.some(u => nameMatch(u.name, user.name)));
+    }
+    setUserComp(scorecardComp || null);
   }, [user, comps]);
 
   return (
     <PageBackground>
       {/* Top nav menu */}
-      <TopMenu user={user} userComp={userComp} onSignOut={onSignOut} />
+      <TopMenu user={user} userComp={userComp} onSignOut={onSignOut} competitionList={comps} />
       <div className="relative z-10 flex flex-col items-center px-4 mt-12">
         <img
           src={westlakeLogo}

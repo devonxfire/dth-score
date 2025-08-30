@@ -259,7 +259,7 @@ export default function ResultsMedal() {
   return (
     <PageBackground>
       {/* Top nav menu for UI consistency */}
-      <TopMenu user={user} userComp={isPlayerInComp ? competition : null} />
+      <TopMenu user={user} userComp={isPlayerInComp ? competition : null} competitionList={competition ? [competition] : []} />
   <div className="flex flex-col items-center px-4 w-full" style={{ minHeight: '100vh', fontFamily: 'Lato, Arial, sans-serif' }}>
   <div className="w-full max-w-4xl" ref={exportRef} id="export-section">
         {/* Hidden plain export table for PDF generation only */}
