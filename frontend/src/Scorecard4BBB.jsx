@@ -898,7 +898,7 @@ export default function Scorecard4BBB(props) {
                       </table>
                     </div>
                   )}
-                  {competition.notes && <><span className="font-semibold">Notes from Captain:</span> {competition.notes} <br /></>}
+                 
                 </div>
                 {/* Action buttons stacked vertically at top right */}
                 <div className="flex flex-col items-end space-y-2 ml-8 mt-2">

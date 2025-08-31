@@ -156,7 +156,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
     <PageBackground>
       <div>
   {/* Modal for open competition block */}
-  <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
+  <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} messageType={showOpenCompModal === 'reopen' ? 'reopen' : 'create'} />
         {/* Top nav menu */}
   <TopMenu user={user} userComp={userComp} competitionList={competitionList} />
   <div className="flex flex-col items-center px-4 mt-12">
@@ -175,7 +175,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                   onClick={() => {
                     console.log('Create New Competition clicked. openComps:', openComps);
                     if (openComps.length > 0) {
-                      setShowOpenCompModal(true);
+                      setShowOpenCompModal('create');
                     } else {
                       navigate('/create');
                     }
@@ -269,6 +269,11 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                                   className={status === 'Open' ? endBtnClass : reopenBtnClass}
                                   style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
                                   onClick={async () => {
+                                    // Prevent re-opening if another competition is already open
+                                    if (status !== 'Open' && openComps.length > 0) {
+                                      setShowOpenCompModal('reopen');
+                                      return;
+                                    }
                                     // Toggle comp status between Open and Closed
                                     const newStatus = status === 'Open' ? 'Closed' : 'Open';
                                     const apiUrl = `/api/competitions/${comp.id}`;
