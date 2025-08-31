@@ -698,7 +698,9 @@ export default function Scorecard4BBB(props) {
                               <tr key={name}>
                                 <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
                                 <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>{displayName}</td>
-                                <td className={`border px-2 py-1 text-center ${teeBg}`}>{teebox !== '' ? teebox : '-'}</td>
+                                <td className={`border px-2 py-1 text-center ${teeBg}`}>
+                                  {teebox !== '' ? teebox : '-'}
+                                </td>
                                 <td className="border px-2 py-1 text-center">
                                   <input
                                     type="number"
@@ -1111,7 +1113,7 @@ export default function Scorecard4BBB(props) {
                                   adjHandicap = fullHandicap;
                                 }
                               }
-                              let netFrontTotal = 0;
+                              let pointsTotal = 0;
                               const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
                               defaultHoles.slice(0,9).forEach((hole, hIdx) => {
                                 const strokeIdx = hole.index;
@@ -1125,21 +1127,31 @@ export default function Scorecard4BBB(props) {
                                     strokesReceived = 1;
                                   }
                                 }
-                                const gross = parseInt(row[hIdx], 10) || 0;
-                                const net = gross ? gross - strokesReceived : 0;
-                                if (typeof net === 'number') netFrontTotal += net;
+                                const gross = row[hIdx] !== undefined && row[hIdx] !== '' ? parseInt(row[hIdx], 10) : null;
+                                const net = gross !== null && !isNaN(gross) && gross > 0 ? gross - strokesReceived : null;
+                                let pts = '';
+                                if (net !== null) {
+                                  if (net === hole.par - 4) pts = 6;
+                                  else if (net === hole.par - 3) pts = 5;
+                                  else if (net === hole.par - 2) pts = 4;
+                                  else if (net === hole.par - 1) pts = 3;
+                                  else if (net === hole.par) pts = 2;
+                                  else if (net === hole.par + 1) pts = 1;
+                                  else pts = 0;
+                                }
+                                if (pts !== '' && gross !== null && !isNaN(gross) && gross > 0) pointsTotal += pts;
                               });
-                              return netFrontTotal;
+                              return pointsTotal !== 0 ? pointsTotal : '';
                             })()}
                           </td>
                         </tr>
                         {/* Insert B/B Score row after player B's Result row (pIdx === 1) */}
                         {pIdx === 1 && (
-                          <tr key="bb-score-front">
+                          <tr key="bb-score-front-ab">
                             <td className="border border-white px-2 py-1" style={{ minWidth: 32 }}></td>
                             <td className="border px-2 py-1 text-base font-bold text-center" style={{ minWidth: 40 }}>B/B Score</td>
                             {defaultHoles.slice(0,9).map((hole, hIdx) => {
-                              // Calculate net for A
+                              // ...existing code for A/B logic...
                               let adjHandicapA = 0;
                               if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[0]]) {
                                 const fullHandicapA = parseInt(groupForPlayer.handicaps[groupPlayers[0]], 10) || 0;
@@ -1159,8 +1171,8 @@ export default function Scorecard4BBB(props) {
                                   strokesA = 1;
                                 }
                               }
-                              const grossA = Array.isArray(scores[0]) ? parseInt(scores[0][hIdx], 10) || 0 : 0;
-                              const netA = grossA ? grossA - strokesA : null;
+                              const grossA = Array.isArray(scores[0]) ? parseInt(scores[0][hIdx], 10) : null;
+                              const netA = grossA !== null && !isNaN(grossA) && grossA > 0 ? grossA - strokesA : null;
                               // Calculate net for B
                               let adjHandicapB = 0;
                               if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[1]]) {
@@ -1181,11 +1193,10 @@ export default function Scorecard4BBB(props) {
                                   strokesB = 1;
                                 }
                               }
-                              const grossB = Array.isArray(scores[1]) ? parseInt(scores[1][hIdx], 10) || 0 : 0;
-                              const netB = grossB ? grossB - strokesB : null;
-                              // Stableford points: 6=triple eagle, 5=double eagle, 4=eagle, 3=birdie, 2=par, 1=bogey, 0=worse
+                              const grossB = Array.isArray(scores[1]) ? parseInt(scores[1][hIdx], 10) : null;
+                              const netB = grossB !== null && !isNaN(grossB) && grossB > 0 ? grossB - strokesB : null;
                               function points(net, par) {
-                                if (net == null) return 0;
+                                if (net == null) return '';
                                 if (net === par - 4) return 6;
                                 if (net === par - 3) return 5;
                                 if (net === par - 2) return 4;
@@ -1196,9 +1207,8 @@ export default function Scorecard4BBB(props) {
                               }
                               const ptsA = points(netA, hole.par);
                               const ptsB = points(netB, hole.par);
-                              const best = Math.max(ptsA, ptsB);
-                              // Only show blank if both A and B have not entered a score
-                              const bothBlank = (!grossA && !grossB);
+                              const best = ptsA === '' && ptsB === '' ? '' : Math.max(ptsA || 0, ptsB || 0);
+                              const bothBlank = (grossA === null && grossB === null);
                               return (
                                 <td key={hIdx} className="border border-white py-1 text-center align-middle font-bold text-base text-white" style={{ verticalAlign: 'middle', height: '44px' }}>{bothBlank ? '' : best}</td>
                               );
@@ -1207,9 +1217,8 @@ export default function Scorecard4BBB(props) {
                               {(() => {
                                 let total = 0;
                                 for (let hIdx = 0; hIdx < 9; hIdx++) {
-                                  // Repeat net and points logic for total
                                   const hole = defaultHoles[hIdx];
-                                  // A
+                                  // ...existing code for A/B logic...
                                   let adjHandicapA = 0;
                                   if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[0]]) {
                                     const fullHandicapA = parseInt(groupForPlayer.handicaps[groupPlayers[0]], 10) || 0;
@@ -1229,9 +1238,9 @@ export default function Scorecard4BBB(props) {
                                       strokesA = 1;
                                     }
                                   }
-                                  const grossA = Array.isArray(scores[0]) ? parseInt(scores[0][hIdx], 10) || 0 : 0;
-                                  const netA = grossA ? grossA - strokesA : null;
-                                  // B
+                                  const grossA = Array.isArray(scores[0]) ? parseInt(scores[0][hIdx], 10) : null;
+                                  const netA = grossA !== null && !isNaN(grossA) && grossA > 0 ? grossA - strokesA : null;
+                                  // ...existing code for B...
                                   let adjHandicapB = 0;
                                   if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[1]]) {
                                     const fullHandicapB = parseInt(groupForPlayer.handicaps[groupPlayers[1]], 10) || 0;
@@ -1251,10 +1260,13 @@ export default function Scorecard4BBB(props) {
                                       strokesB = 1;
                                     }
                                   }
-                                  const grossB = Array.isArray(scores[1]) ? parseInt(scores[1][hIdx], 10) || 0 : 0;
-                                  const netB = grossB ? grossB - strokesB : null;
+                                  const grossB = Array.isArray(scores[1]) ? parseInt(scores[1][hIdx], 10) : null;
+                                  const netB = grossB !== null && !isNaN(grossB) && grossB > 0 ? grossB - strokesB : null;
                                   function points(net, par) {
-                                    if (net == null) return 0;
+                                    if (net == null) return '';
+                                    if (net === par - 4) return 6;
+                                    if (net === par - 3) return 5;
+                                    if (net === par - 2) return 4;
                                     if (net === par - 1) return 3;
                                     if (net === par) return 2;
                                     if (net === par + 1) return 1;
@@ -1262,9 +1274,146 @@ export default function Scorecard4BBB(props) {
                                   }
                                   const ptsA = points(netA, hole.par);
                                   const ptsB = points(netB, hole.par);
-                                  total += Math.max(ptsA, ptsB);
+                                  const best = ptsA === '' && ptsB === '' ? '' : Math.max(ptsA || 0, ptsB || 0);
+                                  if (best !== '') total += best;
                                 }
-                                return total > 0 ? total : '';
+                                return total !== 0 ? total : '';
+                              })()}
+                            </td>
+                          </tr>
+                        )}
+                        {pIdx === 3 && groupPlayers.length >= 4 && (
+                          <tr key="bb-score-front-cd">
+                            <td className="border border-white px-2 py-1" style={{ minWidth: 32 }}></td>
+                            <td className="border px-2 py-1 text-base font-bold text-center" style={{ minWidth: 40 }}>B/B Score</td>
+                            {defaultHoles.slice(0,9).map((hole, hIdx) => {
+                              // ...existing code for C/D logic...
+                              let adjHandicapC = 0;
+                              if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[2]]) {
+                                const fullHandicapC = parseInt(groupForPlayer.handicaps[groupPlayers[2]], 10) || 0;
+                                if (competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+                                  adjHandicapC = Math.round(fullHandicapC * Number(competition.handicapallowance) / 100);
+                                } else {
+                                  adjHandicapC = fullHandicapC;
+                                }
+                              }
+                              let strokesC = 0;
+                              if (adjHandicapC > 0) {
+                                if (adjHandicapC >= 18) {
+                                  strokesC = 1;
+                                  if (adjHandicapC - 18 >= hole.index) strokesC = 2;
+                                  else if (hole.index <= (adjHandicapC % 18)) strokesC = 2;
+                                } else if (hole.index <= adjHandicapC) {
+                                  strokesC = 1;
+                                }
+                              }
+                              const grossC = Array.isArray(scores[2]) ? parseInt(scores[2][hIdx], 10) : null;
+                              const netC = grossC !== null && !isNaN(grossC) && grossC > 0 ? grossC - strokesC : null;
+                              // Calculate net for D
+                              let adjHandicapD = 0;
+                              if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[3]]) {
+                                const fullHandicapD = parseInt(groupForPlayer.handicaps[groupPlayers[3]], 10) || 0;
+                                if (competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+                                  adjHandicapD = Math.round(fullHandicapD * Number(competition.handicapallowance) / 100);
+                                } else {
+                                  adjHandicapD = fullHandicapD;
+                                }
+                              }
+                              let strokesD = 0;
+                              if (adjHandicapD > 0) {
+                                if (adjHandicapD >= 18) {
+                                  strokesD = 1;
+                                  if (adjHandicapD - 18 >= hole.index) strokesD = 2;
+                                  else if (hole.index <= (adjHandicapD % 18)) strokesD = 2;
+                                } else if (hole.index <= adjHandicapD) {
+                                  strokesD = 1;
+                                }
+                              }
+                              const grossD = Array.isArray(scores[3]) ? parseInt(scores[3][hIdx], 10) : null;
+                              const netD = grossD !== null && !isNaN(grossD) && grossD > 0 ? grossD - strokesD : null;
+                              function points(net, par) {
+                                if (net == null) return '';
+                                if (net === par - 4) return 6;
+                                if (net === par - 3) return 5;
+                                if (net === par - 2) return 4;
+                                if (net === par - 1) return 3;
+                                if (net === par) return 2;
+                                if (net === par + 1) return 1;
+                                return 0;
+                              }
+                              const ptsC = points(netC, hole.par);
+                              const ptsD = points(netD, hole.par);
+                              const best = ptsC === '' && ptsD === '' ? '' : Math.max(ptsC || 0, ptsD || 0);
+                              const bothBlank = (grossC === null && grossD === null);
+                              return (
+                                <td key={hIdx} className="border border-white py-1 text-center align-middle font-bold text-base text-white" style={{ verticalAlign: 'middle', height: '44px' }}>{bothBlank ? '' : best}</td>
+                              );
+                            })}
+                            <td className="border border-white px-2 py-1 font-bold text-base text-white" style={{ verticalAlign: 'middle', height: '44px' }}>
+                              {(() => {
+                                let total = 0;
+                                for (let hIdx = 0; hIdx < 9; hIdx++) {
+                                  const hole = defaultHoles[hIdx];
+                                  // ...existing code for C/D logic...
+                                  let adjHandicapC = 0;
+                                  if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[2]]) {
+                                    const fullHandicapC = parseInt(groupForPlayer.handicaps[groupPlayers[2]], 10) || 0;
+                                    if (competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+                                      adjHandicapC = Math.round(fullHandicapC * Number(competition.handicapallowance) / 100);
+                                    } else {
+                                      adjHandicapC = fullHandicapC;
+                                    }
+                                  }
+                                  let strokesC = 0;
+                                  if (adjHandicapC > 0) {
+                                    if (adjHandicapC >= 18) {
+                                      strokesC = 1;
+                                      if (adjHandicapC - 18 >= hole.index) strokesC = 2;
+                                      else if (hole.index <= (adjHandicapC % 18)) strokesC = 2;
+                                    } else if (hole.index <= adjHandicapC) {
+                                      strokesC = 1;
+                                    }
+                                  }
+                                  const grossC = Array.isArray(scores[2]) ? parseInt(scores[2][hIdx], 10) : null;
+                                  const netC = grossC !== null && !isNaN(grossC) && grossC > 0 ? grossC - strokesC : null;
+                                  // ...existing code for D...
+                                  let adjHandicapD = 0;
+                                  if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[3]]) {
+                                    const fullHandicapD = parseInt(groupForPlayer.handicaps[groupPlayers[3]], 10) || 0;
+                                    if (competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+                                      adjHandicapD = Math.round(fullHandicapD * Number(competition.handicapallowance) / 100);
+                                    } else {
+                                      adjHandicapD = fullHandicapD;
+                                    }
+                                  }
+                                  let strokesD = 0;
+                                  if (adjHandicapD > 0) {
+                                    if (adjHandicapD >= 18) {
+                                      strokesD = 1;
+                                      if (adjHandicapD - 18 >= hole.index) strokesD = 2;
+                                      else if (hole.index <= (adjHandicapD % 18)) strokesD = 2;
+                                    } else if (hole.index <= adjHandicapD) {
+                                      strokesD = 1;
+                                    }
+                                  }
+                                  const grossD = Array.isArray(scores[3]) ? parseInt(scores[3][hIdx], 10) : null;
+                                  const netD = grossD !== null && !isNaN(grossD) && grossD > 0 ? grossD - strokesD : null;
+                                  function points(net, par) {
+                                    if (net == null) return '';
+                                    if (net === par - 4) return 6;
+                                    if (net === par - 3) return 5;
+                                    if (net === par - 2) return 4;
+                                    if (net === par - 1) return 3;
+                                    if (net === par) return 2;
+                                    if (net === par + 1) return 1;
+                                    return 0;
+                                  }
+                                  const ptsC = points(netC, hole.par);
+                                  const ptsD = points(netD, hole.par);
+                                  const best = ptsC === '' && ptsD === '' ? '' : Math.max(ptsC || 0, ptsD || 0);
+                                  if (best !== '') total += best;
+                                }
+                                return total !== 0 ? total : '';
                               })()}
                             </td>
                           </tr>
@@ -1409,7 +1558,7 @@ export default function Scorecard4BBB(props) {
                                   adjHandicap = fullHandicap;
                                 }
                               }
-                              let netBackTotal = 0;
+                              let pointsTotal = 0;
                               const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
                               defaultHoles.slice(9,18).forEach((hole, hIdx) => {
                                 const strokeIdx = hole.index;
@@ -1423,11 +1572,21 @@ export default function Scorecard4BBB(props) {
                                     strokesReceived = 1;
                                   }
                                 }
-                                const gross = parseInt(row[hIdx+9], 10) || 0;
-                                const net = gross ? gross - strokesReceived : 0;
-                                if (typeof net === 'number') netBackTotal += net;
+                                const gross = row[hIdx+9] !== undefined && row[hIdx+9] !== '' ? parseInt(row[hIdx+9], 10) : null;
+                                const net = gross !== null && !isNaN(gross) && gross > 0 ? gross - strokesReceived : null;
+                                let pts = '';
+                                if (net !== null) {
+                                  if (net === hole.par - 4) pts = 6;
+                                  else if (net === hole.par - 3) pts = 5;
+                                  else if (net === hole.par - 2) pts = 4;
+                                  else if (net === hole.par - 1) pts = 3;
+                                  else if (net === hole.par) pts = 2;
+                                  else if (net === hole.par + 1) pts = 1;
+                                  else pts = 0;
+                                }
+                                if (pts !== '' && gross !== null && !isNaN(gross) && gross > 0) pointsTotal += pts;
                               });
-                              return netBackTotal;
+                              return pointsTotal !== 0 ? pointsTotal : '';
                             })()}
                           </td>
                           <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
@@ -1532,7 +1691,6 @@ export default function Scorecard4BBB(props) {
                               {(() => {
                                 let total = 0;
                                 for (let hIdx = 9; hIdx < 18; hIdx++) {
-                                  // Repeat net and points logic for total
                                   const hole = defaultHoles[hIdx];
                                   // A
                                   let adjHandicapA = 0;
@@ -1554,8 +1712,8 @@ export default function Scorecard4BBB(props) {
                                       strokesA = 1;
                                     }
                                   }
-                                  const grossA = Array.isArray(scores[0]) ? parseInt(scores[0][hIdx], 10) || 0 : 0;
-                                  const netA = grossA ? grossA - strokesA : null;
+                                  const grossA = Array.isArray(scores[0]) ? parseInt(scores[0][hIdx], 10) : null;
+                                  const netA = grossA !== null && !isNaN(grossA) && grossA > 0 ? grossA - strokesA : null;
                                   // B
                                   let adjHandicapB = 0;
                                   if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[1]]) {
@@ -1576,10 +1734,13 @@ export default function Scorecard4BBB(props) {
                                       strokesB = 1;
                                     }
                                   }
-                                  const grossB = Array.isArray(scores[1]) ? parseInt(scores[1][hIdx], 10) || 0 : 0;
-                                  const netB = grossB ? grossB - strokesB : null;
+                                  const grossB = Array.isArray(scores[1]) ? parseInt(scores[1][hIdx], 10) : null;
+                                  const netB = grossB !== null && !isNaN(grossB) && grossB > 0 ? grossB - strokesB : null;
                                   function points(net, par) {
-                                    if (net == null) return 0;
+                                    if (net == null) return '';
+                                    if (net === par - 4) return 6;
+                                    if (net === par - 3) return 5;
+                                    if (net === par - 2) return 4;
                                     if (net === par - 1) return 3;
                                     if (net === par) return 2;
                                     if (net === par + 1) return 1;
@@ -1587,9 +1748,10 @@ export default function Scorecard4BBB(props) {
                                   }
                                   const ptsA = points(netA, hole.par);
                                   const ptsB = points(netB, hole.par);
-                                  total += Math.max(ptsA, ptsB);
+                                  const best = ptsA === '' && ptsB === '' ? '' : Math.max(ptsA || 0, ptsB || 0);
+                                  if (best !== '') total += best;
                                 }
-                                return total > 0 ? total : '';
+                                return total !== 0 ? total : '';
                               })()}
                             </td>
                             <td className="border border-white px-2 py-1 font-bold text-base text-white" style={{ verticalAlign: 'middle', height: '44px' }}></td>
