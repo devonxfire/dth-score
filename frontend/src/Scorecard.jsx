@@ -619,14 +619,17 @@ export default function Scorecard(props) {
               <div className="flex flex-row justify-between items-start w-full">
                 {/* Mini table and comp info */}
                 <div className="mb-2 text-white/90" style={{ fontFamily: 'Lato, Arial, sans-serif', color: 'white' }}>
-                  <span className="font-semibold">Competition:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')} <br />
                   <span className="font-semibold">Date:</span> {formatDate(competition.date)} <br />
+                  <span className="font-semibold">Club:</span> {competition.club || '-'} <br />
+                  <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')} <br />
                   {/* Tee Box removed as per user request */}
                   <span className="font-semibold">Handicap Allowance:</span> {
                     competition.handicapallowance && competition.handicapallowance !== 'N/A'
                       ? competition.handicapallowance + '%'
                       : 'N/A'
                   } <br />
+                  <span className="font-semibold">Notes:</span> {competition.notes && competition.notes.trim() ? competition.notes : '-'} <br />
+                  <br />
                   {/* 4 Ball number removed as per user request */}
                   {groupPlayers.length >= 2 && (
                     <div className="my-2">

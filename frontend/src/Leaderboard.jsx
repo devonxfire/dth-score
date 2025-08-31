@@ -246,6 +246,15 @@ function Leaderboard() {
               {/* ...existing code... */}
             </table>
           )}
+          {/* Captain's Log Section */}
+          <div className="mt-10">
+            <h3 className="text-2xl font-bold text-white mb-2 drop-shadow text-center">Captain's Log</h3>
+            <textarea
+              className="w-full min-h-[100px] rounded-lg p-3 bg-white/90 text-black text-lg font-medium border border-[#FFD700] focus:outline-none focus:ring-2 focus:ring-[#FFD700]"
+              placeholder="Enter notes here..."
+              style={{ resize: 'vertical', fontFamily: 'Lato, Arial, sans-serif' }}
+            />
+          </div>
         </div>
       </div>
     </PageBackground>

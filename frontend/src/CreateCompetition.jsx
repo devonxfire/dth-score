@@ -116,24 +116,12 @@ function CreateCompetition({ user, onSignOut }) {
       setShowOpenCompModal(true);
       return;
     }
-    // If editing, PATCH the competition
+    // If editing, PATCH the competition immediately
     if (editingComp) {
-      // If fourballs entered, show group assignment
-      if (form.fourballs && !showGroups) {
-        setShowGroups(true);
-        return;
-      }
-      // Save changes to backend
       try {
         const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
-        // Normalize field names to match backend/DB
         const updateData = {
-          type: form.type,
-          date: form.date,
-          club: form.club,
-          handicapallowance: form.handicapAllowance, // DB expects lowercase
-          fourballs: form.fourballs,
-          notes: form.notes
+          club: form.club
         };
         const res = await fetch(`/api/competitions/${editingComp.id}`, {
           method: 'PATCH',
@@ -146,6 +134,21 @@ function CreateCompetition({ user, onSignOut }) {
         if (!res.ok) {
           const errText = await res.text();
           throw new Error('Failed to update competition: ' + errText);
+        }
+        // Fetch updated comp from backend
+        const updatedRes = await fetch(`/api/competitions/${editingComp.id}`);
+        let updatedComp = editingComp;
+        if (updatedRes.ok) {
+          updatedComp = await updatedRes.json();
+        }
+        // Update form state with latest comp info
+        setForm(f => ({ ...f, club: updatedComp.club }));
+        // Overwrite editingComp for popup
+        editingComp.club = updatedComp.club;
+        // Now move to group assignment if fourballs entered
+        if (form.fourballs && !showGroups) {
+          setShowGroups(true);
+          return;
         }
         setCreated(true);
       } catch (err) {
@@ -274,7 +277,7 @@ function CreateCompetition({ user, onSignOut }) {
               className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2"
               style={{ color: '#1B3A6B', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}
             >
-              Create Competition
+              {editingComp ? 'Edit Competition' : 'Create Competition'}
             </h1>
             <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, width: '100%', background: 'white', opacity: 0.7, borderRadius: 2}}></div>
           </div>
