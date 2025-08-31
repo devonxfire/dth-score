@@ -15,6 +15,17 @@ import html2canvas from 'html2canvas';
 
 // Medal Results Page UI (fetches real data)
 export default function ResultsMedal() {
+  // Friendly display for comp type
+  const COMP_TYPE_DISPLAY = {
+    fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
+    '4bbb stableford': '4BBB Stableford (2 Scores to Count)',
+    alliance: 'Alliance',
+    medalStrokeplay: 'Medal Strokeplay',
+    'medal strokeplay': 'Medal Strokeplay',
+    stroke: 'Medal Strokeplay',
+    individualStableford: 'Individual Stableford',
+    'individual stableford': 'Individual Stableford',
+  };
   const { id } = useParams();
   // Modal state for email PDF
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -270,7 +281,7 @@ export default function ResultsMedal() {
           <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 28, marginBottom: 8 }}>Medal Results</div>
           {competition && (
             <div style={{ marginBottom: 18, fontSize: 16 }}>
-              <span style={{ fontWeight: 'bold' }}>Competition Type:</span> {competition.type ? (competition.type.replace(/(^|_|-)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')) : '-'}<br />
+              <span style={{ fontWeight: 'bold' }}>Competition Type:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type || ''}<br />
               <span style={{ fontWeight: 'bold' }}>Date:</span> {competition.date ? (new Date(competition.date).toLocaleDateString('en-GB')) : '-'}<br />
               <span style={{ fontWeight: 'bold' }}>Handicap Allowance:</span> {competition.handicapallowance && competition.handicapallowance !== 'N/A' ? competition.handicapallowance + '%' : 'N/A'}
             </div>
@@ -408,9 +419,11 @@ export default function ResultsMedal() {
             {/* Competition info section */}
             {competition && (
               <div className="text-white/90 text-base" style={{minWidth: 260, textAlign: 'left'}}>
-                <span className="font-semibold">Competition Type:</span> {competition.type ? (competition.type.replace(/(^|_|-)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')) : '-'} <br />
                 <span className="font-semibold">Date:</span> {competition.date ? (new Date(competition.date).toLocaleDateString('en-GB')) : '-'} <br />
-                <span className="font-semibold">Handicap Allowance:</span> {competition.handicapallowance && competition.handicapallowance !== 'N/A' ? competition.handicapallowance + '%' : 'N/A'}
+                <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type || ''} <br />
+                <span className="font-semibold">Course:</span> {competition.course || '-'} <br />
+                <span className="font-semibold">Handicap Allowance:</span> {competition.handicapallowance && competition.handicapallowance !== 'N/A' ? competition.handicapallowance + '%' : 'N/A'} <br />
+                <span className="font-semibold">Notes:</span> {competition.notes || '-'}
                 {/* Good Scores section - moved here */}
                 {(() => {
                   const goodScores = players.filter(p => typeof p.dthNet === 'number' && p.dthNet < 70 && p.thru === 'F');

@@ -69,7 +69,19 @@ function Leaderboard() {
   }, [filterDate, filterType]);
 
   // Get competition and date from first entry (filtered)
-  const comp = entries[0]?.competitionType || '';
+  // Normalize comp key to match COMP_TYPE_DISPLAY keys
+  let compRaw = entries[0]?.competitionType || '';
+  let compKey = compRaw
+    .replace(/\s+/g, '')
+    .replace(/\(.*\)/, '')
+    .replace(/[^a-zA-Z]/g, '')
+    .replace(/^[0-9]+/, '')
+    .replace(/^[A-Z]/, m => m.toLowerCase())
+    .replace(/(\w)([A-Z])/g, (m, p1, p2) => p1 + p2.toLowerCase());
+  if (compKey === '4bbbstableford') compKey = 'fourBbbStableford';
+  if (compKey === 'medalstrokeplay') compKey = 'medalStrokeplay';
+  if (compKey === 'individualstableford') compKey = 'individualStableford';
+  if (compKey === 'alliance') compKey = 'alliance';
   const date = entries[0]?.date || '';
   // Determine comp type
   const isMedal = comp.toLowerCase().includes('medal');
@@ -230,7 +242,12 @@ function Leaderboard() {
               ← Back to Scorecard
             </button>
           </div>
-          {comp && <div className="text-lg font-semibold text-white/90 mb-1">{COMP_TYPE_DISPLAY[comp] || comp?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')}</div>}
+          {comp && <div className="text-lg font-semibold text-white/90 mb-1"><span>Type: </span>{COMP_TYPE_DISPLAY[comp] || comp?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')}</div>}
+          {compRaw && COMP_TYPE_DISPLAY[compKey] &&
+            <div className="text-lg font-semibold text-white/90 mb-1">
+              <span>Type: </span>{COMP_TYPE_DISPLAY[compKey]}
+            </div>
+          }
           {date && <div className="text-md text-white/70 mb-1">{formatDate(date)}</div>}
           {(entries[0]?.player?.joinCode || entries[0]?.player?.joincode) && (
             <div className="text-xs text-white/60 mb-4">Invite Code: <span className="font-mono">{entries[0].player.joinCode || entries[0].player.joincode}</span></div>
