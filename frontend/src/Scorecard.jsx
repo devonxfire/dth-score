@@ -609,7 +609,9 @@ export default function Scorecard(props) {
           <div className="flex flex-col items-center px-4">
             <div className="mt-12">
               <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
-                {competition.fourballs ? `4 BALL # ${competition.fourballs}'s Scorecard` : 'Scorecard'}
+                {groupForPlayer && competition.groups.length > 1
+                  ? `4 BALL #${competition.groups.indexOf(groupForPlayer) + 1}'s Scorecard`
+                  : 'Scorecard'}
               </h1>
               <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
             </div>

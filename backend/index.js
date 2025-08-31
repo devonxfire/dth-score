@@ -33,30 +33,84 @@ app.patch('/api/competitions/:id/groups', async (req, res) => {
 
     // Fetch all existing teams for this competition
     const existingTeams = await prisma.teams.findMany({ where: { competition_id: Number(id) } });
+    // Map of team key (sorted player names) to team object
+    const teamKey = (players) => players.map(p => p && p.trim && p.trim()).sort().join('|');
+    const existingTeamMap = {};
+    for (const team of existingTeams) {
+      if (Array.isArray(team.players)) {
+        existingTeamMap[teamKey(team.players)] = team;
+      }
+    }
+
     // For each group, ensure a team exists in the teams table (preserve existing, only add new)
     for (const [i, group] of groups.entries()) {
       if (!Array.isArray(group.players) || group.players.length === 0) continue;
-      // Try to find an existing team for this comp with the same players (order-insensitive)
-      const groupSet = new Set(group.players.map(p => p && p.trim && p.trim()));
-      let foundTeam = null;
-      for (const team of existingTeams) {
-        if (Array.isArray(team.players)) {
-          const teamSet = new Set(team.players.map(p => p && p.trim && p.trim()));
-          if (groupSet.size === teamSet.size && [...groupSet].every(p => teamSet.has(p))) {
-            foundTeam = team;
-            break;
+      const key = teamKey(group.players);
+      let foundTeam = existingTeamMap[key];
+      if (!foundTeam) {
+        // Find the most similar old team (max overlap)
+        let bestMatch = null;
+        let bestOverlap = 0;
+        for (const oldTeam of existingTeams) {
+          if (!Array.isArray(oldTeam.players)) continue;
+          const overlap = oldTeam.players.filter(p => group.players.includes(p)).length;
+          if (overlap > bestOverlap) {
+            bestOverlap = overlap;
+            bestMatch = oldTeam;
           }
         }
-      }
-      if (!foundTeam) {
-        // Only create a new team if this group is truly new
-        await prisma.teams.create({
+        // Create new team
+        foundTeam = await prisma.teams.create({
           data: {
             competition_id: Number(id),
             name: group.name || `Group ${i + 1}`,
             players: group.players
           }
         });
+
+        // For each player in the new group, if they were in the bestMatch team, copy their teams_users and scores
+        if (bestMatch && Array.isArray(bestMatch.players)) {
+          for (const player of group.players) {
+            if (bestMatch.players.includes(player)) {
+              // Find user by name
+              const user = await prisma.users.findFirst({ where: { name: player } });
+              if (user) {
+                // Copy teams_users (handicap, teebox, etc.)
+                const oldTU = await prisma.teams_users.findFirst({ where: { team_id: bestMatch.id, user_id: user.id } });
+                if (oldTU) {
+                  await prisma.teams_users.create({
+                    data: {
+                      team_id: foundTeam.id,
+                      user_id: user.id,
+                      teebox: oldTU.teebox,
+                      course_handicap: oldTU.course_handicap,
+                      waters: oldTU.waters,
+                      dog: oldTU.dog,
+                      two_clubs: oldTU.two_clubs,
+                      fines: oldTU.fines
+                    }
+                  });
+                }
+                // Copy scores
+                const oldScores = await prisma.scores.findMany({ where: { team_id: bestMatch.id, user_id: user.id, competition_id: Number(id) } });
+                for (const score of oldScores) {
+                  await prisma.scores.create({
+                    data: {
+                      competition_id: Number(id),
+                      team_id: foundTeam.id,
+                      user_id: user.id,
+                      hole_id: score.hole_id,
+                      strokes: score.strokes
+                    }
+                  });
+                }
+              }
+            }
+            // If player is new, do nothing (blank data)
+          }
+        }
+        // Add to map so future groups can find this team
+        existingTeamMap[key] = foundTeam;
       }
       // If foundTeam exists, do nothing (preserve all data)
     }
