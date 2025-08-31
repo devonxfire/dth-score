@@ -1,3 +1,21 @@
+// Get all teams for a competition (for leaderboard)
+app.get('/api/teams', async (req, res) => {
+  const { competitionId } = req.query;
+  if (!competitionId) return res.status(400).json({ error: 'competitionId required' });
+  try {
+    const teams = await prisma.teams.findMany({
+      where: { competition_id: Number(competitionId) },
+      select: {
+        id: true,
+        players: true,
+        team_points: true
+      }
+    });
+    res.json(teams);
+  } catch (err) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
 
 
 
@@ -325,6 +343,88 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
         }
       };
       await prisma.scores.upsert(upsertData);
+    }
+    // --- 4BBB Team Points Calculation ---
+    // 1. Fetch all team members
+    const team = await prisma.teams.findUnique({
+      where: { id: Number(teamId) },
+      include: { teams_users: true }
+    });
+    if (team) {
+      // 2. Fetch all scores for this team in this competition
+      const allScores = await prisma.scores.findMany({
+        where: {
+          competition_id: Number(competitionId),
+          team_id: Number(teamId)
+        }
+      });
+      // 3. Fetch holes for this competition, ordered by number
+      const holes = await prisma.holes.findMany({
+        where: { competition_id: Number(competitionId) },
+        orderBy: { number: 'asc' }
+      });
+      // 4. Build a map: user_id -> handicap (from teams_users)
+      const handicapMap = {};
+      for (const tu of team.teams_users) {
+        if (tu.user_id != null && tu.course_handicap != null) {
+          handicapMap[tu.user_id] = Number(tu.course_handicap);
+        }
+      }
+      // 5. Get handicap allowance for competition (if any)
+      let comp = null;
+      let handicapAllowance = 1;
+      try {
+        comp = await prisma.competitions.findUnique({ where: { id: Number(competitionId) } });
+        if (comp && comp.handicapallowance && !isNaN(Number(comp.handicapallowance))) {
+          handicapAllowance = Number(comp.handicapallowance) / 100;
+        }
+      } catch {}
+      // 6. For each hole, find best Stableford points among all team members
+      let teamPoints = 0;
+      for (const hole of holes) {
+        let bestPoints = 0;
+        for (const tu of team.teams_users) {
+          const userId = tu.user_id;
+          // Find score for this user/hole
+          const scoreObj = allScores.find(s => s.user_id === userId && s.hole_id === hole.id);
+          if (!scoreObj || scoreObj.strokes == null) continue;
+          // Calculate adjusted handicap for this user
+          let adjHandicap = 0;
+          if (handicapMap[userId] != null) {
+            adjHandicap = Math.round(handicapMap[userId] * handicapAllowance);
+          }
+          // Calculate strokes received for this hole
+          let strokesReceived = 0;
+          if (adjHandicap > 0) {
+            if (adjHandicap >= 18) {
+              strokesReceived = 1;
+              if (adjHandicap - 18 >= hole.stroke_index) strokesReceived = 2;
+              else if (hole.stroke_index <= (adjHandicap % 18)) strokesReceived = 2;
+            } else if (hole.stroke_index <= adjHandicap) {
+              strokesReceived = 1;
+            }
+          }
+          const gross = Number(scoreObj.strokes);
+          const net = gross ? gross - strokesReceived : null;
+          // Stableford points: 6=triple eagle, 5=double eagle, 4=eagle, 3=birdie, 2=par, 1=bogey, 0=worse
+          let pts = 0;
+          if (net !== null) {
+            if (net === hole.par - 4) pts = 6;
+            else if (net === hole.par - 3) pts = 5;
+            else if (net === hole.par - 2) pts = 4;
+            else if (net === hole.par - 1) pts = 3;
+            else if (net === hole.par) pts = 2;
+            else if (net === hole.par + 1) pts = 1;
+          }
+          if (pts > bestPoints) bestPoints = pts;
+        }
+        teamPoints += bestPoints;
+      }
+      // 7. Update team_points in teams table
+      await prisma.teams.update({
+        where: { id: Number(teamId) },
+        data: { team_points: teamPoints }
+      });
     }
     res.json({ success: true });
   } catch (err) {

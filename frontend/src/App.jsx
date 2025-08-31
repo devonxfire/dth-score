@@ -7,6 +7,8 @@ import CompetitionInfo from './CompetitionInfo';
 import Scorecard from './Scorecard';
 import ScorecardRouter from './ScorecardRouter';
 import Leaderboard from './Leaderboard';
+import Leaderboard4BBB from './Leaderboard4BBB';
+import LeaderboardRouter from './LeaderboardRouter';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import ResultsMedal from './ResultsMedal';
@@ -44,7 +46,7 @@ function AppRoutes({ user, setUser }) {
           <Route path="/competition/:id" element={<CompetitionInfo user={user} />} />
           <Route path="/competition/:id/edit" element={<CreateCompetition user={user} />} />
           <Route path="/scorecard/:id" element={<ScorecardRouter user={user} />} />
-          <Route path="/leaderboard/:id" element={<Leaderboard user={user} />} />
+          <Route path="/leaderboard/:id" element={<LeaderboardRouter user={user} />} />
           <Route path="/results/:id" element={<ResultsMedal />} />
           <Route path="/profile" element={<div className="p-8">User Profile (coming soon)</div>} />
         </>
