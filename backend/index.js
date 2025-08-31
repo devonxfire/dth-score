@@ -1,3 +1,15 @@
+
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const { PrismaClient } = require('@prisma/client');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const prisma = new PrismaClient();
+
 // Get all teams for a competition (for leaderboard)
 app.get('/api/teams', async (req, res) => {
   const { competitionId } = req.query;
@@ -16,20 +28,6 @@ app.get('/api/teams', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
-
-
-
-
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const { PrismaClient } = require('@prisma/client');
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-const prisma = new PrismaClient();
 
 app.get('/', (req, res) => {
   res.send('Backend is running!');
@@ -220,7 +218,8 @@ app.get('/api/competitions/:id', async (req, res) => {
           for (const team of allTeams) {
             if (Array.isArray(team.players)) {
               const teamSet = new Set(team.players.map(p => p && p.trim && p.trim()));
-              if (groupSet.size === teamSet.size && [...groupSet].every(p => teamSet.has(p))) {
+              // Ensure both sets are the same size and have the same members
+              if (groupSet.size === teamSet.size && groupSet.size > 0 && [...groupSet].every(p => teamSet.has(p))) {
                 foundTeam = team;
                 break;
               }
@@ -229,9 +228,8 @@ app.get('/api/competitions/:id', async (req, res) => {
         }
         groupDebug.foundTeam = foundTeam;
         debug.push(groupDebug);
-        if (foundTeam) {
-          group.teamId = foundTeam.id;
-        }
+        // Always assign the correct teamId (or null if not found)
+        group.teamId = foundTeam ? foundTeam.id : null;
         if (foundTeam && Array.isArray(group.players)) {
           // Build lookup for player handicaps and teeboxes
           group.handicaps = {};
