@@ -27,9 +27,9 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
         const users = await res.json();
         // Use username or name field, fallback to id if needed
         const names = users.map(u => u.name || u.username || u.id);
-        setAvailable([...names, 'GUEST']);
+  setAvailable([...names]); // Remove 'GUEST' from available list
       } catch (err) {
-        setAvailable(['GUEST']); // fallback to just GUEST if error
+  setAvailable([]); // fallback to empty if error
       }
     }
     fetchUsers();
@@ -58,10 +58,10 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
     }
     // If selecting a guest, assign Guest 1/2/3 based on first available
     let assignedValue = value;
-    if (value === 'GUEST') {
+  if (['GUEST', 'GUEST - Burt Reds'].includes(value)) {
       // Find which GuestX is not already used in this comp
       const allAssigned = groups.flatMap(g => g.players);
-      const guestOptions = ['Guest 1', 'Guest 2', 'Guest 3'];
+  const guestOptions = ['Guest 1', 'Guest 2', 'Guest 3']; // Only allow Guest 1/2/3
       assignedValue = guestOptions.find(g => !allAssigned.includes(g)) || 'Guest 1';
     }
     const newGroups = groups.map((g, i) =>
@@ -137,16 +137,22 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
               {group.players.map((player, pIdx) => (
                 <div key={pIdx} className="mb-2 flex items-center">
                   <select
-                    value={['Guest 1','Guest 2','Guest 3'].includes(player) ? 'GUEST' : player}
+                    value={['Guest 1','Guest 2','Guest 3'].includes(player) ? '' : player}
                     onChange={e => handlePlayerChange(idx, pIdx, e.target.value)}
                     className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
                     style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700 }}
                     required
                   >
                     <option value="" style={{ color: '#1B3A6B', fontWeight: 700 }}>Select player</option>
-                    {available.concat(['Guest 1','Guest 2','Guest 3'].includes(player) ? 'GUEST' : player).map(
-                      (name, optIdx) => name && <option key={`${name}-${idx}-${pIdx}-${optIdx}`} value={name} style={{ color: '#1B3A6B', fontWeight: 700 }}>{name}</option>
-                    )}
+                    {/* Show all available players not already assigned elsewhere, plus the current selection */}
+                    {[
+                      ...available.filter(name => !groups.flatMap(g => g.players).includes(name) || name === player),
+                      ...(player && !available.includes(player) && !['Guest 1','Guest 2','Guest 3'].includes(player) ? [player] : [])
+                    ]
+                      .filter((name, i, arr) => name && arr.indexOf(name) === i)
+                      .map((name, optIdx) => (
+                        <option key={`${name}-${idx}-${pIdx}-${optIdx}`} value={name} style={{ color: '#1B3A6B', fontWeight: 700 }}>{name}</option>
+                      ))}
                   </select>
                   {(['Guest 1','Guest 2','Guest 3'].includes(player)) && (
                     <input

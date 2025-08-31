@@ -25,6 +25,7 @@ function isAdmin(user) {
 function RecentCompetitions({ user = {}, comps = [] }) {
   // All useState declarations must come first
   const [competitionList, setCompetitionList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteCompId, setDeleteCompId] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -47,6 +48,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
 
   // Helper to fetch competitions and update state
   async function fetchCompetitions() {
+    setLoading(true);
     try {
       const res = await fetch('/api/competitions');
       const data = await res.json();
@@ -56,6 +58,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
     } catch {
       setCompetitionList([]);
       setOpenComps([]);
+    } finally {
+      setLoading(false);
     }
   }
   useEffect(() => {
@@ -193,7 +197,11 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 </tr>
               </thead>
             <tbody>
-              {competitionList.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="border px-2 py-4 text-white/80">Loading competition data...</td>
+                </tr>
+              ) : competitionList.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="border px-2 py-4 text-white/80">No competitions found.</td>
                 </tr>
