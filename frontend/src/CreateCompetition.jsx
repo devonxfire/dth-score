@@ -120,9 +120,18 @@ function CreateCompetition({ user, onSignOut }) {
     if (editingComp) {
       try {
         const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
-        const updateData = {
-          club: form.club
-        };
+        // Only include defined fields and always send date as string
+        const updateData = {};
+        if (form.type) updateData.type = form.type;
+        if (form.date) {
+          updateData.date = (form.date instanceof Date)
+            ? form.date.toISOString().split('T')[0]
+            : form.date;
+        }
+        if (form.club) updateData.club = form.club;
+        if (form.handicapAllowance) updateData.handicapAllowance = form.handicapAllowance;
+        if (form.fourballs) updateData.fourballs = form.fourballs;
+        if (form.notes) updateData.notes = form.notes;
         const res = await fetch(`/api/competitions/${editingComp.id}`, {
           method: 'PATCH',
           headers: {
@@ -142,9 +151,21 @@ function CreateCompetition({ user, onSignOut }) {
           updatedComp = await updatedRes.json();
         }
         // Update form state with latest comp info
-        setForm(f => ({ ...f, club: updatedComp.club }));
+        setForm(f => ({ ...f, 
+          type: updatedComp.type,
+          date: updatedComp.date ? new Date(updatedComp.date) : null,
+          club: updatedComp.club,
+          handicapAllowance: updatedComp.handicapAllowance,
+          fourballs: updatedComp.fourballs,
+          notes: updatedComp.notes
+        }));
         // Overwrite editingComp for popup
+        editingComp.type = updatedComp.type;
+        editingComp.date = updatedComp.date;
         editingComp.club = updatedComp.club;
+        editingComp.handicapAllowance = updatedComp.handicapAllowance;
+        editingComp.fourballs = updatedComp.fourballs;
+        editingComp.notes = updatedComp.notes;
         // Now move to group assignment if fourballs entered
         if (form.fourballs && !showGroups) {
           setShowGroups(true);

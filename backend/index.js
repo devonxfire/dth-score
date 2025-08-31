@@ -279,10 +279,6 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
   }
 });
 
-
-// Delete competition by ID
-// Simple admin check: require X-Admin-Secret header to match env var ADMIN_SECRET
-app.delete('/api/competitions/:id', async (req, res) => {
 // Update competition status by ID (admin only)
 app.patch('/api/competitions/:id', async (req, res) => {
   const { id } = req.params;
@@ -310,6 +306,7 @@ app.patch('/api/competitions/:id', async (req, res) => {
   if (notes !== undefined) updateData.notes = notes;
   if (status !== undefined) updateData.status = status;
   if (groups !== undefined) updateData.groups = groups;
+  console.log('PATCH /api/competitions/:id updateData:', updateData);
   if (Object.keys(updateData).length === 0) {
     return res.status(400).json({ error: 'No valid fields provided for update' });
   }
@@ -323,6 +320,10 @@ app.patch('/api/competitions/:id', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+// Delete competition by ID
+// Simple admin check: require X-Admin-Secret header to match env var ADMIN_SECRET
+app.delete('/api/competitions/:id', async (req, res) => {
+
   const { id } = req.params;
   const adminSecret = req.headers['x-admin-secret'];
   if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
