@@ -125,7 +125,7 @@ function CreateCompetition({ user, onSignOut }) {
         if (form.type) updateData.type = form.type;
         if (form.date) {
           updateData.date = (form.date instanceof Date)
-            ? form.date.toISOString().split('T')[0]
+            ? form.date.toISOString()
             : form.date;
         }
         if (form.club) updateData.club = form.club;
