@@ -1548,6 +1548,7 @@ export default function Scorecard4BBB(props) {
                           })()}
                           {/* Net back 9 and total */}
                           <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
+                            {/* IN (back 9) points */}
                             {(() => {
                               let adjHandicap = 0;
                               if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
@@ -1590,7 +1591,11 @@ export default function Scorecard4BBB(props) {
                             })()}
                           </td>
                           <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
+                            {/* TOTAL = OUT + IN points */}
                             {(() => {
+                              // Get OUT and IN points using same logic as OUT/IN columns
+                              let outPoints = 0;
+                              let inPoints = 0;
                               let adjHandicap = 0;
                               if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[name]) {
                                 const fullHandicap = parseInt(groupForPlayer.handicaps[name], 10) || 0;
@@ -1600,9 +1605,9 @@ export default function Scorecard4BBB(props) {
                                   adjHandicap = fullHandicap;
                                 }
                               }
-                              let netTotal = 0;
                               const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
-                              defaultHoles.forEach((hole, hIdx) => {
+                              // OUT (front 9)
+                              defaultHoles.slice(0,9).forEach((hole, hIdx) => {
                                 const strokeIdx = hole.index;
                                 let strokesReceived = 0;
                                 if (adjHandicap > 0) {
@@ -1614,11 +1619,49 @@ export default function Scorecard4BBB(props) {
                                     strokesReceived = 1;
                                   }
                                 }
-                                const gross = parseInt(row[hIdx], 10) || 0;
-                                const net = gross ? gross - strokesReceived : 0;
-                                if (typeof net === 'number') netTotal += net;
+                                const gross = row[hIdx] !== undefined && row[hIdx] !== '' ? parseInt(row[hIdx], 10) : null;
+                                const net = gross !== null && !isNaN(gross) && gross > 0 ? gross - strokesReceived : null;
+                                let pts = '';
+                                if (net !== null) {
+                                  if (net === hole.par - 4) pts = 6;
+                                  else if (net === hole.par - 3) pts = 5;
+                                  else if (net === hole.par - 2) pts = 4;
+                                  else if (net === hole.par - 1) pts = 3;
+                                  else if (net === hole.par) pts = 2;
+                                  else if (net === hole.par + 1) pts = 1;
+                                  else pts = 0;
+                                }
+                                if (pts !== '' && gross !== null && !isNaN(gross) && gross > 0) outPoints += pts;
                               });
-                              return netTotal;
+                              // IN (back 9)
+                              defaultHoles.slice(9,18).forEach((hole, hIdx) => {
+                                const strokeIdx = hole.index;
+                                let strokesReceived = 0;
+                                if (adjHandicap > 0) {
+                                  if (adjHandicap >= 18) {
+                                    strokesReceived = 1;
+                                    if (adjHandicap - 18 >= strokeIdx) strokesReceived = 2;
+                                    else if (strokeIdx <= (adjHandicap % 18)) strokesReceived = 2;
+                                  } else if (strokeIdx <= adjHandicap) {
+                                    strokesReceived = 1;
+                                  }
+                                }
+                                const gross = row[hIdx+9] !== undefined && row[hIdx+9] !== '' ? parseInt(row[hIdx+9], 10) : null;
+                                const net = gross !== null && !isNaN(gross) && gross > 0 ? gross - strokesReceived : null;
+                                let pts = '';
+                                if (net !== null) {
+                                  if (net === hole.par - 4) pts = 6;
+                                  else if (net === hole.par - 3) pts = 5;
+                                  else if (net === hole.par - 2) pts = 4;
+                                  else if (net === hole.par - 1) pts = 3;
+                                  else if (net === hole.par) pts = 2;
+                                  else if (net === hole.par + 1) pts = 1;
+                                  else pts = 0;
+                                }
+                                if (pts !== '' && gross !== null && !isNaN(gross) && gross > 0) inPoints += pts;
+                              });
+                              const totalPoints = outPoints + inPoints;
+                              return totalPoints !== 0 ? totalPoints : '';
                             })()}
                           </td>
                         </tr>
@@ -1758,7 +1801,8 @@ export default function Scorecard4BBB(props) {
                             {/* TOTAL (front 9 + back 9) */}
                             <td className="border border-white px-2 py-1 font-bold text-base text-white" style={{ verticalAlign: 'middle', height: '44px' }}>
                               {(() => {
-                                let frontTotal = 0;
+                                // Calculate OUT (front 9) and IN (back 9) using same logic as OUT/IN columns
+                                let outTotal = 0;
                                 for (let hIdx = 0; hIdx < 9; hIdx++) {
                                   let adjHandicapA = 0;
                                   if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[0]]) {
@@ -1815,9 +1859,9 @@ export default function Scorecard4BBB(props) {
                                   const ptsA = points(netA, defaultHoles[hIdx].par);
                                   const ptsB = points(netB, defaultHoles[hIdx].par);
                                   const best = ptsA === '' && ptsB === '' ? '' : Math.max(ptsA || 0, ptsB || 0);
-                                  if (best !== '') frontTotal += best;
+                                  if (best !== '') outTotal += best;
                                 }
-                                let backTotal = 0;
+                                let inTotal = 0;
                                 for (let hIdx = 9; hIdx < 18; hIdx++) {
                                   let adjHandicapA = 0;
                                   if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[0]]) {
@@ -1874,9 +1918,9 @@ export default function Scorecard4BBB(props) {
                                   const ptsA = points(netA, defaultHoles[hIdx].par);
                                   const ptsB = points(netB, defaultHoles[hIdx].par);
                                   const best = ptsA === '' && ptsB === '' ? '' : Math.max(ptsA || 0, ptsB || 0);
-                                  if (best !== '') backTotal += best;
+                                  if (best !== '') inTotal += best;
                                 }
-                                const total = frontTotal + backTotal;
+                                const total = outTotal + inTotal;
                                 return total !== 0 ? total : '';
                               })()}
                             </td>

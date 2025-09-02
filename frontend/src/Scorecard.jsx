@@ -1138,8 +1138,8 @@ export default function Scorecard(props) {
                       {defaultHoles.slice(9,18).map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
                       ))}
-                      <th className="border px-2 py-1 bg-white/5 font-bold">In</th>
-                      <th className="border px-2 py-1 bg-white/5 font-bold">TOTAL</th>
+                        <th className="border px-2 py-1 bg-white/5 font-bold">In</th>
+                        <th className="border px-2 py-1 bg-white/5 font-bold">TOTAL</th>
                     </tr>
                     <tr className="bg-blue-900/90">
                       <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}></th>
@@ -1147,8 +1147,8 @@ export default function Scorecard(props) {
                       {defaultHoles.slice(9,18).map(hole => (
                         <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
                       ))}
-                      <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
-                      <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>72</th>
+                        <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
+                        <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>72</th>
                     </tr>
                     <tr className="bg-gray-900/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
@@ -1156,8 +1156,9 @@ export default function Scorecard(props) {
                       {defaultHoles.slice(9,18).map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
                       ))}
-                      <th className="border px-2 py-1 bg-white/5"></th>
-                    </tr>
+                        <th className="border px-2 py-1 bg-white/5 border-r"></th>
+                        <th className="border px-2 py-1 bg-white/5 border-r"></th>
+                      </tr>
                   </thead>
                   <tbody>
                     {groupPlayers.map((name, pIdx) => (
@@ -1204,8 +1205,24 @@ export default function Scorecard(props) {
                             </td>
                           ))}
 
-                          <td className="border px-2 py-1 font-bold text-base">{Array.isArray(scores[pIdx]) ? scores[pIdx].slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''}</td>
-                          <td className="border px-2 py-1 font-bold text-base">{Array.isArray(scores[pIdx]) ? scores[pIdx].reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''}</td>
+                          <td className="border px-2 py-1 font-bold text-base">{
+                            (() => {
+                              const row = Array.isArray(scores[pIdx]) ? scores[pIdx].slice(9,18) : [];
+                              const hasAnyScore = row.some(val => val !== '' && val !== null && !isNaN(parseInt(val, 10)));
+                              return hasAnyScore
+                                ? row.reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0)
+                                : '';
+                            })()
+                          }</td>
+                          <td className="border px-2 py-1 font-bold text-base">{
+                            (() => {
+                              const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
+                              const hasAnyScore = row.some(val => val !== '' && val !== null && !isNaN(parseInt(val, 10)));
+                              return hasAnyScore
+                                ? row.reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0)
+                                : '';
+                            })()
+                          }</td>
                         </tr>
                         {/* Net row (no player label cell) */}
                         <tr key={name + '-net-back'}>

@@ -100,7 +100,31 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
     e.preventDefault();
     // Attach displayNames to each group for frontend use
     const groupsWithDisplay = groups.map((g, i) => ({ ...g, displayNames: guestNames[i] }));
-    onAssign(groupsWithDisplay);
+    // Split each 4-ball group into two 2-man teams for 4BBB
+    function splitFourballsToTeams(groups) {
+      const teams = [];
+      groups.forEach((group, idx) => {
+        if (Array.isArray(group.players) && group.players.length === 4) {
+          // Team 1: players 0 and 1
+          teams.push({
+            players: [group.players[0], group.players[1]],
+            teeTime: group.teeTime,
+            groupIndex: idx,
+            displayNames: [guestNames[idx][0], guestNames[idx][1]]
+          });
+          // Team 2: players 2 and 3
+          teams.push({
+            players: [group.players[2], group.players[3]],
+            teeTime: group.teeTime,
+            groupIndex: idx,
+            displayNames: [guestNames[idx][2], guestNames[idx][3]]
+          });
+        }
+      });
+      return teams;
+    }
+    const teams = splitFourballsToTeams(groupsWithDisplay);
+    onAssign(teams);
   }
 
   return (
