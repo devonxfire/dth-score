@@ -22,6 +22,7 @@ function formatDate(dateStr) {
 }
 
 import React, { useEffect, useState } from 'react';
+import { useBackendTeams } from './hooks/useBackendTeams';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
 
@@ -91,6 +92,9 @@ function Leaderboard() {
   const [groups, setGroups] = useState([]);
   const [compId, setCompId] = useState(null);
 
+  // Fetch teams and their BB Score from backend
+  const backendTeams = useBackendTeams(compId);
+
   // Fetch latest comp groups from backend
   useEffect(() => {
     // Try to get compId from entries
@@ -135,26 +139,28 @@ function Leaderboard() {
         const pts = groupEntries.map(e => {
           // Calculate points for this hole only
           const ph = getPlayingHandicap(e);
-          const gross = parseInt(e.scores?.[h] || 0);
-          if (!gross) return 0;
+          const gross = parseInt(e.scores?.[h], 10);
+          if (!gross || isNaN(gross) || gross <= 0) return 0;
           const hole = defaultHoles[h];
-          let shots = 0;
+          let strokesReceived = 0;
           if (ph > 0) {
-            shots = Math.floor(ph / 18);
-            if (hole.index <= (ph % 18)) shots += 1;
+            strokesReceived = Math.floor(ph / 18);
+            if (hole.index <= (ph % 18)) strokesReceived += 1;
           }
-          const net = gross - shots;
+          const net = gross - strokesReceived;
           const par = hole.par;
-          if (net === par - 2) return 4;
-          if (net === par - 1) return 3;
-          if (net === par) return 2;
-          if (net === par + 1) return 1;
+          if (net === par - 4) return 6; // triple eagle
+          if (net === par - 3) return 5; // double eagle
+          if (net === par - 2) return 4; // eagle
+          if (net === par - 1) return 3; // birdie
+          if (net === par) return 2; // par
+          if (net === par + 1) return 1; // bogey
           return 0;
         });
-        // Best 2 scores to count
-        const best2 = pts.sort((a, b) => b - a).slice(0, 2);
-        if (best2.some(p => p > 0)) thru = h + 1;
-        teamPoints += best2.reduce((a, b) => a + b, 0);
+        // Best single score to count (BB Score)
+        const best = Math.max(...pts);
+        if (best > 0) thru = h + 1;
+        teamPoints += best;
       }
       // Propagate guest display names for UI
       let displayPlayers = (group.players || []).map((name, i) => {
@@ -174,11 +180,23 @@ function Leaderboard() {
           return '';
         }
       });
+      // Find backend team_points by matching player names
+      let backendTeamPoints;
+      if (backendTeams && backendTeams.length > 0) {
+        const groupKey = (group.players || []).map(p => p && p.trim && p.trim()).sort().join('|');
+        const found = backendTeams.find(t => {
+          if (!Array.isArray(t.players)) return false;
+          const teamKey = t.players.map(p => p && p.trim && p.trim()).sort().join('|');
+          return teamKey === groupKey;
+        });
+        backendTeamPoints = found?.team_points;
+      }
       return {
         groupNum: idx + 1,
         teeTime: group.teeTime,
         players: displayPlayers,
         teamPoints,
+        backendTeamPoints,
         thru,
       };
     });
@@ -254,7 +272,24 @@ function Leaderboard() {
           )}
           {isAlliance ? (
             <table className="min-w-full border text-center">
-              {/* ...existing code... */}
+              <thead>
+                <tr>
+                  <th>Team</th>
+                  <th>Players</th>
+                  <th>Points (BB Score)</th>
+                  {showThru && <th>Thru</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {getAllianceTeams().map((team, idx) => (
+                  <tr key={idx}>
+                    <td>{team.groupNum}</td>
+                    <td>{team.players.join(', ')}</td>
+                    <td>{team.backendTeamPoints ?? team.teamPoints}</td>
+                    {showThru && <td>{team.thru}</td>}
+                  </tr>
+                ))}
+              </tbody>
             </table>
           ) : entries.length === 0 ? (
             <div className="text-white/80">No scores submitted yet.</div>

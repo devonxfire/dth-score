@@ -367,7 +367,73 @@ export default function Scorecard4BBB(props) {
     // Prepare scores array for this player
     const playerScores = scores[playerIdx].map((v, idx) => idx === holeIdx ? value : v);
     const patchUrl = `/api/teams/${groupTeamId}/users/${userId}/scores`;
-    const patchBody = { competitionId: competition.id, scores: playerScores.map(v => v === '' ? null : Number(v)) };
+    // Calculate BB Score for this team (A/B)
+    function calculateBBScore() {
+      let total = 0;
+      for (let hIdx = 0; hIdx < 18; hIdx++) {
+        const hole = defaultHoles[hIdx];
+        // Handicap logic for A
+        let adjHandicapA = 0;
+        if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[0]]) {
+          const fullHandicapA = parseInt(groupForPlayer.handicaps[groupPlayers[0]], 10) || 0;
+          if (competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+            adjHandicapA = Math.round(fullHandicapA * Number(competition.handicapallowance) / 100);
+          } else {
+            adjHandicapA = fullHandicapA;
+          }
+        }
+        let strokesA = 0;
+        if (adjHandicapA > 0) {
+          if (adjHandicapA >= 18) {
+            strokesA = 1;
+            if (adjHandicapA - 18 >= hole.index) strokesA = 2;
+            else if (hole.index <= (adjHandicapA % 18)) strokesA = 2;
+          } else if (hole.index <= adjHandicapA) {
+            strokesA = 1;
+          }
+        }
+        const grossA = Array.isArray(scores[0]) ? parseInt(scores[0][hIdx], 10) : null;
+        const netA = grossA !== null && !isNaN(grossA) && grossA > 0 ? grossA - strokesA : null;
+        // Handicap logic for B
+        let adjHandicapB = 0;
+        if (groupForPlayer && groupForPlayer.handicaps && groupForPlayer.handicaps[groupPlayers[1]]) {
+          const fullHandicapB = parseInt(groupForPlayer.handicaps[groupPlayers[1]], 10) || 0;
+          if (competition.handicapallowance && !isNaN(Number(competition.handicapallowance))) {
+            adjHandicapB = Math.round(fullHandicapB * Number(competition.handicapallowance) / 100);
+          } else {
+            adjHandicapB = fullHandicapB;
+          }
+        }
+        let strokesB = 0;
+        if (adjHandicapB > 0) {
+          if (adjHandicapB >= 18) {
+            strokesB = 1;
+            if (adjHandicapB - 18 >= hole.index) strokesB = 2;
+            else if (hole.index <= (adjHandicapB % 18)) strokesB = 2;
+          } else if (hole.index <= adjHandicapB) {
+            strokesB = 1;
+          }
+        }
+        const grossB = Array.isArray(scores[1]) ? parseInt(scores[1][hIdx], 10) : null;
+        const netB = grossB !== null && !isNaN(grossB) && grossB > 0 ? grossB - strokesB : null;
+        function points(net, par) {
+          if (net == null) return 0;
+          if (net === par - 4) return 6;
+          if (net === par - 3) return 5;
+          if (net === par - 2) return 4;
+          if (net === par - 1) return 3;
+          if (net === par) return 2;
+          if (net === par + 1) return 1;
+          return 0;
+        }
+        const ptsA = points(netA, hole.par);
+        const ptsB = points(netB, hole.par);
+        const best = Math.max(ptsA, ptsB);
+        total += best;
+      }
+      return total;
+    }
+    const patchBody = { competitionId: competition.id, scores: playerScores.map(v => v === '' ? null : Number(v)), bbScore: calculateBBScore() };
     try {
       const res = await fetch(patchUrl, {
         method: 'PATCH',

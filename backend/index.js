@@ -58,9 +58,9 @@ app.patch('/api/competitions/:id/groups', async (req, res) => {
       }
     }
 
-    // For each group, ensure a team exists in the teams table (preserve existing, only add new)
+    // Only create teams for valid pairs (2 players) for 4BBB
     for (const [i, group] of groups.entries()) {
-      if (!Array.isArray(group.players) || group.players.length === 0) continue;
+      if (!Array.isArray(group.players) || group.players.length !== 2) continue;
       const key = teamKey(group.players);
       let foundTeam = existingTeamMap[key];
       if (!foundTeam) {
@@ -83,8 +83,7 @@ app.patch('/api/competitions/:id/groups', async (req, res) => {
             players: group.players
           }
         });
-
-        // For each player in the new group, if they were in the bestMatch team, copy their teams_users and scores
+        // Copy teams_users and scores from bestMatch if applicable
         if (bestMatch && Array.isArray(bestMatch.players)) {
           for (const player of group.players) {
             if (bestMatch.players.includes(player)) {
@@ -294,7 +293,7 @@ app.get('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
 // Save all scores for a player in a team for a competition
 app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
   const { teamId, userId } = req.params;
-  const { competitionId, scores } = req.body; // scores: array of 18 numbers/nulls
+  const { competitionId, scores, bbScore } = req.body; // scores: array of 18 numbers/nulls, bbScore: optional number
   if (!competitionId || !Array.isArray(scores) || scores.length !== 18) {
     return res.status(400).json({ error: 'competitionId and 18 scores required' });
   }
@@ -385,7 +384,7 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
           const userId = tu.user_id;
           // Find score for this user/hole
           const scoreObj = allScores.find(s => s.user_id === userId && s.hole_id === hole.id);
-          if (!scoreObj || scoreObj.strokes == null) continue;
+          if (!scoreObj || scoreObj.strokes == null || Number(scoreObj.strokes) <= 0) continue; // Ignore blank/zero scores
           // Calculate adjusted handicap for this user
           let adjHandicap = 0;
           if (handicapMap[userId] != null) {
@@ -419,9 +418,10 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
         teamPoints += bestPoints;
       }
       // 7. Update team_points in teams table
+      // If bbScore is provided by frontend, use it. Otherwise, use backend calculation.
       await prisma.teams.update({
         where: { id: Number(teamId) },
-        data: { team_points: teamPoints }
+        data: { team_points: typeof bbScore === 'number' ? bbScore : teamPoints }
       });
     }
     res.json({ success: true });
