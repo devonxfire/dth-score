@@ -90,6 +90,8 @@ export default function ResultsMedal() {
   const [playerTeamUserMap, setPlayerTeamUserMap] = useState({});
 
   useEffect(() => {
+  // Debug: print playerTeamUserMap to inspect teamId mapping
+  // Removed debug console.log statements
   async function fetchResults() {
       setLoading(true);
       setError(null);
@@ -113,9 +115,13 @@ export default function ResultsMedal() {
               teamsById = Object.fromEntries(teamsArr.map(t => [t.id, t]));
             }
           }
+          // Build a map of teamId to teamPoints
+          const teamPointsMap = {};
+          Object.values(teamsById).forEach(team => {
+            teamPointsMap[team.id] = team.team_points;
+          });
           for (const group of comp.groups) {
             if (!Array.isArray(group.players) || !group.teamId) continue;
-            const team = teamsById[group.teamId];
             for (const playerName of group.players) {
               const user = comp.users.find(u => u.name === playerName);
               if (!user) continue;
@@ -165,14 +171,13 @@ export default function ResultsMedal() {
               const dthNet = gross - ch;
               // Calculate 'Thru' as the number of holes with a non-empty score
               let thru = scores.filter(v => v !== null && v !== '' && !isNaN(v)).length;
-              // If completed all 18 holes, show 'F' for Finished
               if (thru === 18) {
                 thru = 'F';
               } else if (thru === 0 && group.teeTime) {
-                thru = group.teeTime; // e.g., '8:10 AM'
+                thru = group.teeTime;
               }
-              // Get team_points for this player
-              const teamPoints = team && typeof team.team_points === 'number' ? team.team_points : null;
+              // Assign correct teamPoints from teamPointsMap
+              const teamPoints = teamPointsMap[group.teamId] ?? null;
               playerRows.push({
                 name: playerName,
                 gross,
@@ -191,12 +196,31 @@ export default function ResultsMedal() {
             }
           }
         }
+        // Persist ptumap for position logic
+        setPlayerTeamUserMap(ptumap);
         // 7. Sort: by teamPoints (desc), then net (asc)
         playerRows.sort((a, b) => {
           if ((b.teamPoints ?? -1) !== (a.teamPoints ?? -1)) return (b.teamPoints ?? -1) - (a.teamPoints ?? -1);
           return a.net - b.net;
         });
-        playerRows.forEach((p, i) => (p.position = i + 1));
+        // Assign same position to both teammates (by teamId)
+        let pos = 1;
+        let lastTeamId = null;
+        let teamPositions = {};
+        for (let i = 0; i < playerRows.length; i++) {
+          const teamId = ptumap[playerRows[i].name]?.teamId;
+          if (teamId !== lastTeamId) {
+            teamPositions[teamId] = pos;
+            pos++;
+            lastTeamId = teamId;
+          }
+        }
+        playerRows.forEach(p => {
+          const teamId = ptumap[p.name]?.teamId;
+          p.position = teamPositions[teamId] || '';
+        });
+        // Debug: print leaderboard rows and team positions
+            // Removed debug console.log statements
   setPlayers(playerRows);
   setFines(finesObj);
   setPlayerTeamUserMap(ptumap);

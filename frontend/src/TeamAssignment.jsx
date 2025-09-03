@@ -63,13 +63,24 @@ export default function TeamAssignment({ numTeams, onAssign, initialTeams }) {
 
   function handleSubmit(e) {
     e.preventDefault();
-    // For each 4 Ball, output a group of 4 players (A, B, C, D) and teeTime
-    const groupsOut = fourballs.map((fb, fbIdx) => ({
+    // For Medal/4-ball UI: each 4-ball group of 4 players
+    const fourballGroups = fourballs.map((fb, fbIdx) => ({
       players: [...fb.teams[0], ...fb.teams[1]],
       teeTime: fb.teeTime,
       fourball: fbIdx + 1
     }));
-    onAssign(groupsOut);
+
+    // For backend/leaderboard: each 2-man team as a group
+    const teamGroups = fourballs.flatMap((fb, fbIdx) => [
+      { players: fb.teams[0], teeTime: fb.teeTime, fourball: fbIdx + 1 },
+      { players: fb.teams[1], teeTime: fb.teeTime, fourball: fbIdx + 1 }
+    ]);
+
+    // Example: send teamGroups to backend for 4BBB, but keep fourballGroups for Medal/other UI
+    // You may want to pass both to onAssign, or choose based on comp type
+    // onAssign({ teamGroups, fourballGroups });
+    // For now, default to teamGroups for backend
+    onAssign(teamGroups);
   }
 
   // Get all assigned players to filter selects
