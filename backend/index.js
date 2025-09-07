@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -40,10 +39,14 @@ app.patch('/api/competitions/:id/groups', async (req, res) => {
   if (!groups) {
     return res.status(400).json({ error: 'Groups data required' });
   }
+  const compId = Number(id);
+  if (!compId || isNaN(compId)) {
+    return res.status(400).json({ error: 'Competition id required and must be a valid integer.' });
+  }
   try {
     // Update groups in competitions table
     const updated = await prisma.competitions.update({
-      where: { id: Number(id) },
+      where: { id: compId },
       data: { groups: groups },
     });
 
@@ -596,7 +599,6 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-
 // Create Competition endpoint
 app.post('/api/competitions', async (req, res) => {
   let { date, type, club, handicapAllowance, joinCode, notes, groups } = req.body;
@@ -622,6 +624,86 @@ app.post('/api/competitions', async (req, res) => {
     res.status(201).json({ success: true, competition: comp });
   } catch (err) {
     console.error('Error creating competition:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Medal: Update player data (teebox, handicap, scores) in a group
+app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req, res) => {
+  const { id, groupId, playerName } = req.params;
+  const { teebox, handicap, scores, waters, dog, two_clubs } = req.body; // scores: array of 18 numbers/nulls
+  console.log('PATCH Medal player:', { id, groupId, playerName, teebox, handicap, scores, waters, dog, two_clubs });
+  try {
+    const comp = await prisma.competitions.findUnique({ where: { id: Number(id) } });
+    if (!comp || !Array.isArray(comp.groups)) {
+      return res.status(404).json({ error: 'Competition or groups not found' });
+    }
+    const groupIdx = comp.groups.findIndex((g, idx) => String(idx) === String(groupId));
+    if (groupIdx === -1) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+    const group = comp.groups[groupIdx];
+    // Update teebox and handicap
+    group.teeboxes = group.teeboxes || {};
+    group.handicaps = group.handicaps || {};
+    if (teebox !== undefined) group.teeboxes[playerName] = teebox;
+    if (handicap !== undefined) group.handicaps[playerName] = handicap;
+    // Update scores
+    group.scores = group.scores || {};
+    if (Array.isArray(scores) && scores.length === 18) {
+      group.scores[playerName] = scores;
+    }
+    // Update mini table stats
+    group.waters = group.waters || {};
+    group.dog = group.dog || {};
+    group.two_clubs = group.two_clubs || {};
+    if (waters !== undefined) group.waters[playerName] = waters;
+    if (dog !== undefined) group.dog[playerName] = dog;
+    if (two_clubs !== undefined) group.two_clubs[playerName] = two_clubs;
+    // Save updated groups array
+    const updated = await prisma.competitions.update({
+      where: { id: Number(id) },
+      data: { groups: comp.groups }
+    });
+    console.log('Updated groups:', JSON.stringify(comp.groups));
+    res.json({ success: true, group });
+  } catch (err) {
+    console.error('Error updating Medal player data:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Medal: Fetch player data in a group
+app.get('/api/competitions/:id/groups/:groupId/player/:playerName', async (req, res) => {
+  const { id, groupId, playerName } = req.params;
+  console.log('GET Medal player:', { id, groupId, playerName });
+  try {
+    const comp = await prisma.competitions.findUnique({ where: { id: Number(id) } });
+    if (!comp || !Array.isArray(comp.groups)) {
+      console.error('Competition or groups not found', { id });
+      return res.status(404).json({ error: 'Competition or groups not found' });
+    }
+    const groupIdx = comp.groups.findIndex((g, idx) => String(idx) === String(groupId));
+    if (groupIdx === -1) {
+      console.error('Group not found', { groupId });
+      return res.status(404).json({ error: 'Group not found' });
+    }
+    const group = comp.groups[groupIdx];
+    const teebox = group.teeboxes?.[playerName] || null;
+    const handicap = group.handicaps?.[playerName] || null;
+    let scores = group.scores?.[playerName];
+    if (!Array.isArray(scores)) {
+      scores = Array(18).fill('');
+    } else {
+      scores = scores.map(v => (v == null ? '' : String(v)));
+    }
+    const waters = group.waters?.[playerName] ?? '';
+    const dog = group.dog?.[playerName] ?? false;
+    const two_clubs = group.two_clubs?.[playerName] ?? '';
+    console.log('GET Medal response:', { teebox, handicap, scores, waters, dog, two_clubs });
+    res.json({ teebox, handicap, scores, waters, dog, two_clubs });
+  } catch (err) {
+    console.error('Error fetching Medal player data:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });

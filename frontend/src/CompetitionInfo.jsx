@@ -162,7 +162,14 @@ export default function CompetitionInfo({ user }) {
                 <button
                   className="py-2 px-4 border border-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap scorecard-pulse"
                   style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                  onClick={() => navigate(`/scorecard/${compId}`)}
+                  onClick={() => {
+                    const medalTypes = ['medalStrokeplay', 'medal strokeplay', 'stroke'];
+                    if (medalTypes.includes((comp.type || '').toLowerCase().replace(/\s+/g, ''))) {
+                      navigate(`/scorecard-medal/${compId}`);
+                    } else {
+                      navigate(`/scorecard/${compId}`);
+                    }
+                  }}
                   onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
                   onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
                 >

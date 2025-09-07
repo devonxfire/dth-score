@@ -1,7 +1,7 @@
 import React from 'react';
 import bgUrl from './assets/dan-congdon-gJeusCuFyYA-unsplash.jpg';
 
-export default function PageBackground({ children }) {
+export default function PageBackground({ children, hideFooter }) {
   // Use local Unsplash image for background
   return (
     <div
@@ -15,9 +15,11 @@ export default function PageBackground({ children }) {
       <div className="relative z-10 flex flex-col flex-grow min-h-screen">
         {children}
       </div>
-      <footer className="relative z-10 text-center text-white py-4 text-sm mt-auto">
-        Dog Tag Hackers Golf Group
-      </footer>
+      {!hideFooter && (
+        <footer className="relative z-10 text-center text-white py-4 text-sm mt-auto">
+          Dog Tag Hackers Golf Group
+        </footer>
+      )}
     </div>
   );
 }

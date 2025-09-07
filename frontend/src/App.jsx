@@ -12,6 +12,12 @@ import LeaderboardRouter from './LeaderboardRouter';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import ResultsMedal from './ResultsMedal';
+import MedalAssignment from './MedalAssignment';
+import MedalScorecard from './MedalScorecard';
+import MedalLeaderboard from './MedalLeaderboard';
+import FourballAssignment from './FourballAssignment';
+import FourballScorecard from './FourballScorecard';
+import FourballLeaderboard from './FourballLeaderboard';
 
 function AppRoutes({ user, setUser }) {
   const navigate = useNavigate();
@@ -49,6 +55,12 @@ function AppRoutes({ user, setUser }) {
           <Route path="/leaderboard/:id" element={<LeaderboardRouter user={user} />} />
           <Route path="/results/:id" element={<ResultsMedal />} />
           <Route path="/profile" element={<div className="p-8">User Profile (coming soon)</div>} />
+          <Route path="/assign-medal" element={<MedalAssignment user={user} onSignOut={handleSignOut} />} />
+          <Route path="/scorecard-medal/:id" element={<MedalScorecard user={user} onSignOut={handleSignOut} />} />
+          <Route path="/leaderboard-medal/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
+          <Route path="/assign-fourball" element={<FourballAssignment user={user} onSignOut={handleSignOut} />} />
+          <Route path="/scorecard-fourball/:id" element={<FourballScorecard user={user} onSignOut={handleSignOut} />} />
+          <Route path="/leaderboard-fourball/:id" element={<FourballLeaderboard user={user} onSignOut={handleSignOut} />} />
         </>
       )}
     </Routes>

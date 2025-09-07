@@ -10,6 +10,7 @@ import OpenCompModal from './OpenCompModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import TopMenu from './TopMenu';
 import FourballAssignment from './FourballAssignment';
+import MedalAssignment from './MedalAssignment';
 
 // Display mapping for all comp types
 const COMP_TYPE_DISPLAY = {
@@ -307,11 +308,21 @@ function CreateCompetition({ user, onSignOut }) {
   <div className="relative z-10 flex flex-col items-center px-4 mt-2">
   <div className="w-full max-w-2xl rounded-2xl shadow-lg p-8 flex flex-col gap-6" style={{ background: 'rgba(0,47,95,0.95)', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}>
           {showGroups ? (
-            <FourballAssignment
-              fourballs={parseInt(form.fourballs) || 1}
-              onAssign={handleAssign}
-              initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
-            />
+            ((form.type && ['medalStrokeplay', 'medal strokeplay', 'stroke'].includes((form.type || '').replace(/\s+/g, ''))) ? (
+              <MedalAssignment
+                compId={compId}
+                initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
+                user={user}
+                onSignOut={onSignOut}
+                onAssign={handleAssign}
+              />
+            ) : (
+              <FourballAssignment
+                fourballs={parseInt(form.fourballs) || 1}
+                onAssign={handleAssign}
+                initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
+              />
+            ))
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
               <div className="mb-4">
