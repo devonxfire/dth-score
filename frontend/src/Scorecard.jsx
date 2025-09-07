@@ -261,17 +261,8 @@ export default function Scorecard(props) {
 
   // Now the modal useEffect can safely reference groupForPlayer
   useEffect(() => {
-    if (player && groupForPlayer) {
-      const backendTee = groupForPlayer.teeboxes?.[player.name];
-      const backendHandi = groupForPlayer.handicaps?.[player.name];
-      if (!backendTee && !backendHandi) {
-        setShowTeeModal(true);
-        setSelectedTee('');
-        setInputHandicap('');
-      } else {
-        setShowTeeModal(false);
-      }
-    }
+    // Always bypass Tee/Handicap modal
+    setShowTeeModal(false);
   }, [player, groupForPlayer]);
   const isAlliance = competition && competition.type?.toLowerCase().includes('alliance');
   // Scores state: [playerIdx][holeIdx] = value

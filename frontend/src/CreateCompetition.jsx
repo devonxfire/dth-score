@@ -61,7 +61,6 @@ function CreateCompetition({ user, onSignOut }) {
         date: editingComp.date ? new Date(editingComp.date) : null,
         club: editingComp.club || 'Westlake Golf Club',
         handicapAllowance: editingComp.handicapAllowance || '95',
-        fourballs: editingComp.fourballs || '',
         notes: editingComp.notes || '',
       };
     }
@@ -70,7 +69,6 @@ function CreateCompetition({ user, onSignOut }) {
       date: null,
       club: 'Westlake Golf Club',
       handicapAllowance: '95',
-      fourballs: '',
       notes: '',
     };
   });
@@ -131,7 +129,6 @@ function CreateCompetition({ user, onSignOut }) {
         }
         if (form.club) updateData.club = form.club;
         if (form.handicapAllowance) updateData.handicapAllowance = form.handicapAllowance;
-        if (form.fourballs) updateData.fourballs = form.fourballs;
         if (form.notes) updateData.notes = form.notes;
         const res = await fetch(`/api/competitions/${editingComp.id}`, {
           method: 'PATCH',
@@ -157,7 +154,6 @@ function CreateCompetition({ user, onSignOut }) {
           date: updatedComp.date ? new Date(updatedComp.date) : null,
           club: updatedComp.club,
           handicapAllowance: updatedComp.handicapAllowance,
-          fourballs: updatedComp.fourballs,
           notes: updatedComp.notes
         }));
         // Overwrite editingComp for popup
@@ -165,7 +161,6 @@ function CreateCompetition({ user, onSignOut }) {
         editingComp.date = updatedComp.date;
         editingComp.club = updatedComp.club;
         editingComp.handicapAllowance = updatedComp.handicapAllowance;
-        editingComp.fourballs = updatedComp.fourballs;
         editingComp.notes = updatedComp.notes;
         // Now move to group assignment if fourballs entered
         if (form.fourballs && !showGroups) {
@@ -178,28 +173,7 @@ function CreateCompetition({ user, onSignOut }) {
       }
       return;
     }
-    // If fourballs entered, create comp in backend and then show group assignment
-    if (form.fourballs && !showGroups) {
-      try {
-        const res = await fetch('/api/competitions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...form })
-        });
-        if (!res.ok) throw new Error('Failed to create competition');
-        const data = await res.json();
-        // Store backend id and joinCode
-        if (data.competition) {
-          setCompId(data.competition.id);
-          setJoinCode(data.competition.joinCode || data.competition.joincode || '');
-        }
-        setShowGroups(true);
-      } catch (err) {
-        alert('Error creating competition: ' + err.message);
-      }
-      return;
-    }
-    // Otherwise, finalize comp creation (no fourballs)
+    // Always show group assignment after creating comp
     try {
       const res = await fetch('/api/competitions', {
         method: 'POST',
@@ -208,11 +182,12 @@ function CreateCompetition({ user, onSignOut }) {
       });
       if (!res.ok) throw new Error('Failed to create competition');
       const data = await res.json();
+      // Store backend id and joinCode
       if (data.competition) {
         setCompId(data.competition.id);
         setJoinCode(data.competition.joinCode || data.competition.joincode || '');
       }
-      setCreated(true);
+      setShowGroups(true);
     } catch (err) {
       alert('Error creating competition: ' + err.message);
     }
@@ -318,7 +293,7 @@ function CreateCompetition({ user, onSignOut }) {
               />
             ) : (
               <FourballAssignment
-                fourballs={parseInt(form.fourballs) || 1}
+                fourballs={1}
                 onAssign={handleAssign}
                 initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
               />
@@ -413,21 +388,6 @@ function CreateCompetition({ user, onSignOut }) {
                   <option value="95">95%</option>
                   <option value="100">100%</option>
                 </select>
-              </div>
-              <div className="mb-4">
-                <label className="block mb-1 font-bold" htmlFor="fourballs" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>How many 4 Balls are playing today?</label>
-                <input
-                  id="fourballs"
-                  name="fourballs"
-                  type="number"
-                  min="1"
-                  required
-                  value={form.fourballs}
-                  onChange={handleChange}
-                  className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
-                  style={{ fontFamily: 'Lato, Arial, sans-serif' }}
-                  placeholder="e.g. 3"
-                />
               </div>
               <div className="mb-6">
                 <label className="block mb-1 font-bold" htmlFor="notes" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>Notes</label>

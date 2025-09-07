@@ -18,6 +18,8 @@ const playerColors = [
 
 export default function MedalScorecard(props) {
   // ...existing code...
+  // Tee Box/Handicap modal bypass: always show scorecard, modal logic enforced
+  // Modal logic removed: always render scorecard UI
   const params = useParams();
   const navigate = useNavigate();
   const compId = params.id;
@@ -309,14 +311,17 @@ export default function MedalScorecard(props) {
         <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
           Medal Competition: Scorecard
         </h1>
-        <div className="max-w-4xl w-full bg-[#002F5F] rounded-2xl shadow-2xl p-8 border-4 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
-          <div className="mb-6 flex gap-4">
-            {groups.map((g, idx) => (
-              <button key={idx} className={`px-4 py-2 rounded font-bold ${groupIdx === idx ? 'bg-[#FFD700] text-[#002F5F]' : 'bg-[#003366] text-white'}`} onClick={() => setGroupIdx(idx)}>
-                Group {idx + 1}
-              </button>
-            ))}
+        {/* Comp Info Section */}
+        <div className="max-w-4xl w-full mb-4 p-4 rounded-xl border-2 border-[#FFD700] text-white flex flex-col gap-2" style={{ fontFamily: 'Lato, Arial, sans-serif', background: 'rgba(0,47,95,0.95)' }}>
+          <div className="flex flex-nowrap justify-between gap-x-6 text-sm font-normal w-full overflow-x-auto">
+            <div className="flex-1 min-w-[140px] whitespace-nowrap">Date: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.date ? (new Date(comp.date).toLocaleDateString()) : '-'}</span></div>
+            <div className="flex-1 min-w-[140px] whitespace-nowrap">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.club || '-'}</span></div>
+            <div className="flex-1 min-w-[140px] whitespace-nowrap">Tee Time: <span className="font-bold" style={{ color: '#FFD700' }}>{groups[groupIdx]?.teeTime || '-'}</span></div>
+            <div className="flex-1 min-w-[180px] whitespace-nowrap">Allowance: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.handicapallowance ? comp.handicapallowance + '%' : '-'}</span></div>
           </div>
+        </div>
+        <div className="max-w-4xl w-full bg-[#002F5F] rounded-2xl shadow-2xl p-8 border-4 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+          {/* Group buttons removed above mini table */}
           {/* Mini Table for Waters, Dog, 2 Clubs, etc. */}
           <table className="min-w-[300px] border text-white text-sm rounded mb-6" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
             <thead>
@@ -325,6 +330,7 @@ export default function MedalScorecard(props) {
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Tee</th>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>CH</th>
+                <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>PH</th>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
@@ -335,8 +341,45 @@ export default function MedalScorecard(props) {
                   <tr key={name}>
                     <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
                     <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>{name}</td>
-                    <td className="border px-2 py-1 text-center">{playerData[name]?.teebox || '-'}</td>
-                    <td className="border px-2 py-1 text-center">{playerData[name]?.handicap || '-'}</td>
+                    <td className="border px-2 py-1 text-center">
+                      <select
+                        value={playerData[name]?.teebox || ''}
+                        onChange={e => handleChange(name, 'teebox', e.target.value)}
+                        className="w-24 text-center bg-transparent rounded focus:outline-none font-semibold"
+                        style={{
+                          border: 'none',
+                          color:
+                            playerData[name]?.teebox === 'Red' ? '#FF4B4B' :
+                            playerData[name]?.teebox === 'White' ? '#FFFFFF' :
+                            '#FFD700'
+                        }}
+                      >
+                        <option value="" style={{ color: '#FFD700' }}>Select</option>
+                        <option value="Yellow" style={{ color: '#FFD700' }}>Yellow</option>
+                        <option value="White" style={{ color: '#FFFFFF', background: '#002F5F' }}>White</option>
+                        <option value="Red" style={{ color: '#FF4B4B', background: '#002F5F' }}>Red</option>
+                      </select>
+                    </td>
+                    <td className="border px-2 py-1 text-center">
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-16 text-center bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                        style={{
+                          border: 'none',
+                          color: '#FFD700'
+                        }}
+                        value={playerData[name]?.handicap || ''}
+                        onChange={e => handleChange(name, 'handicap', e.target.value)}
+                      />
+                    </td>
+                    <td className="border border-white px-2 py-1 text-center font-bold" style={{ color: '#FFD700' }}>
+                      {(() => {
+                        const ch = parseFloat(playerData[name]?.handicap) || 0;
+                        const allowance = comp?.handicapAllowance ? parseFloat(comp.handicapAllowance) : 100;
+                        return Math.round(ch * (allowance / 100));
+                      })()}
+                    </td>
                     <td className="border px-2 py-1 text-center">
                       <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => handleMiniTableChange(name, 'waters', e.target.value)} />
                     </td>
@@ -346,10 +389,10 @@ export default function MedalScorecard(props) {
                     <td className="border px-2 py-1 text-center">
                       <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.twoClubs || ''} onChange={e => handleMiniTableChange(name, 'twoClubs', e.target.value)} />
                     </td>
-                    {/* Save button removed for auto-save */}
                   </tr>
                 ))}
               </tbody>
+            
           </table>
           {/* Scorecard Table UI: Front 9 and Back 9, PAR/STROKE/HOLE headings, gross/net rows, Medal logic */}
           <div className="overflow-x-auto">
