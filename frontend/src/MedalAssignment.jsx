@@ -8,7 +8,15 @@ export default function MedalAssignment(props) {
   // Fallback logic for compId
   const compId = props.compId || params.id || props.competition?.id;
   const [comp, setComp] = useState(null);
-  const [groups, setGroups] = useState([]);
+  // Default to one 4 ball group loaded
+  const [groups, setGroups] = useState(() => {
+    // If initialGroups provided (editing), use those
+    if (props.initialGroups && props.initialGroups.length > 0) {
+      return props.initialGroups;
+    }
+    // Otherwise, start with one empty group
+    return [{ players: [], teeTime: '', displayNames: ['', '', '', ''] }];
+  });
   const [availablePlayers, setAvailablePlayers] = useState([]); // Will be fetched
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -21,7 +29,12 @@ export default function MedalAssignment(props) {
       .then(data => {
         if (data) {
           setComp(data);
-          setGroups(Array.isArray(data.groups) ? data.groups : []);
+          // If backend returns no groups, always load one default 4 ball
+          if (Array.isArray(data.groups) && data.groups.length > 0) {
+            setGroups(data.groups);
+          } else {
+            setGroups([{ players: [], teeTime: '', displayNames: ['', '', '', ''] }]);
+          }
         }
       });
   }, [compId]);
@@ -118,9 +131,7 @@ export default function MedalAssignment(props) {
 
   return (
   <PageBackground hideFooter>
-     
-      
-  <div className="max-w-4xl w-full h-screen flex flex-col justify-start bg-[#002F5F] shadow-2xl p-8 border-4 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+  <div className="max-w-4xl w-full h-screen flex flex-col justify-start bg-[#002F5F] p-8 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
           <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
             Medal Competition: 4 Ball Assignment
           </h1>

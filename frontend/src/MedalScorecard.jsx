@@ -163,6 +163,18 @@ export default function MedalScorecard(props) {
         [field]: value
       }
     }));
+    // Persist teebox or handicap change immediately
+    if (!compId || !groups.length) return;
+    const patchBody = {};
+    if (field === 'teebox') patchBody.teebox = value;
+    if (field === 'handicap') patchBody.handicap = value;
+    if (Object.keys(patchBody).length > 0) {
+      fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchBody)
+      }).catch(() => {});
+    }
   }
 
   // Birdie/Eagle/Blowup popup state
@@ -289,6 +301,19 @@ export default function MedalScorecard(props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patchBody)
       });
+      // Re-fetch latest mini table data for sync
+      const res = await fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMiniTableStats(prev => ({
+          ...prev,
+          [name]: {
+            waters: data.waters ?? '',
+            dog: !!data.dog,
+            twoClubs: data.two_clubs ?? ''
+          }
+        }));
+      }
     } catch (err) {
       setError('Failed to save mini table for ' + name + ': ' + (err.message || err));
     }
@@ -306,7 +331,7 @@ export default function MedalScorecard(props) {
 
   return (
     <PageBackground>
-      <TopMenu {...props} />
+      <TopMenu {...props} userComp={comp} competitionList={comp ? [comp] : []} />
       <div className="flex flex-col items-center px-4 mt-12">
         <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
           Medal Competition: Scorecard

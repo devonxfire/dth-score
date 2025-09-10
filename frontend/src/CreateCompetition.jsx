@@ -281,7 +281,7 @@ function CreateCompetition({ user, onSignOut }) {
         </div>
       )}
   <div className="relative z-10 flex flex-col items-center px-4 mt-2">
-  <div className="w-full max-w-2xl rounded-2xl shadow-lg p-8 flex flex-col gap-6" style={{ background: 'rgba(0,47,95,0.95)', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}>
+  <div className="w-full max-w-2xl rounded-2xl shadow-lg p-8 flex flex-col gap-6 border-4 border-[#FFD700]" style={{ background: 'rgba(0,47,95,0.95)', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}>
           {showGroups ? (
             ((form.type && ['medalStrokeplay', 'medal strokeplay', 'stroke'].includes((form.type || '').replace(/\s+/g, ''))) ? (
               <MedalAssignment

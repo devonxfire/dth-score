@@ -58,6 +58,7 @@ function AppRoutes({ user, setUser }) {
           <Route path="/assign-medal" element={<MedalAssignment user={user} onSignOut={handleSignOut} />} />
           <Route path="/scorecard-medal/:id" element={<MedalScorecard user={user} onSignOut={handleSignOut} />} />
           <Route path="/leaderboard-medal/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
+          <Route path="/medal-leaderboard/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/assign-fourball" element={<FourballAssignment user={user} onSignOut={handleSignOut} />} />
           <Route path="/scorecard-fourball/:id" element={<FourballScorecard user={user} onSignOut={handleSignOut} />} />
           <Route path="/leaderboard-fourball/:id" element={<FourballLeaderboard user={user} onSignOut={handleSignOut} />} />
