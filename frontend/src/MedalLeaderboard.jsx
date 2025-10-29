@@ -473,24 +473,10 @@ function MedalLeaderboard() {
       </div>
       <div className="flex flex-col items-center px-4 mt-8">
         <div ref={exportRef} className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
-          <div className="flex justify-between mb-4">
-            <button
-              onClick={() => navigate('/')}
-              className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#002F5F] transition mr-2"
-              style={{ fontFamily: 'Lato, Arial, sans-serif' }}
-            >
-              Home
-            </button>
-            <button
-              onClick={() => navigate(-1)}
-              className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#002F5F] transition"
-              style={{ fontFamily: 'Lato, Arial, sans-serif' }}
-            >
-              ← Back to Scorecard
-            </button>
+          <div className="flex justify-center mb-4">
             <button
               onClick={() => { exportToPDF(); }}
-              className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#002F5F] transition ml-2"
+              className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#002F5F] transition"
               style={{ fontFamily: 'Lato, Arial, sans-serif' }}
             >
               Export Results

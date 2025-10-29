@@ -409,7 +409,7 @@ function CreateCompetition({ user, onSignOut }) {
                 onMouseOver={e => e.currentTarget.style.backgroundColor = '#FFE066'}
                 onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
               >
-                Next: Assign 4 Balls
+                {editingComp ? 'Update Competition' : 'Next: Assign 4 Balls'}
               </button>
             </form>
           )}

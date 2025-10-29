@@ -180,7 +180,7 @@ export default function CompetitionInfo({ user }) {
               <button
                 className="py-2 px-4 border border-white text-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap"
                 style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                onClick={() => navigate(`/results/${compId}`)}
+                onClick={() => navigate(`/medal-leaderboard/${compId}`)}
                 onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
                 onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
               >

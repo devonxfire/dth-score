@@ -24,6 +24,7 @@ export default function MedalScorecard(props) {
     return Math.round(parsedCh * (parseFloat(allowance) / 100));
   };
   // ...existing code...
+  // ...existing code...
   // Tee Box/Handicap modal bypass: always show scorecard, modal logic enforced
   // Modal logic removed: always render scorecard UI
   const params = useParams();
@@ -43,6 +44,7 @@ export default function MedalScorecard(props) {
   const [watersPlayer, setWatersPlayer] = useState(null);
   const [showDogPopup, setShowDogPopup] = useState(false);
   const [dogPlayer, setDogPlayer] = useState(null);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   // Fetch comp info and groups
   useEffect(() => {
@@ -335,6 +337,32 @@ export default function MedalScorecard(props) {
   if (loading) return <PageBackground><TopMenu {...props} /><div className="p-8 text-white">Loading...</div></PageBackground>;
   if (!groups.length) return <PageBackground><TopMenu {...props} /><div className="p-8 text-white">No groups found.</div></PageBackground>;
 
+  async function handleConfirmReset() {
+    // Clear gross scores for all players locally and persist to backend
+    const cleared = {};
+    for (const name of players) {
+      cleared[name] = {
+        ...playerData[name],
+        scores: Array(18).fill('')
+      };
+    }
+    setPlayerData(prev => ({ ...prev, ...cleared }));
+    setShowResetModal(false);
+    // Persist clears to backend (PATCH per player)
+    try {
+      for (const name of players) {
+        await fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scores: Array(18).fill(null) })
+        });
+      }
+    } catch (err) {
+      console.error('Failed to persist cleared scores', err);
+      setError('Failed to persist cleared scores: ' + (err.message || err));
+    }
+  }
+
   return (
     <PageBackground>
       <TopMenu {...props} userComp={comp} competitionList={comp ? [comp] : []} />
@@ -354,7 +382,9 @@ export default function MedalScorecard(props) {
         <div className="max-w-4xl w-full bg-[#002F5F] rounded-2xl shadow-2xl p-8 border-4 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
           {/* Group buttons removed above mini table */}
           {/* Mini Table for Waters, Dog, 2 Clubs, etc. */}
-          <table className="min-w-[300px] border text-white text-sm rounded mb-6" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
+          <div className="flex items-start justify-between mb-6" style={{ gap: '1rem' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <table className="min-w-[300px] border text-white text-sm rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
             <thead>
               <tr>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}></th>
@@ -420,7 +450,20 @@ export default function MedalScorecard(props) {
                 ))}
               </tbody>
             
-          </table>
+              </table>
+            </div>
+            <div className="flex-shrink-0 ml-4 self-start">
+              <button
+                className="py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
+                style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
+                onClick={() => setShowResetModal(true)}
+              >
+                Reset Scores
+              </button>
+            </div>
+          </div>
           {/* Scorecard Table UI: Front 9 and Back 9, PAR/STROKE/HOLE headings, gross/net rows, Medal logic */}
           <div className="overflow-x-auto">
             {/* Front 9 Table */}
@@ -725,6 +768,19 @@ export default function MedalScorecard(props) {
             <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Woof!</h2>
             <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{dogPlayer} has just gotten the dog</div>
             <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowDogPopup(false); if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current); }}>Dismiss</button>
+          </div>
+        </div>
+      )}
+      {/* Reset Scores Confirmation Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-6 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
+            <h2 className="text-2xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif' }}>Clear all gross scores?</h2>
+            <div className="text-sm text-white mb-4 text-center" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>This will clear only the gross score input row for every player. Net calculations and running totals will update accordingly. This action cannot be undone.</div>
+            <div className="flex gap-3">
+              <button className="px-4 py-2 rounded-2xl font-bold shadow border border-white" style={{ backgroundColor: '#1B3A6B', color: 'white' }} onClick={() => { setShowResetModal(false); }}>Cancel</button>
+              <button className="px-4 py-2 rounded-2xl font-bold shadow border border-white" style={{ backgroundColor: '#FF4B4B', color: 'white' }} onClick={handleConfirmReset}>Yes, clear scores</button>
+            </div>
           </div>
         </div>
       )}
