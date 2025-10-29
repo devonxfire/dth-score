@@ -582,6 +582,45 @@ app.get('/api/teams/:teamId/users/:userId', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+
+// Fallback: upsert fines by competition and player name when teamId/userId not known
+app.patch('/api/competitions/:compId/players/:playerName/fines', async (req, res) => {
+  const { compId, playerName } = req.params;
+  const { fines } = req.body;
+  try {
+    // Find teams for competition
+    const teams = await prisma.teams.findMany({ where: { competition_id: Number(compId) } });
+    if (!teams || teams.length === 0) return res.status(404).json({ error: 'No teams found for competition' });
+    const normalized = (s) => (s || '').trim().toLowerCase();
+    let foundTeam = null;
+    // Find team that contains this player name in its players array (string match)
+    for (const t of teams) {
+      if (Array.isArray(t.players)) {
+        if (t.players.map(p => normalized(p)).includes(normalized(playerName))) {
+          foundTeam = t;
+          break;
+        }
+      }
+    }
+    if (!foundTeam) return res.status(404).json({ error: 'Team for player not found' });
+    // Find user record by name (case-insensitive)
+    const allUsers = await prisma.users.findMany();
+    const user = allUsers.find(u => normalized(u.name) === normalized(playerName));
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    // Upsert teams_users record
+    let record = await prisma.teams_users.findFirst({ where: { team_id: foundTeam.id, user_id: user.id } });
+    const updateData = { fines: fines !== undefined && fines !== null ? Number(fines) : null };
+    if (record) {
+      record = await prisma.teams_users.update({ where: { id: record.id }, data: updateData });
+    } else {
+      record = await prisma.teams_users.create({ data: { team_id: foundTeam.id, user_id: user.id, ...updateData } });
+    }
+    res.json(record);
+  } catch (err) {
+    console.error('Error upserting fines by competition/player:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 // Helper to generate a 6-character alphanumeric join code
 function generateJoinCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();

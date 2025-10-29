@@ -1,26 +1,3 @@
-  // Helper: get par for holes played
-  function getParDiff(entry) {
-    const holesPlayed = entry.scores?.filter(s => s && s !== '').length || 0;
-    if (!holesPlayed) return '';
-    let gross = 0;
-    let par = 0;
-    for (let i = 0; i < holesPlayed; i++) {
-      gross += parseInt(entry.scores[i] || 0);
-      par += defaultHoles[i]?.par || 0;
-    }
-    const diff = gross - par;
-    if (holesPlayed === 0) return '';
-    if (diff === 0) return 'E';
-    if (diff > 0) return `+${diff}`;
-    return `${diff}`;
-  }
-// Format date as DD/MM/YYYY
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const [year, month, day] = dateStr.split('-');
-  return `${day}/${month}/${year}`;
-}
-
 import React, { useEffect, useState, useRef } from 'react';
 import { useBackendTeams } from './hooks/useBackendTeams';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -56,6 +33,30 @@ const defaultHoles = [
   { number: 17, par: 3, index: 16 },
   { number: 18, par: 4, index: 8 },
 ];
+
+// Helper: get par for holes played
+function getParDiff(entry) {
+  const holesPlayed = entry.scores?.filter(s => s && s !== '').length || 0;
+  if (!holesPlayed) return '';
+  let gross = 0;
+  let par = 0;
+  for (let i = 0; i < holesPlayed; i++) {
+    gross += parseInt(entry.scores[i] || 0);
+    par += defaultHoles[i]?.par || 0;
+  }
+  const diff = gross - par;
+  if (holesPlayed === 0) return '';
+  if (diff === 0) return 'E';
+  if (diff > 0) return `+${diff}`;
+  return `${diff}`;
+}
+
+// Format date as DD/MM/YYYY
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+}
 
 function MedalLeaderboard() {
   const [entries, setEntries] = useState([]);
@@ -99,7 +100,7 @@ function MedalLeaderboard() {
     // find matching user id if available
     const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
     const userId = matchedUser?.id || null;
-    const teamId = group.teamId || null;
+    const teamId = group.teamId || group.id || group.team_id || group.group_id || null;
                 entries.push({
                   name,
                   scores,
@@ -118,7 +119,27 @@ function MedalLeaderboard() {
             }
           });
         }
-        setEntries(entries);
+  console.debug('Built leaderboard entries (name -> teamId,userId):', entries.map(e => ({ name: e.name, teamId: e.teamId, userId: e.userId })));
+  setEntries(entries);
+        // If we have teamId/userId for entries, fetch their persisted fines from the teams API
+        (async () => {
+          try {
+            const updated = await Promise.all(entries.map(async ent => {
+              if (!ent.teamId || !ent.userId) return ent;
+              try {
+                const res = await fetch(`/api/teams/${ent.teamId}/users/${ent.userId}`);
+                if (!res.ok) return ent;
+                const data = await res.json();
+                return { ...ent, fines: data.fines ?? ent.fines };
+              } catch (e) {
+                return ent;
+              }
+            }));
+            setEntries(updated);
+          } catch (e) {
+            console.error('Failed to fetch persisted fines for entries', e);
+          }
+        })();
       });
   }, [id]);
 
@@ -401,26 +422,57 @@ function MedalLeaderboard() {
   function isAdmin(user) {
     return user && (user.role === 'admin' || user.isAdmin || user.isadmin || (user.username && ['devon','arno','arno_cap'].includes(user.username.toLowerCase())) );
   }
-
-  async function saveFines(teamId, userId, fines) {
-    if (!teamId || !userId) return;
+  async function saveFines(teamId, userId, fines, playerName, compId) {
     try {
-      const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
-      const url = `/api/teams/${teamId}/users/${userId}`;
+      if (teamId && userId) {
+        const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+        const url = `/api/teams/${teamId}/users/${userId}`;
+        const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
+        console.log('Saving fines', { url, body });
+        const res = await fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(adminSecret ? { 'X-Admin-Secret': adminSecret } : {})
+          },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          console.error('Failed to save fines, response not ok', res.status, text);
+          alert('Failed to save fines: ' + res.status + ' ' + text);
+          return;
+        }
+        const data = await res.json();
+        console.log('Saved fines response', data);
+        setEntries(es => es.map(e => (e.teamId === teamId && e.userId === userId) ? { ...e, fines: data.fines ?? (fines !== '' ? fines : '') } : e));
+        return;
+      }
+      // fallback
+      if (!compId || !playerName) {
+        console.warn('Fallback saveFines missing compId or playerName', { compId, playerName });
+        alert('Cannot save fines: missing team/user and insufficient fallback data');
+        return;
+      }
+      const url = `/api/competitions/${compId}/players/${encodeURIComponent(playerName)}/fines`;
       const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
-      await fetch(url, {
+      const res = await fetch(url, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(adminSecret ? { 'X-Admin-Secret': adminSecret } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      // Update local state
-      setEntries(es => es.map(e => (e.teamId === teamId && e.userId === userId) ? { ...e, fines } : e));
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Fallback save failed', res.status, text);
+        alert('Fallback save failed: ' + res.status + ' ' + text);
+        return;
+      }
+      const data = await res.json();
+      console.log('Fallback saved fines', data);
+      setEntries(es => es.map(e => (e.name === playerName ? { ...e, fines: data.fines ?? (fines !== '' ? fines : '') } : e)));
     } catch (err) {
       console.error('Failed to save fines', err);
-      alert('Failed to save fines');
+      alert('Failed to save fines: ' + (err.message || err));
     }
   }
 
@@ -542,8 +594,8 @@ function MedalLeaderboard() {
                             const v = e.target.value;
                             // optimistic UI
                             setEntries(es => es.map(x => x.name === entry.name ? { ...x, fines: v } : x));
-                            // save immediately
-                            saveFines(entry.teamId, entry.userId, v);
+                            // save immediately; pass player name and comp id for fallback when team/user ids are missing
+                            saveFines(entry.teamId, entry.userId, v, entry.name, comp?.id || id);
                           }}
                           className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
                           style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
