@@ -21,11 +21,13 @@ function formatDate(dateStr) {
   return `${day}/${month}/${year}`;
 }
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useBackendTeams } from './hooks/useBackendTeams';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const COMP_TYPE_DISPLAY = {
   fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
@@ -60,12 +62,19 @@ function MedalLeaderboard() {
   const [comp, setComp] = useState(null);
   const [groups, setGroups] = useState([]);
   const [compId, setCompId] = useState(null);
+  const exportRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState(null);
   // Get comp id from URL if using react-router
   const id = location.pathname.split('/').pop();
 
   useEffect(() => {
+    // Load current user from localStorage if present
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) setCurrentUser(JSON.parse(raw));
+    } catch (e) {}
     // Fetch competition and scores for this comp
     fetch(`/api/competitions/${id}`)
       .then(res => res.json())
@@ -74,6 +83,7 @@ function MedalLeaderboard() {
         setGroups(Array.isArray(data.groups) ? data.groups : []);
         // Flatten all players in all groups into leaderboard entries
         const entries = [];
+  const usersList = Array.isArray(data.users) ? data.users : [];
         if (Array.isArray(data.groups)) {
           data.groups.forEach((group, groupIdx) => {
             if (Array.isArray(group.players)) {
@@ -86,6 +96,10 @@ function MedalLeaderboard() {
                 const twoClubs = group.two_clubs?.[name] ?? '';
                 const fines = group.fines?.[name] ?? '';
                 const gross = scores.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
+    // find matching user id if available
+    const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
+    const userId = matchedUser?.id || null;
+    const teamId = group.teamId || null;
                 entries.push({
                   name,
                   scores,
@@ -96,6 +110,8 @@ function MedalLeaderboard() {
                   fines,
                   handicap,
                   teebox,
+      teamId,
+      userId,
                   groupIdx
                 });
               });
@@ -249,8 +265,164 @@ function MedalLeaderboard() {
     return points;
   }
 
+  // Export visible leaderboard area to PDF
+  async function exportToPDF() {
+    try {
+      const element = exportRef.current;
+      if (!element) {
+        alert('Export area not found');
+        return;
+      }
+      // Use html2canvas to render the element
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${(comp?.name || 'results').replace(/[^a-z0-9_-]/gi, '_')}_leaderboard.pdf`);
+    } catch (err) {
+      console.error('Export to PDF failed', err);
+      console.warn('Falling back to text-only PDF export');
+      try {
+        exportPlainPDF();
+        return;
+      } catch (e) {
+        console.error('Fallback export failed', e);
+      }
+      alert('Failed to export PDF. Try using the browser Print -> Save as PDF.');
+    }
+  }
+
+  // Fallback: generate a simple text PDF using jsPDF (no images/styles)
+  function exportPlainPDF() {
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const margin = 10;
+    const lineHeight = 7;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    let y = margin;
+    pdf.setFontSize(12);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text(`${(comp?.name) || 'Competition'} - Leaderboard`, margin, y);
+    y += lineHeight;
+    pdf.setFontSize(10);
+    // Robust date formatting to DD/MM/YYYY
+    let formattedDate = '-';
+    if (comp?.date) {
+      try {
+        const d = new Date(comp.date);
+        if (!isNaN(d.getTime())) {
+          const dd = String(d.getDate()).padStart(2, '0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const yyyy = d.getFullYear();
+          formattedDate = `${dd}/${mm}/${yyyy}`;
+        }
+      } catch (e) {
+        formattedDate = formatDate(comp?.date);
+      }
+    }
+    pdf.text(`Date: ${formattedDate}`, margin, y);
+    // Include competition type (friendly display if available)
+    const compTypeDisplay = COMP_TYPE_DISPLAY[comp?.type] || comp?.type || '';
+    if (compTypeDisplay) {
+      pdf.text(`Type: ${compTypeDisplay}`, margin + 80, y);
+    }
+    y += lineHeight * 1.2;
+
+    // Course, Handicap Allowance, Notes
+  const courseText = comp?.club || comp?.course || '-';
+    const allowanceText = comp?.handicapallowance && comp.handicapallowance !== 'N/A' ? `${comp.handicapallowance}%` : (comp?.handicapallowance === 'N/A' ? 'N/A' : '100%');
+    const notesText = comp?.notes || '-';
+    pdf.text(`Course: ${courseText}`, margin, y);
+    pdf.text(`Handicap Allowance: ${allowanceText}`, margin + 80, y);
+    y += lineHeight * 1.2;
+    pdf.text(`Notes: ${notesText}`, margin, y);
+    y += lineHeight * 1.2;
+
+    // Good Scores header
+    pdf.setFont(undefined, 'bold');
+    pdf.text('Good Scores', margin, y);
+    y += lineHeight;
+    pdf.setFont(undefined, 'normal');
+    // Print good scores (use leaderboardRows filtered earlier)
+    if (goodScores && goodScores.length > 0) {
+      goodScores.forEach(p => {
+        if (y > pageHeight - margin - lineHeight) {
+          pdf.addPage();
+          y = margin;
+        }
+        const line = `${p.name.toUpperCase()}: Net ${p.dthNet}`;
+        pdf.text(line, margin, y);
+        y += lineHeight;
+      });
+    } else {
+      pdf.text('No one. Everyone shit.', margin, y);
+      y += lineHeight;
+    }
+    y += lineHeight * 0.5;
+
+    // Table header
+    const headers = ['Pos', 'Name', 'Thru', 'Gross', 'Net', 'DTH Net', 'Dog', 'Waters', '2Clubs', 'Fines'];
+    const colWidths = [12, 60, 12, 18, 18, 18, 10, 18, 18, 18];
+    let x = margin;
+    pdf.setFont(undefined, 'bold');
+    headers.forEach((h, i) => {
+      pdf.text(h, x, y);
+      x += colWidths[i] || 20;
+    });
+    pdf.setFont(undefined, 'normal');
+    y += lineHeight;
+
+    // Rows
+    leaderboardRows.forEach(r => {
+      if (y > pageHeight - margin - lineHeight) {
+        pdf.addPage();
+        y = margin;
+      }
+      let x = margin;
+      const rowValues = [r.position, r.name, String(r.thru), String(r.total), String(r.net), String(r.dthNet), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
+      rowValues.forEach((val, i) => {
+        // truncate long names
+        let text = String(val || '');
+        if (i === 1 && text.length > 24) text = text.slice(0, 21) + '...';
+        pdf.text(text, x, y);
+        x += colWidths[i] || 20;
+      });
+      y += lineHeight;
+    });
+
+    pdf.save(`${(comp?.name || 'results').replace(/[^a-z0-9_-]/gi, '_')}_leaderboard_text.pdf`);
+  }
+
   // Determine if any player has played less than 18 holes
   const showThru = entries.some(e => (e.scores?.filter(s => s && s !== '').length || 0) < 18);
+
+  function isAdmin(user) {
+    return user && (user.role === 'admin' || user.isAdmin || user.isadmin || (user.username && ['devon','arno','arno_cap'].includes(user.username.toLowerCase())) );
+  }
+
+  async function saveFines(teamId, userId, fines) {
+    if (!teamId || !userId) return;
+    try {
+      const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+      const url = `/api/teams/${teamId}/users/${userId}`;
+      const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
+      await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adminSecret ? { 'X-Admin-Secret': adminSecret } : {})
+        },
+        body: JSON.stringify(body)
+      });
+      // Update local state
+      setEntries(es => es.map(e => (e.teamId === teamId && e.userId === userId) ? { ...e, fines } : e));
+    } catch (err) {
+      console.error('Failed to save fines', err);
+      alert('Failed to save fines');
+    }
+  }
 
   // Compute leaderboard rows with position, thru, dthNet, etc.
   const leaderboardRows = entries.map(entry => {
@@ -300,7 +472,7 @@ function MedalLeaderboard() {
         <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
       </div>
       <div className="flex flex-col items-center px-4 mt-8">
-        <div className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+        <div ref={exportRef} className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
           <div className="flex justify-between mb-4">
             <button
               onClick={() => navigate('/')}
@@ -316,13 +488,20 @@ function MedalLeaderboard() {
             >
               ← Back to Scorecard
             </button>
+            <button
+              onClick={() => { exportToPDF(); }}
+              className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#002F5F] transition ml-2"
+              style={{ fontFamily: 'Lato, Arial, sans-serif' }}
+            >
+              Export Results
+            </button>
           </div>
           {/* Competition Info Section */}
           {comp && (
             <div className="text-white/90 text-base mb-4" style={{minWidth: 260, textAlign: 'left'}}>
               <span className="font-semibold">Date:</span> {comp.date ? (new Date(comp.date).toLocaleDateString('en-GB')) : '-'} <br />
               <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type || ''} <br />
-              <span className="font-semibold">Course:</span> {comp.course || '-'} <br />
+              <span className="font-semibold">Course:</span> {comp?.club || comp?.course || '-'} <br />
               <span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance && comp.handicapallowance !== 'N/A' ? comp.handicapallowance + '%' : 'N/A'} <br />
               <span className="font-semibold">Notes:</span> {comp.notes || '-'}
               {/* Good Scores section */}
@@ -367,7 +546,26 @@ function MedalLeaderboard() {
                     <td className="border px-2 py-0.5">{entry.dog ? '🐶' : ''}</td>
                     <td className="border px-2 py-0.5">{entry.waters || ''}</td>
                     <td className="border px-2 py-0.5">{entry.twoClubs || ''}</td>
-                    <td className="border px-2 py-0.5">{entry.fines || ''}</td>
+                    <td className="border px-2 py-0.5">
+                      {isAdmin(currentUser) ? (
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.fines || ''}
+                          onChange={e => {
+                            const v = e.target.value;
+                            // optimistic UI
+                            setEntries(es => es.map(x => x.name === entry.name ? { ...x, fines: v } : x));
+                            // save immediately
+                            saveFines(entry.teamId, entry.userId, v);
+                          }}
+                          className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                          style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
+                        />
+                      ) : (
+                        entry.fines || ''
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
