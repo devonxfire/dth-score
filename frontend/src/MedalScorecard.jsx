@@ -17,6 +17,12 @@ const playerColors = [
 ];
 
 export default function MedalScorecard(props) {
+  // Helper: compute Playing Handicap (PH) from Course Handicap (CH) using competition allowance
+  const computePH = (ch) => {
+    const allowance = comp?.handicapallowance ?? comp?.handicapAllowance ?? 100;
+    const parsedCh = parseFloat(ch) || 0;
+    return Math.round(parsedCh * (parseFloat(allowance) / 100));
+  };
   // ...existing code...
   // Tee Box/Handicap modal bypass: always show scorecard, modal logic enforced
   // Modal logic removed: always render scorecard UI
@@ -399,11 +405,7 @@ export default function MedalScorecard(props) {
                       />
                     </td>
                     <td className="border border-white px-2 py-1 text-center font-bold" style={{ color: '#FFD700' }}>
-                      {(() => {
-                        const ch = parseFloat(playerData[name]?.handicap) || 0;
-                        const allowance = comp?.handicapAllowance ? parseFloat(comp.handicapAllowance) : 100;
-                        return Math.round(ch * (allowance / 100));
-                      })()}
+                      {computePH(playerData[name]?.handicap)}
                     </td>
                     <td className="border px-2 py-1 text-center">
                       <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => handleMiniTableChange(name, 'waters', e.target.value)} />
@@ -482,14 +484,15 @@ export default function MedalScorecard(props) {
                       <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Net</td>
                       {defaultHoles.slice(0,9).map((hole, hIdx) => {
                         // Medal net calculation: gross - strokes received
-                        let adjHandicap = parseInt(playerData[name]?.handicap, 10) || 0;
+                        // Use playing handicap (PH) for strokes allocation
+                        const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                         let strokesReceived = 0;
-                        if (adjHandicap > 0) {
-                          if (adjHandicap >= 18) {
+                        if (playingHandicap > 0) {
+                          if (playingHandicap >= 18) {
                             strokesReceived = 1;
-                            if (adjHandicap - 18 >= hole.index) strokesReceived = 2;
-                            else if (hole.index <= (adjHandicap % 18)) strokesReceived = 2;
-                          } else if (hole.index <= adjHandicap) {
+                            if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                            else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                          } else if (hole.index <= playingHandicap) {
                             strokesReceived = 1;
                           }
                         }
@@ -504,16 +507,16 @@ export default function MedalScorecard(props) {
                       {/* Net front 9 total */}
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
-                          let adjHandicap = parseInt(playerData[name]?.handicap, 10) || 0;
+                          const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netFrontTotal = 0;
                           defaultHoles.slice(0,9).forEach((hole, hIdx) => {
                             let strokesReceived = 0;
-                            if (adjHandicap > 0) {
-                              if (adjHandicap >= 18) {
+                            if (playingHandicap > 0) {
+                              if (playingHandicap >= 18) {
                                 strokesReceived = 1;
-                                if (adjHandicap - 18 >= hole.index) strokesReceived = 2;
-                                else if (hole.index <= (adjHandicap % 18)) strokesReceived = 2;
-                              } else if (hole.index <= adjHandicap) {
+                                if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                                else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                              } else if (hole.index <= playingHandicap) {
                                 strokesReceived = 1;
                               }
                             }
@@ -597,14 +600,14 @@ export default function MedalScorecard(props) {
                     <tr key={name + '-net-back'}>
                       <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Net</td>
                       {defaultHoles.slice(9,18).map((hole, hIdx) => {
-                        let adjHandicap = parseInt(playerData[name]?.handicap, 10) || 0;
+                        const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                         let strokesReceived = 0;
-                        if (adjHandicap > 0) {
-                          if (adjHandicap >= 18) {
+                        if (playingHandicap > 0) {
+                          if (playingHandicap >= 18) {
                             strokesReceived = 1;
-                            if (adjHandicap - 18 >= hole.index) strokesReceived = 2;
-                            else if (hole.index <= (adjHandicap % 18)) strokesReceived = 2;
-                          } else if (hole.index <= adjHandicap) {
+                            if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                            else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                          } else if (hole.index <= playingHandicap) {
                             strokesReceived = 1;
                           }
                         }
@@ -619,16 +622,16 @@ export default function MedalScorecard(props) {
                       {/* Net back 9 and total */}
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
-                          let adjHandicap = parseInt(playerData[name]?.handicap, 10) || 0;
+                          const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netBackTotal = 0;
                           defaultHoles.slice(9,18).forEach((hole, hIdx) => {
                             let strokesReceived = 0;
-                            if (adjHandicap > 0) {
-                              if (adjHandicap >= 18) {
+                            if (playingHandicap > 0) {
+                              if (playingHandicap >= 18) {
                                 strokesReceived = 1;
-                                if (adjHandicap - 18 >= hole.index) strokesReceived = 2;
-                                else if (hole.index <= (adjHandicap % 18)) strokesReceived = 2;
-                              } else if (hole.index <= adjHandicap) {
+                                if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                                else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                              } else if (hole.index <= playingHandicap) {
                                 strokesReceived = 1;
                               }
                             }
@@ -641,16 +644,16 @@ export default function MedalScorecard(props) {
                       </td>
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
-                          let adjHandicap = parseInt(playerData[name]?.handicap, 10) || 0;
+                          const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netTotal = 0;
                           defaultHoles.forEach((hole, hIdx) => {
                             let strokesReceived = 0;
-                            if (adjHandicap > 0) {
-                              if (adjHandicap >= 18) {
+                            if (playingHandicap > 0) {
+                              if (playingHandicap >= 18) {
                                 strokesReceived = 1;
-                                if (adjHandicap - 18 >= hole.index) strokesReceived = 2;
-                                else if (hole.index <= (adjHandicap % 18)) strokesReceived = 2;
-                              } else if (hole.index <= adjHandicap) {
+                                if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                                else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                              } else if (hole.index <= playingHandicap) {
                                 strokesReceived = 1;
                               }
                             }

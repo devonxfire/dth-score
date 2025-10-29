@@ -86,12 +86,10 @@ function MedalLeaderboard() {
                 const twoClubs = group.two_clubs?.[name] ?? '';
                 const fines = group.fines?.[name] ?? '';
                 const gross = scores.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
-                const net = gross && handicap !== '' ? gross - Math.round(parseFloat(handicap) * 0.95) : '';
                 entries.push({
                   name,
                   scores,
                   total: gross || '',
-                  net,
                   waters,
                   dog,
                   twoClubs,
@@ -217,8 +215,10 @@ function MedalLeaderboard() {
 
   // Helper: calculate net and points
   function getPlayingHandicap(entry) {
-    const full = parseFloat(entry.player?.handicap || 0);
-    return Math.round(full * 0.95);
+  // Use entry.handicap and comp.handicapallowance for correct PH
+  const ch = parseFloat(entry.handicap || 0);
+  const allowance = comp?.handicapallowance ? parseFloat(comp.handicapallowance) : 100;
+  return Math.round(ch * (allowance / 100));
   }
   function getNet(entry) {
     return entry.total - getPlayingHandicap(entry);
@@ -256,15 +256,16 @@ function MedalLeaderboard() {
   const leaderboardRows = entries.map(entry => {
     const holesPlayed = entry.scores?.filter(s => s && s !== '').length || 0;
     let thru = holesPlayed === 18 ? 'F' : holesPlayed;
-    // Course Handicap (CH)
-    const ch = entry.handicap !== '' ? parseInt(entry.handicap, 10) || 0 : 0;
-    // Playing Handicap (PH) with allowance
-    const allowance = comp?.handicapallowance ? parseFloat(comp.handicapallowance) : 100;
-    const ph = Math.round(ch * (allowance / 100));
+  // Course Handicap (CH) entered manually
+  const ch = entry.handicap !== '' ? parseFloat(entry.handicap) || 0 : 0;
+  // Playing Handicap (PH) = CH * allowance%
+  const allowance = comp?.handicapallowance ? parseFloat(comp.handicapallowance) : 100;
+  const ph = Math.round(ch * (allowance / 100));
     // DTH Net = Gross - CH
     const dthNet = entry.total - ch;
-    // Net = Gross - PH
-    const net = entry.total - ph;
+  // Net = gross total minus playing handicap (PH). For full rounds this equals sum(gross - strokesReceived).
+  const totalGross = parseInt(entry.total || 0);
+  const net = totalGross - ph;
     return {
       ...entry,
       thru,
