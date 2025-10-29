@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { apiUrl } from './api';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -50,7 +51,7 @@ export default function MedalScorecard(props) {
   useEffect(() => {
     if (!compId) return;
     setLoading(true);
-    fetch(`/api/competitions/${compId}`)
+    fetch(apiUrl(`/api/competitions/${compId}`))
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) {
@@ -74,7 +75,7 @@ export default function MedalScorecard(props) {
       const newData = {};
       const newMiniStats = {};
       for (const name of group.players) {
-        const res = await fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`);
+        const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
         if (res.ok) {
           const data = await res.json();
           newData[name] = {
@@ -109,7 +110,7 @@ export default function MedalScorecard(props) {
       const stats = {};
       for (const name of players) {
         try {
-          const res = await fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`);
+          const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
           if (res.ok) {
             const data = await res.json();
             stats[name] = {
@@ -137,7 +138,7 @@ export default function MedalScorecard(props) {
     const mini = miniTableStats[name] || {};
     try {
       console.log('Saving player:', name, { teebox: data.teebox, handicap: data.handicap, scores: data.scores, waters: mini.waters, dog: mini.dog, two_clubs: mini.twoClubs });
-      const res = await fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`, {
+      const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -177,7 +178,7 @@ export default function MedalScorecard(props) {
     if (field === 'teebox') patchBody.teebox = value;
     if (field === 'handicap') patchBody.handicap = value;
     if (Object.keys(patchBody).length > 0) {
-      fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`, {
+      fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patchBody)
@@ -239,7 +240,7 @@ export default function MedalScorecard(props) {
     const group = groups[groupIdx];
     if (!group || !Array.isArray(group.players)) return;
     try {
-      const res = await fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`, {
+      const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -275,7 +276,7 @@ export default function MedalScorecard(props) {
       try {
         for (const player of players) {
           const patchBody = { dog: player === name };
-          await fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(player)}`, {
+          await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(player)}`), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(patchBody)
@@ -304,13 +305,13 @@ export default function MedalScorecard(props) {
       const patchBody = {};
       if (field === 'waters') patchBody.waters = value;
       if (field === 'twoClubs') patchBody.two_clubs = value;
-      await fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`, {
+      await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patchBody)
       });
       // Re-fetch latest mini table data for sync
-      const res = await fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`);
+      const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
       if (res.ok) {
         const data = await res.json();
         setMiniTableStats(prev => ({
@@ -351,7 +352,7 @@ export default function MedalScorecard(props) {
     // Persist clears to backend (PATCH per player)
     try {
       for (const name of players) {
-        await fetch(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`, {
+        await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scores: Array(18).fill(null) })

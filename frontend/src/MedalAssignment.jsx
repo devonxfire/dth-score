@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { apiUrl } from './api';
 import PageBackground from './PageBackground';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -24,7 +25,7 @@ export default function MedalAssignment(props) {
   // Fetch comp info on mount
   useEffect(() => {
     if (!compId) return;
-    fetch(`/api/competitions/${compId}`)
+    fetch(apiUrl(`/api/competitions/${compId}`))
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) {
@@ -41,7 +42,7 @@ export default function MedalAssignment(props) {
 
   // Fetch real player list from backend
   useEffect(() => {
-    fetch('/api/users')
+    fetch(apiUrl('/api/users'))
       .then(res => res.ok ? res.json() : [])
       .then(data => {
         if (Array.isArray(data)) {
@@ -104,7 +105,7 @@ export default function MedalAssignment(props) {
       return;
     }
     try {
-      const res = await fetch(`/api/competitions/${compIdInt}/groups`, {
+  const res = await fetch(apiUrl(`/api/competitions/${compIdInt}/groups`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ groups })

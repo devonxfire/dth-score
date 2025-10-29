@@ -22,7 +22,7 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
   useEffect(() => {
     async function fetchUsers() {
       try {
-        const res = await fetch('http://localhost:5050/api/users');
+  const res = await fetch(apiUrl('/api/users'));
         if (!res.ok) throw new Error('Failed to fetch users');
         const users = await res.json();
         // Use username or name field, fallback to id if needed

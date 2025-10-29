@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { apiUrl } from './api';
 import { TrophyIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageBackground from './PageBackground';
@@ -118,9 +119,9 @@ export default function Scorecard(props) {
         if (user) userId = user.id || user.user_id || user.userId;
       }
       if (!userId) continue;
-      const url = `/api/teams/${groupTeamId}/users/${userId}/scores`;
+  const url = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores`);
       try {
-        await fetch(url, {
+  await fetch(url, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ competitionId: competition.id, scores: Array(18).fill('') })
@@ -182,7 +183,7 @@ export default function Scorecard(props) {
       if (initialCompetition && initialCompetition.id) {
         setLoading(true);
         try {
-          const res = await fetch(`/api/competitions/${initialCompetition.id}`);
+          const res = await fetch(apiUrl(`/api/competitions/${initialCompetition.id}`));
           if (res.ok) {
             const data = await res.json();
             setCompetition(data);
@@ -195,7 +196,7 @@ export default function Scorecard(props) {
       } else if (urlId) {
         setLoading(true);
         try {
-          const res = await fetch(`/api/competitions/${urlId}`);
+            const res = await fetch(apiUrl(`/api/competitions/${urlId}`));
           if (res.ok) {
             const data = await res.json();
             setCompetition(data);
@@ -238,7 +239,7 @@ export default function Scorecard(props) {
         if (!user) continue;
         const userId = user.id || user.user_id || user.userId;
         try {
-          const res = await fetch(`/api/teams/${groupTeamId}/users/${userId}`);
+    const res = await fetch(apiUrl(`/api/teams/${groupTeamId}/users/${userId}`));
           if (res.ok) {
             const data = await res.json();
             stats[name] = {
@@ -284,7 +285,7 @@ export default function Scorecard(props) {
           const user = competition.users.find(u => u.name === name);
           if (user) userId = user.id || user.user_id || user.userId;
         }
-        const url = `/api/teams/${groupTeamId}/users/${userId}/scores?competitionId=${competition.id}`;
+  const url = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores?competitionId=${competition.id}`);
         if (!userId) return Array(18).fill('');
         try {
           const res = await fetch(url);
@@ -357,7 +358,7 @@ export default function Scorecard(props) {
     }
     // Prepare scores array for this player
     const playerScores = scores[playerIdx].map((v, idx) => idx === holeIdx ? value : v);
-    const patchUrl = `/api/teams/${groupTeamId}/users/${userId}/scores`;
+  const patchUrl = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores`);
     const patchBody = { competitionId: competition.id, scores: playerScores.map(v => v === '' ? null : Number(v)) };
     try {
       const res = await fetch(patchUrl, {
@@ -533,7 +534,7 @@ export default function Scorecard(props) {
                     setSavingTee(false);
                     return;
                   }
-                  const patchUrl = `/api/teams/${teamId}/users/${userId}`;
+                const patchUrl = apiUrl(`/api/teams/${teamId}/users/${userId}`);
                   const patchBody = { teebox: selectedTee, course_handicap: inputHandicap };
                   const res = await fetch(patchUrl, {
                     method: 'PATCH',
@@ -547,7 +548,7 @@ export default function Scorecard(props) {
                   if (competition && competition.id) {
                     setLoading(true);
                     try {
-                      const compRes = await fetch(`/api/competitions/${competition.id}`);
+                      const compRes = await fetch(apiUrl(`/api/competitions/${competition.id}`));
                       if (compRes.ok) {
                         const compData = await compRes.json();
                         setCompetition(compData);
@@ -706,7 +707,7 @@ export default function Scorecard(props) {
                                         if (user) userId = user.id || user.user_id || user.userId;
                                       }
                                       if (!userId) return;
-                                      const patchUrl = `/api/teams/${groupTeamId}/users/${userId}`;
+                                      const patchUrl = apiUrl(`/api/teams/${groupTeamId}/users/${userId}`);
                                       const patchBody = { course_handicap: newCH };
                                       try {
                                         await fetch(patchUrl, {
@@ -720,7 +721,7 @@ export default function Scorecard(props) {
                                         }
                                         // Optionally re-fetch competition data
                                         if (competition && competition.id) {
-                                          const res = await fetch(`/api/competitions/${competition.id}`);
+                                          const res = await fetch(apiUrl(`/api/competitions/${competition.id}`));
                                           if (res.ok) {
                                             const data = await res.json();
                                             setCompetition(data);
@@ -757,7 +758,7 @@ export default function Scorecard(props) {
                                       const user = competition.users.find(u => u.name === name);
                                       if (!user) return;
                                       const userId = user.id || user.user_id || user.userId;
-                                      await fetch(`/api/teams/${groupTeamId}/users/${userId}`, {
+                                      await fetch(apiUrl(`/api/teams/${groupTeamId}/users/${userId}`), {
                                         method: 'PATCH',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ waters: val })
@@ -824,7 +825,7 @@ export default function Scorecard(props) {
                                           const otherUser = competition.users.find(u => u.name === otherName);
                                           if (!otherUser) continue;
                                           const otherUserId = otherUser.id || otherUser.user_id || otherUser.userId;
-                                          await fetch(`/api/teams/${groupTeamId}/users/${otherUserId}`, {
+                                          await fetch(apiUrl(`/api/teams/${groupTeamId}/users/${otherUserId}`), {
                                             method: 'PATCH',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({ dog: otherName === name })
@@ -842,7 +843,7 @@ export default function Scorecard(props) {
                                             dog: false
                                           }
                                         }));
-                                        await fetch(`/api/teams/${groupTeamId}/users/${userId}`, {
+                                        await fetch(apiUrl(`/api/teams/${groupTeamId}/users/${userId}`), {
                                           method: 'PATCH',
                                           headers: { 'Content-Type': 'application/json' },
                                           body: JSON.stringify({ dog: false })
@@ -872,7 +873,7 @@ export default function Scorecard(props) {
                                       const user = competition.users.find(u => u.name === name);
                                       if (!user) return;
                                       const userId = user.id || user.user_id || user.userId;
-                                      await fetch(`/api/teams/${groupTeamId}/users/${userId}`, {
+                                      await fetch(apiUrl(`/api/teams/${groupTeamId}/users/${userId}`), {
                                         method: 'PATCH',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ two_clubs: val })

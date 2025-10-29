@@ -2,6 +2,7 @@
 
 
 import { useState } from 'react';
+import { apiUrl } from './api';
 import { useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
 import westlakeLogo from './assets/westlake-logo2.png';
@@ -21,7 +22,7 @@ export default function Login({ onLogin }) {
     e.preventDefault();
     setError('');
     try {
-      const res = await fetch('http://localhost:5050/api/login', {
+  const res = await fetch(apiUrl('/api/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: form.username, password: form.password })

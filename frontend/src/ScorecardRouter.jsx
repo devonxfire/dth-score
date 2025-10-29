@@ -19,7 +19,7 @@ export default function ScorecardRouter(props) {
       if (!competition && id) {
         setLoading(true);
         try {
-          const res = await fetch(`/api/competitions/${id}`);
+          const res = await fetch(apiUrl(`/api/competitions/${id}`));
           if (res.ok) {
             const data = await res.json();
             setCompetition(data);

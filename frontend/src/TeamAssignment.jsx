@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiUrl } from './api';
 
 // numFourballs: number of 4 Balls
 // Each 4 Ball has 2 teams, each team has 2 players
@@ -28,7 +29,7 @@ export default function TeamAssignment({ numTeams, onAssign, initialTeams }) {
   useEffect(() => {
     async function fetchUsers() {
       try {
-        const res = await fetch('http://localhost:5050/api/users');
+  const res = await fetch(apiUrl('/api/users'));
         if (!res.ok) throw new Error('Failed to fetch users');
         const users = await res.json();
         const names = users.map(u => u.name || u.username || u.id);

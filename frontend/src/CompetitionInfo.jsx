@@ -9,6 +9,7 @@ function formatDate(dateStr) {
 }
 
 import React, { useEffect, useState } from "react";
+import { apiUrl } from './api';
 import { ArrowLeftIcon, ChartBarIcon, TrophyIcon, SignalIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import PageBackground from './PageBackground';
@@ -35,7 +36,7 @@ export default function CompetitionInfo({ user }) {
 
   useEffect(() => {
     if (!compId) return;
-    fetch(`/api/competitions/${compId}`)
+    fetch(apiUrl(`/api/competitions/${compId}`))
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (data) setComp(data); });
   }, [compId]);

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiUrl } from './api';
 import OpenCompModal from './OpenCompModal';
 import { PlusIcon, EyeIcon, PencilSquareIcon, ScissorsIcon, XMarkIcon, TrashIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 import { useNavigate } from "react-router-dom";
@@ -50,7 +51,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
   async function fetchCompetitions() {
     setLoading(true);
     try {
-      const res = await fetch('/api/competitions');
+  const res = await fetch(apiUrl('/api/competitions'));
       const data = await res.json();
       setCompetitionList(data);
       const open = (data || []).filter(c => c.status === 'Open');
@@ -108,15 +109,15 @@ function RecentCompetitions({ user = {}, comps = [] }) {
     if (!id) return;
     setDeleting(true);
     try {
-      // Always use relative URL so Vite proxy works in dev
-      const apiUrl = `/api/competitions/${id}`;
+  // Use apiUrl helper
+  const deleteUrl = apiUrl(`/api/competitions/${id}`);
       const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
       if (!adminSecret) {
         alert('Admin secret missing. Set REACT_APP_ADMIN_SECRET in your .env file.');
         setDeleting(false);
         return;
       }
-      const res = await fetch(apiUrl, {
+  const res = await fetch(deleteUrl, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -276,14 +277,14 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                                     }
                                     // Toggle comp status between Open and Closed
                                     const newStatus = status === 'Open' ? 'Closed' : 'Open';
-                                    const apiUrl = `/api/competitions/${comp.id}`;
+                                    const patchUrl = apiUrl(`/api/competitions/${comp.id}`);
                                     const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
                                     if (!adminSecret) {
                                       alert('Admin secret missing. Set REACT_APP_ADMIN_SECRET in your .env file.');
                                       return;
                                     }
                                     try {
-                                      const res = await fetch(apiUrl, {
+                                      const res = await fetch(patchUrl, {
                                         method: 'PATCH',
                                         headers: {
                                           'Content-Type': 'application/json',

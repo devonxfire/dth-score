@@ -36,7 +36,7 @@ export default function Dashboard({ user, onSignOut }) {
   const [userComp, setUserComp] = useState(null);
 
   useEffect(() => {
-    fetch('/api/competitions')
+    fetch(apiUrl('/api/competitions'))
       .then(res => res.json())
       .then(data => {
         setComps(Array.isArray(data) ? data : []);

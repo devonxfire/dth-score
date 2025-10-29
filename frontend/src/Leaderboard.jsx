@@ -101,13 +101,13 @@ function Leaderboard() {
     const joinCode = entries[0]?.player?.joinCode || entries[0]?.player?.joincode;
     if (!joinCode) return;
     // Fetch all competitions, find matching joinCode
-    fetch('/api/competitions')
+    fetch(apiUrl('/api/competitions'))
       .then(res => res.json())
       .then(data => {
         const comp = data.find(c => c.joincode === joinCode || c.joinCode === joinCode);
         if (comp) {
           setCompId(comp.id);
-          fetch(`/api/competitions/${comp.id}`)
+          fetch(apiUrl(`/api/competitions/${comp.id}`))
             .then(res => res.json())
             .then(cdata => setGroups(cdata.groups || []));
         }

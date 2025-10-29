@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { apiUrl } from './api';
 import { useBackendTeams } from './hooks/useBackendTeams';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
@@ -77,7 +78,7 @@ function MedalLeaderboard() {
       if (raw) setCurrentUser(JSON.parse(raw));
     } catch (e) {}
     // Fetch competition and scores for this comp
-    fetch(`/api/competitions/${id}`)
+  fetch(apiUrl(`/api/competitions/${id}`))
       .then(res => res.json())
       .then(data => {
         setComp(data);
@@ -127,7 +128,7 @@ function MedalLeaderboard() {
             const updated = await Promise.all(entries.map(async ent => {
               if (!ent.teamId || !ent.userId) return ent;
               try {
-                const res = await fetch(`/api/teams/${ent.teamId}/users/${ent.userId}`);
+                const res = await fetch(apiUrl(`/api/teams/${ent.teamId}/users/${ent.userId}`));
                 if (!res.ok) return ent;
                 const data = await res.json();
                 return { ...ent, fines: data.fines ?? ent.fines };
@@ -426,7 +427,7 @@ function MedalLeaderboard() {
     try {
       if (teamId && userId) {
         const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
-        const url = `/api/teams/${teamId}/users/${userId}`;
+  const url = apiUrl(`/api/teams/${teamId}/users/${userId}`);
         const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
         console.log('Saving fines', { url, body });
         const res = await fetch(url, {
@@ -454,7 +455,7 @@ function MedalLeaderboard() {
         alert('Cannot save fines: missing team/user and insufficient fallback data');
         return;
       }
-      const url = `/api/competitions/${compId}/players/${encodeURIComponent(playerName)}/fines`;
+  const url = apiUrl(`/api/competitions/${compId}/players/${encodeURIComponent(playerName)}/fines`);
       const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
       const res = await fetch(url, {
         method: 'PATCH',

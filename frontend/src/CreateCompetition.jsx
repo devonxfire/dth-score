@@ -94,7 +94,7 @@ function CreateCompetition({ user, onSignOut }) {
 
   // Fetch open competitions on mount
   useEffect(() => {
-    fetch('/api/competitions')
+    fetch(apiUrl('/api/competitions'))
       .then(res => res.json())
       .then(data => {
         // Open = status is 'Open'
@@ -130,7 +130,7 @@ function CreateCompetition({ user, onSignOut }) {
         if (form.club) updateData.club = form.club;
         if (form.handicapAllowance) updateData.handicapAllowance = form.handicapAllowance;
         if (form.notes) updateData.notes = form.notes;
-        const res = await fetch(`/api/competitions/${editingComp.id}`, {
+  const res = await fetch(apiUrl(`/api/competitions/${editingComp.id}`), {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ function CreateCompetition({ user, onSignOut }) {
           throw new Error('Failed to update competition: ' + errText);
         }
         // Fetch updated comp from backend
-        const updatedRes = await fetch(`/api/competitions/${editingComp.id}`);
+  const updatedRes = await fetch(apiUrl(`/api/competitions/${editingComp.id}`));
         let updatedComp = editingComp;
         if (updatedRes.ok) {
           updatedComp = await updatedRes.json();
@@ -175,7 +175,7 @@ function CreateCompetition({ user, onSignOut }) {
     }
     // Always show group assignment after creating comp
     try {
-      const res = await fetch('/api/competitions', {
+  const res = await fetch(apiUrl('/api/competitions'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form })
@@ -203,7 +203,7 @@ function CreateCompetition({ user, onSignOut }) {
     try {
       // Always PATCH groups endpoint so teams table is updated
       const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
-      const res = await fetch(`/api/competitions/${idToUse}/groups`, {
+  const res = await fetch(apiUrl(`/api/competitions/${idToUse}/groups`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

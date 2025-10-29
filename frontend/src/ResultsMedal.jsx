@@ -1,5 +1,6 @@
 import './pdfExportPlain.css';
 import React, { useEffect, useState, useRef } from 'react';
+import { apiUrl } from './api';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { TrophyIcon, ArrowLeftIcon, ArrowDownTrayIcon, EnvelopeIcon } from '@heroicons/react/24/solid';
 import './pdfExportPlain.css';
@@ -58,7 +59,7 @@ export default function ResultsMedal() {
       const formData = new FormData();
       formData.append('email', emailAddress);
       formData.append('pdf', pdfBlob, 'results.pdf');
-      const res = await fetch('/api/email-pdf', {
+  const res = await fetch(apiUrl('/api/email-pdf'), {
         method: 'POST',
         body: formData
       });
@@ -95,7 +96,7 @@ export default function ResultsMedal() {
       setError(null);
   try {
         // 1. Fetch competition data
-        const res = await fetch(`/api/competitions/${id}`);
+  const res = await fetch(apiUrl(`/api/competitions/${id}`));
         if (!res.ok) throw new Error('Competition not found');
         const comp = await res.json();
         setCompetition(comp);
@@ -110,7 +111,7 @@ export default function ResultsMedal() {
               const user = comp.users.find(u => u.name === playerName);
               if (!user) continue;
               // 3. Fetch scores for this player
-              const scoreRes = await fetch(`/api/teams/${group.teamId}/users/${user.id}/scores?competitionId=${comp.id}`);
+              const scoreRes = await fetch(apiUrl(`/api/teams/${group.teamId}/users/${user.id}/scores?competitionId=${comp.id}`));
               let scores = [];
               if (scoreRes.ok) {
                 const scoreData = await scoreRes.json();
@@ -122,7 +123,7 @@ export default function ResultsMedal() {
               let twoClubs = '';
               let finesVal = '';
               try {
-                const statRes = await fetch(`/api/teams/${group.teamId}/users/${user.id}`);
+                const statRes = await fetch(apiUrl(`/api/teams/${group.teamId}/users/${user.id}`));
                 if (statRes.ok) {
                   const statData = await statRes.json();
                   waters = statData.waters ?? '';
@@ -394,7 +395,7 @@ export default function ResultsMedal() {
                                   // Persist to backend
                                   const ids = playerTeamUserMap[p.name];
                                   if (ids) {
-                                    await fetch(`/api/teams/${ids.teamId}/users/${ids.userId}`, {
+                                    await fetch(apiUrl(`/api/teams/${ids.teamId}/users/${ids.userId}`), {
                                       method: 'PATCH',
                                       headers: { 'Content-Type': 'application/json' },
                                       body: JSON.stringify({ fines: newFine })
