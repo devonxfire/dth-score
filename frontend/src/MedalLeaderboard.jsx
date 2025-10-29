@@ -288,7 +288,7 @@ function MedalLeaderboard() {
   return (
     <PageBackground>
       <TopMenu userComp={comp} competitionList={comp ? [comp] : []} />
-      <div className="flex flex-col items-center px-4 mt-12">
+  <div className="flex flex-col items-center px-4 mt-12" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
         <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <span style={{lineHeight:1}}>Leaderboard</span>
         </h1>
@@ -304,13 +304,15 @@ function MedalLeaderboard() {
           <div className="flex justify-between mb-4">
             <button
               onClick={() => navigate('/')}
-              className="py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition mr-2"
+              className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#002F5F] transition mr-2"
+              style={{ fontFamily: 'Lato, Arial, sans-serif' }}
             >
               Home
             </button>
             <button
               onClick={() => navigate(-1)}
-              className="py-2 px-4 bg-transparent border border-white text-white rounded-2xl hover:bg-white hover:text-black transition"
+              className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#002F5F] transition"
+              style={{ fontFamily: 'Lato, Arial, sans-serif' }}
             >
               ← Back to Scorecard
             </button>
