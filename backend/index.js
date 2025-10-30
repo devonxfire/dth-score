@@ -654,9 +654,9 @@ app.patch('/api/competitions/:compId/players/:playerName/fines', async (req, res
   }
 });
 // Helper to generate a 6-character alphanumeric join code
-function generateJoinCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
+// function generateJoinCode() {
+//   r  PGPASSWORD=1234 psql -h localhost -p 5432 -U postgres -d dth_score -c "INSERT INTO users (name, username, password, isadmin) VALUES ('Brett \"Roger\" Martindale', 'brett', 'martindale', false) ON CONFLICT (username) DO UPDATE SET name = EXCLUDED.name, password = EXCLUDED.password, isadmin = EXCLUDED.isadmin;"eturn Math.random().toString(36).substring(2, 8).toUpperCase();
+// }
 
 
 // Test PATCH endpoint for debugging
