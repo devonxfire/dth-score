@@ -46,6 +46,12 @@ export default function MedalScorecard(props) {
   const [showDogPopup, setShowDogPopup] = useState(false);
   const [dogPlayer, setDogPlayer] = useState(null);
   const [showResetModal, setShowResetModal] = useState(false);
+  // Mobile selected player for compact score entry
+  const [mobileSelectedPlayer, setMobileSelectedPlayer] = useState('');
+
+  useEffect(() => {
+    if (!mobileSelectedPlayer && players && players.length) setMobileSelectedPlayer(players[0]);
+  }, [players, mobileSelectedPlayer]);
 
   // Fetch comp info and groups
   useEffect(() => {
@@ -199,6 +205,13 @@ export default function MedalScorecard(props) {
   const [blowupHole, setBlowupHole] = useState(null);
   const [blowupPlayer, setBlowupPlayer] = useState(null);
   const blowupTimeoutRef = useRef(null);
+  // Delayed-show refs to avoid showing popups while user is rapidly changing values
+  const birdieShowDelayRef = useRef(null);
+  const eagleShowDelayRef = useRef(null);
+  const blowupShowDelayRef = useRef(null);
+  // Keep a ref copy of playerData so delayed callbacks can read latest values
+  const playerDataRef = useRef(playerData);
+  useEffect(() => { playerDataRef.current = playerData; }, [playerData]);
 
   async function handleScoreChange(name, idx, value) {
     setPlayerData(prev => ({
@@ -212,27 +225,58 @@ export default function MedalScorecard(props) {
     const gross = parseInt(value, 10);
     const hole = defaultHoles[idx];
     if (gross > 0 && hole) {
+      // Eagle (2 under)
       if (gross === hole.par - 2) {
-        setEagleHole(hole.number);
-        setEaglePlayer(name);
-        setShowEagle(true);
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-        if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-        eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
-      } else if (gross === hole.par - 1) {
-        setBirdieHole(hole.number);
-        setBirdiePlayer(name);
-        setShowBirdie(true);
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-        if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
-        birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
-      } else if (gross >= hole.par + 3) {
-        setBlowupHole(hole.number);
-        setBlowupPlayer(name);
-        setShowBlowup(true);
-        if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
-        if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-        blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+        if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
+        eagleShowDelayRef.current = setTimeout(() => {
+          const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+          if (latest === gross) {
+            setEagleHole(hole.number);
+            setEaglePlayer(name);
+            setShowEagle(true);
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+            if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+            eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+          }
+        }, 2000);
+      } else {
+        if (eagleShowDelayRef.current) { clearTimeout(eagleShowDelayRef.current); eagleShowDelayRef.current = null; }
+      }
+
+      // Birdie (1 under)
+      if (gross === hole.par - 1) {
+        if (birdieShowDelayRef.current) clearTimeout(birdieShowDelayRef.current);
+        birdieShowDelayRef.current = setTimeout(() => {
+          const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+          if (latest === gross) {
+            setBirdieHole(hole.number);
+            setBirdiePlayer(name);
+            setShowBirdie(true);
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+            birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+          }
+        }, 2000);
+      } else {
+        if (birdieShowDelayRef.current) { clearTimeout(birdieShowDelayRef.current); birdieShowDelayRef.current = null; }
+      }
+
+      // Blowup (>= par + 3)
+      if (gross >= hole.par + 3) {
+        if (blowupShowDelayRef.current) clearTimeout(blowupShowDelayRef.current);
+        blowupShowDelayRef.current = setTimeout(() => {
+          const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+          if (latest === gross) {
+            setBlowupHole(hole.number);
+            setBlowupPlayer(name);
+            setShowBlowup(true);
+            if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
+            if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+            blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+          }
+        }, 2000);
+      } else {
+        if (blowupShowDelayRef.current) { clearTimeout(blowupShowDelayRef.current); blowupShowDelayRef.current = null; }
       }
     }
     // Save scores for this player immediately
@@ -335,6 +379,15 @@ export default function MedalScorecard(props) {
     }
   }
 
+  // Cleanup any pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      [watersTimeoutRef, birdieTimeoutRef, eagleTimeoutRef, blowupTimeoutRef, birdieShowDelayRef, eagleShowDelayRef, blowupShowDelayRef].forEach(ref => {
+        try { if (ref && ref.current) clearTimeout(ref.current); } catch (e) { /* ignore */ }
+      });
+    };
+  }, []);
+
   if (loading) return <PageBackground><TopMenu {...props} /><div className="p-8 text-white">Loading...</div></PageBackground>;
   if (!groups.length) return <PageBackground><TopMenu {...props} /><div className="p-8 text-white">No groups found.</div></PageBackground>;
 
@@ -435,11 +488,11 @@ export default function MedalScorecard(props) {
                       </span>
                       <span className="hidden sm:block truncate whitespace-nowrap" title={name}>{name}</span>
                     </td>
-                    <td className="border px-2 py-1 text-center">
+                      <td className="border px-2 py-1 text-center">
                       <select
                         value={playerData[name]?.teebox || ''}
                         onChange={e => handleChange(name, 'teebox', e.target.value)}
-                        className="w-24 text-center bg-transparent rounded focus:outline-none font-semibold"
+                        className="w-16 sm:w-24 text-center bg-transparent rounded focus:outline-none font-semibold"
                         style={{
                           border: 'none',
                           color:
@@ -458,7 +511,7 @@ export default function MedalScorecard(props) {
                       <input
                         type="number"
                         min="0"
-                        className="w-16 text-center bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                        className="w-12 sm:w-16 text-center bg-transparent rounded focus:outline-none font-semibold no-spinner"
                         style={{
                           border: 'none',
                           color: '#FFD700'
@@ -548,7 +601,150 @@ export default function MedalScorecard(props) {
             </div>
           </div>
           {/* Scorecard Table UI: Front 9 and Back 9, PAR/STROKE/HOLE headings, gross/net rows, Medal logic */}
-          <div className="overflow-x-auto">
+          {/* Mobile-only per-hole entry (select a player, then show their holes) */}
+          <div className="sm:hidden w-full mt-4">
+            <div className="mb-3">
+              <label className="sr-only">Select player</label>
+              <select
+                aria-label="Select player"
+                className={`w-full p-2 rounded ${players.indexOf(mobileSelectedPlayer) >= 0 ? playerColors[players.indexOf(mobileSelectedPlayer) % playerColors.length] : 'bg-white/10 text-white'}`}
+                value={mobileSelectedPlayer}
+                onChange={e => setMobileSelectedPlayer(e.target.value)}
+              >
+                {players.map((name, idx) => (
+                  <option key={name} value={name}>{`PLAYER ${String.fromCharCode(65 + idx)}: ${name}`}</option>
+                ))}
+              </select>
+              <div className="text-xs text-white/70 mt-1">(Click to select different player)</div>
+            </div>
+            {mobileSelectedPlayer && (() => {
+              const name = mobileSelectedPlayer;
+              const pIdx = players.indexOf(name);
+              return (
+                <div key={`mobile-${name}`} className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className={`font-bold ${playerColors[pIdx % playerColors.length]} truncate`} style={{ minWidth: 0 }}></div>
+                    <div className="text-xs font-semibold" style={{ color: '#FFD700' }}>PH {computePH(playerData[name]?.handicap)}</div>
+                  </div>
+                  <div className="divide-y divide-white/10">
+                    {defaultHoles.map((hole, hIdx) => (
+                      <div key={hole.number} className="flex items-center justify-between py-2">
+                        <div className="w-20">
+                          <div className="text-sm font-bold">Hole {hole.number}</div>
+                          <div className="text-xs text-white/80">Par {hole.par} • S{hole.index}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            aria-label={`decrement-hole-${hole.number}-${name}`}
+                            className="px-2 py-1 rounded bg-white/10"
+                            onClick={() => {
+                              const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0;
+                              const next = Math.max(0, cur - 1);
+                              handleScoreChange(name, hIdx, String(next));
+                            }}
+                          >−</button>
+                          <input
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none"
+                            value={playerData[name]?.scores?.[hIdx] ?? ''}
+                            onChange={e => {
+                              const v = (e.target.value || '').replace(/[^0-9]/g, '');
+                              handleScoreChange(name, hIdx, v);
+                            }}
+                            onFocus={e => e.currentTarget.scrollIntoView({ block: 'center' })}
+                          />
+                          <button
+                            aria-label={`increment-hole-${hole.number}-${name}`}
+                            className="px-2 py-1 rounded bg-white/10"
+                            onClick={() => {
+                              const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0;
+                              const next = cur + 1;
+                              handleScoreChange(name, hIdx, String(next));
+                            }}
+                          >+</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {(function() {
+                    // Sum only holes where a gross score has been entered (non-empty)
+                    const outTotal = defaultHoles.slice(0,9).reduce((s, hole, i) => {
+                      const raw = playerData[name]?.scores?.[i];
+                      const val = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+                      return s + (Number.isFinite(val) ? val : 0);
+                    }, 0);
+                    const inTotal = defaultHoles.slice(9,18).reduce((s, hole, i) => {
+                      const raw = playerData[name]?.scores?.[i + 9];
+                      const val = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+                      return s + (Number.isFinite(val) ? val : 0);
+                    }, 0);
+                    const grossTotal = outTotal + inTotal;
+
+                    // Net: only include holes with entered gross values
+                    const playingHandicap = computePH(playerData[name]?.handicap) || 0;
+                    let netTotal = 0;
+                    let holesWithScore = 0;
+                    defaultHoles.forEach((hole, idx) => {
+                      const raw = playerData[name]?.scores?.[idx];
+                      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+                      if (!Number.isFinite(gross)) return;
+                      holesWithScore++;
+                      let strokesReceived = 0;
+                      if (playingHandicap > 0) {
+                        if (playingHandicap >= 18) {
+                          strokesReceived = 1;
+                          if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                          else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                        } else if (hole.index <= playingHandicap) {
+                          strokesReceived = 1;
+                        }
+                      }
+                      const net = gross - strokesReceived;
+                      if (typeof net === 'number') netTotal += net;
+                    });
+
+                    // Score to par: sum of (gross - par) for played holes only
+                    let scoreToPar = 0;
+                    let anyScore = false;
+                    defaultHoles.forEach((hole, idx) => {
+                      const raw = playerData[name]?.scores?.[idx];
+                      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+                      if (!Number.isFinite(gross)) return;
+                      anyScore = true;
+                      scoreToPar += (gross - hole.par);
+                    });
+                    let scoreToParLabel = '';
+                    if (!anyScore || scoreToPar === 0) {
+                      scoreToParLabel = 'E';
+                    } else {
+                      scoreToParLabel = `${scoreToPar >= 0 ? '+' + scoreToPar : String(scoreToPar)}`;
+                    }
+
+                    return (
+                      <div className="mt-3 text-sm font-bold">
+                        <div className="flex justify-between">
+                          <div>Out: {outTotal}</div>
+                          <div>In: {inTotal}</div>
+                        </div>
+                        <div className="flex justify-between mt-1">
+                          <div>Total: {grossTotal}</div>
+                          <div>Net: {holesWithScore ? netTotal : ''}</div>
+                        </div>
+
+                        <div className="flex justify-center mt-4">
+                          <div className="text-center px-6 py-3 rounded-2xl border-4 font-extrabold text-2xl" style={{ borderColor: '#FFD700', background: '#1B3A6B', color: 'white' }}>
+                            Score: <span className="ml-2">{scoreToParLabel}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })()}
+          </div>
+          <div className="hidden sm:block overflow-x-auto">
             {/* Front 9 Table */}
             <h3 className="text-lg font-bold text-center mb-2 text-white">Front 9</h3>
             <table className="min-w-full border text-center mb-8">
@@ -584,7 +780,7 @@ export default function MedalScorecard(props) {
                     {/* Gross row */}
                     <tr key={name + '-gross-front'}>
                       <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pIdx % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
-                        {String.fromCharCode(65 + pIdx)}
+                        <span className="hidden sm:inline">{String.fromCharCode(65 + pIdx)}</span>
                       </td>
                       <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
                       {defaultHoles.slice(0,9).map((hole, hIdx) => (
@@ -696,7 +892,7 @@ export default function MedalScorecard(props) {
                     {/* Gross row */}
                     <tr key={name + '-gross-back'}>
                       <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pIdx % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
-                        {String.fromCharCode(65 + pIdx)}
+                        <span className="hidden sm:inline">{String.fromCharCode(65 + pIdx)}</span>
                       </td>
                       <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
                       {defaultHoles.slice(9,18).map((hole, hIdx) => (
