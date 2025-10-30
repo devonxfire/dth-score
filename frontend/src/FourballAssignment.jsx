@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { apiUrl } from './api';
 
 export default function FourballAssignment({ fourballs, onAssign, initialGroups }) {
   // fourballs: number of 4balls

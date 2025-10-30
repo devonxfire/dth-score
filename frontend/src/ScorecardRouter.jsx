@@ -4,6 +4,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import Scorecard from './Scorecard';
 import Scorecard4BBB from './Scorecard4BBB';
 import MedalScorecard from './MedalScorecard';
+import { apiUrl } from './api';
 
 // This router fetches the competition if not provided, then renders the correct scorecard
 export default function ScorecardRouter(props) {

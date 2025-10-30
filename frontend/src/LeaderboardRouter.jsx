@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import Leaderboard from './Leaderboard';
 import Leaderboard4BBB from './Leaderboard4BBB';
+import { apiUrl } from './api';
 
 export default function LeaderboardRouter(props) {
   const { id } = useParams();

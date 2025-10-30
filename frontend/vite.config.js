@@ -1,5 +1,3 @@
-// Ensure lightningcss uses the WASM fallback if the env var is not set
-process.env.LIGHTNING_CSS_FORCE_WASM = process.env.LIGHTNING_CSS_FORCE_WASM || '1';
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'

@@ -1,5 +1,5 @@
 import OpenCompModal from './OpenCompModal';
-
+import { apiUrl } from './api';
 
 
 import PageBackground from './PageBackground';

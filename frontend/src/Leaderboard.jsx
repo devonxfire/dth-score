@@ -25,6 +25,7 @@ import React, { useEffect, useState } from 'react';
 import { useBackendTeams } from './hooks/useBackendTeams';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
+import { apiUrl } from './api';
 
 const COMP_TYPE_DISPLAY = {
   fourBbbStableford: '4BBB Stableford (2 Scores to Count)',

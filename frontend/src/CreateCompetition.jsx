@@ -5,6 +5,7 @@ function isAdmin(user) {
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import React, { useState, useEffect } from 'react';
+import { apiUrl } from './api';
 import PageBackground from './PageBackground';
 import OpenCompModal from './OpenCompModal';
 import { useNavigate, useLocation } from 'react-router-dom';
