@@ -86,7 +86,7 @@ function MedalLeaderboard() {
         // Flatten all players in all groups into leaderboard entries
         const entries = [];
   const usersList = Array.isArray(data.users) ? data.users : [];
-        if (Array.isArray(data.groups)) {
+            if (Array.isArray(data.groups)) {
           data.groups.forEach((group, groupIdx) => {
             if (Array.isArray(group.players)) {
               group.players.forEach(name => {
@@ -101,6 +101,8 @@ function MedalLeaderboard() {
     // find matching user id if available
     const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
     const userId = matchedUser?.id || null;
+    const displayNameFromUser = matchedUser?.displayName || matchedUser?.display_name || matchedUser?.displayname || '';
+    const nickFromUser = matchedUser?.nick || matchedUser?.nickname || '';
     const teamId = group.teamId || group.id || group.team_id || group.group_id || null;
                 entries.push({
                   name,
@@ -114,6 +116,8 @@ function MedalLeaderboard() {
                   teebox,
       teamId,
       userId,
+      displayName: displayNameFromUser,
+      nick: nickFromUser,
                   groupIdx
                 });
               });
@@ -287,6 +291,25 @@ function MedalLeaderboard() {
     return points;
   }
 
+  // Compact display name: prefer explicit nickname/displayName, then parenthetical nickname, then first name
+  function compactDisplayName(entry) {
+    if (!entry) return '';
+    if (entry.displayName && entry.displayName.trim()) return entry.displayName.trim();
+    if (entry.nick && entry.nick.trim()) return entry.nick.trim();
+    if (entry.name && typeof entry.name === 'string') {
+      const m = entry.name.match(/\(([^)]+)\)/);
+      if (m && m[1]) return m[1].trim();
+      const q = entry.name.match(/"([^"]+)"/);
+      if (q && q[1]) return q[1].trim();
+      // also try single-quoted nicknames like: Devon 'Tugger' Martindale
+      const s = entry.name.match(/'([^']+)'/);
+      if (s && s[1]) return s[1].trim();
+      // do not fallback to first name — only return an explicit nickname
+      return '';
+    }
+    return '';
+  }
+
   // Export visible leaderboard area to PDF
   async function exportToPDF() {
     try {
@@ -367,14 +390,15 @@ function MedalLeaderboard() {
     pdf.text('Good Scores', margin, y);
     y += lineHeight;
     pdf.setFont(undefined, 'normal');
-    // Print good scores (use leaderboardRows filtered earlier)
+    // Print good scores (use leaderboardRows filtered earlier) - show nickname when available
     if (goodScores && goodScores.length > 0) {
       goodScores.forEach(p => {
         if (y > pageHeight - margin - lineHeight) {
           pdf.addPage();
           y = margin;
         }
-        const line = `${p.name.toUpperCase()}: Net ${p.dthNet}`;
+        const displayName = (compactDisplayName(p) || p.name || '').toUpperCase();
+        const line = `${displayName}: Net ${p.dthNet}`;
         pdf.text(line, margin, y);
         y += lineHeight;
       });
@@ -403,7 +427,8 @@ function MedalLeaderboard() {
         y = margin;
       }
       let x = margin;
-      const rowValues = [r.position, r.name, String(r.thru), String(r.total), String(r.net), String(r.dthNet), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
+      const display = (compactDisplayName(r) || r.name || '');
+      const rowValues = [r.position, display, String(r.thru), String(r.total), String(r.net), String(r.dthNet), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
       rowValues.forEach((val, i) => {
         // truncate long names
         let text = String(val || '');
@@ -549,7 +574,7 @@ function MedalLeaderboard() {
                 {goodScores.length === 0
                   ? <div style={{marginLeft: 0}}>No one. Everyone shit.</div>
                   : goodScores.map(p => (
-                      <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{p.name.toUpperCase()}: Net {p.dthNet}</div>
+                      <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{(compactDisplayName(p) || p.name).toUpperCase()}: Net {p.dthNet}</div>
                     ))}
               </div>
             </div>
@@ -558,57 +583,61 @@ function MedalLeaderboard() {
           {leaderboardRows.length === 0 ? (
             <div className="text-white/80">No scores submitted yet.</div>
           ) : (
-            <table className="min-w-full border text-center mb-8" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
-              <thead>
-                <tr style={{ background: '#00204A' }}>
-                  <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Pos</th>
-                  <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
-                  <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Thru</th>
-                  <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
-                  <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
-                  <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
-                  <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
-                  <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
-                  <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
-                  <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboardRows.map((entry, idx) => (
-                  <tr key={entry.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
-                    <td className="border px-2 py-0.5 font-bold">{entry.position}</td>
-                    <td className="border px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>{entry.name.toUpperCase()}</td>
-                    <td className="border px-2 py-0.5">{entry.thru}</td>
-                    <td className="border px-2 py-0.5">{entry.total}</td>
-                    <td className="border px-2 py-0.5">{entry.net}</td>
-                    <td className="border px-2 py-0.5">{entry.dthNet}</td>
-                    <td className="border px-2 py-0.5">{entry.dog ? '🐶' : ''}</td>
-                    <td className="border px-2 py-0.5">{entry.waters || ''}</td>
-                    <td className="border px-2 py-0.5">{entry.twoClubs || ''}</td>
-                    <td className="border px-2 py-0.5">
-                      {isAdmin(currentUser) ? (
-                        <input
-                          type="number"
-                          min="0"
-                          value={entry.fines || ''}
-                          onChange={e => {
-                            const v = e.target.value;
-                            // optimistic UI
-                            setEntries(es => es.map(x => x.name === entry.name ? { ...x, fines: v } : x));
-                            // save immediately; pass player name and comp id for fallback when team/user ids are missing
-                            saveFines(entry.teamId, entry.userId, v, entry.name, comp?.id || id);
-                          }}
-                          className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
-                          style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
-                        />
-                      ) : (
-                        entry.fines || ''
-                      )}
-                    </td>
+            <div className="w-full overflow-x-auto">
+              <table className="min-w-full border text-center mb-8 text-[10px] sm:text-base" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
+                <thead>
+                  <tr style={{ background: '#00204A' }}>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Pos</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5 text-left" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Thru</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {leaderboardRows.map((entry, idx) => (
+                    <tr key={entry.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
+                      <td className="border px-0.5 sm:px-2 py-0.5 font-bold">{entry.position}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>
+                        <div className="max-w-[8ch] sm:max-w-none truncate">{(compactDisplayName(entry) || entry.name).toUpperCase()}</div>
+                      </td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.total}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.dthNet}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.dog ? '🐶' : ''}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.waters || ''}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.twoClubs || ''}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">
+                        {isAdmin(currentUser) ? (
+                          <input
+                            type="number"
+                            min="0"
+                            value={entry.fines || ''}
+                            onChange={e => {
+                              const v = e.target.value;
+                              // optimistic UI
+                              setEntries(es => es.map(x => x.name === entry.name ? { ...x, fines: v } : x));
+                              // save immediately; pass player name and comp id for fallback when team/user ids are missing
+                              saveFines(entry.teamId, entry.userId, v, entry.name, comp?.id || id);
+                            }}
+                            className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                            style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
+                          />
+                        ) : (
+                          entry.fines || ''
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
