@@ -77,7 +77,95 @@ export default function CompetitionInfo({ user }) {
             </h1>
             <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
           </div>
-  <div className="w-full max-w-4xl rounded-2xl bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none', fontFamily: 'Lato, Arial, sans-serif', color: 'white', borderColor: '#FFD700', marginTop: '-2.5rem' }}>
+  {/* Mobile stacked info (keeps blue theme, full-width buttons) */}
+  <table className="w-full sm:hidden border-collapse text-base shadow-xl overflow-hidden bg-white/10 mb-6" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700', borderRadius: 8, border: '2px solid #FFD700' }}>
+    <tbody>
+      <tr className="border-b border-white/20">
+        <td className="px-3 py-3"><strong className="text-[#FFD700]">Date:</strong> <span className="text-white">{formatDate(comp.date)}</span></td>
+      </tr>
+      <tr className="border-b border-white/20">
+        <td className="px-3 py-3"><strong className="text-[#FFD700]">Course:</strong> <span className="text-white">{comp.club || '-'}</span></td>
+      </tr>
+      <tr className="border-b border-white/20">
+        <td className="px-3 py-3"><strong className="text-[#FFD700]">Type:</strong> <span className="text-white">{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</span></td>
+      </tr>
+      {comp.handicapallowance && (
+        <tr className="border-b border-white/20"><td className="px-3 py-3"><strong className="text-[#FFD700]">Handicap Allowance:</strong> <span className="text-white">{comp.handicapallowance}{typeof comp.handicapallowance === 'string' && comp.handicapallowance.includes('%') ? '' : '%'}</span></td></tr>
+      )}
+      <tr className="border-b border-white/20">
+        <td className="px-3 py-3"><strong className="text-[#FFD700]">Notes:</strong> <span className="text-white">{comp.notes && comp.notes.trim() !== '' ? comp.notes : '-'}</span></td>
+      </tr>
+      {comp.teeBox && (
+        <tr className="border-b border-white/20"><td className="px-3 py-3"><strong className="text-[#FFD700]">Tee Box:</strong> <span className="text-white">{comp.teeBox}</span></td></tr>
+      )}
+      {comp.groups && Array.isArray(comp.groups) && (
+        <tr className="border-b border-white/20">
+          <td className="px-3 py-3">
+            <div className="mb-2 text-[#FFD700] font-semibold">Groups</div>
+            <div className="flex flex-col gap-2">
+              {comp.groups.map((group, idx) => (
+                <div key={idx} className="p-2 rounded border border-white/10">
+                  <div className="text-white font-semibold">{group.name || idx + 1} <span className="text-sm text-white/80">{group.teeTime ? ` — ${group.teeTime}` : ''}</span></div>
+                  <div className="text-white text-sm">
+                    {Array.isArray(group.players) && group.players.length > 0 ? (
+                      group.players.map((name, i, arr) => {
+                        if (['Guest 1','Guest 2','Guest 3'].includes(name) && Array.isArray(group.displayNames) && group.displayNames[i]) {
+                          return (<div key={i} className="font-bold">GUEST - {group.displayNames[i]}{i < arr.length - 1 ? ', ' : ''}</div>);
+                        } else if (['Guest 1','Guest 2','Guest 3'].includes(name)) {
+                          return (<div key={i} className="font-bold">{name}{i < arr.length - 1 ? ', ' : ''}</div>);
+                        } else if (typeof name === 'string') {
+                          const parts = name.trim().split(/\s+/);
+                          let initial = '', surname = '';
+                          if (parts.length > 1) {
+                            initial = parts[0][0].toUpperCase();
+                            surname = parts[parts.length - 1].toUpperCase();
+                          } else {
+                            initial = parts[0][0].toUpperCase();
+                            surname = '';
+                          }
+                          return (<div key={i}>{initial}{surname && '. '}{surname}{i < arr.length - 1 ? ', ' : ''}</div>);
+                        } else return null;
+                      })
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
+      <tr>
+        <td className="px-3 py-3">
+          <div className="flex flex-col gap-3">
+            <button onClick={() => navigate('/recent')} className="w-full py-2 rounded-2xl bg-[#1B3A6B] text-white font-semibold flex items-center justify-center gap-2">
+              <ArrowLeftIcon className="h-5 w-5" />
+              <span>Back to Competitions</span>
+            </button>
+            {isPlayerInComp && (
+              <button onClick={() => {
+                const medalTypes = ['medalStrokeplay', 'medal strokeplay', 'stroke'];
+                if (medalTypes.includes((comp.type || '').toLowerCase().replace(/\s+/g, ''))) {
+                  navigate(`/scorecard-medal/${compId}`);
+                } else {
+                  navigate(`/scorecard/${compId}`);
+                }
+              }} className="w-full py-2 rounded-2xl bg-[#FFD700] text-[#002F5F] font-semibold flex items-center justify-center gap-2 scorecard-pulse">
+                <SignalIcon className="h-5 w-5" style={{ color: '#002F5F' }} />
+                <span>My Scorecard</span>
+              </button>
+            )}
+            <button onClick={() => navigate(`/medal-leaderboard/${compId}`)} className="w-full py-2 rounded-2xl bg-[#1B3A6B] text-white font-semibold flex items-center justify-center gap-2">
+              <TrophyIcon className="h-5 w-5" style={{ color: '#FFD700' }} />
+              <span>Leaderboard</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  {/* Desktop content (keeps original layout) */}
+  <div className="hidden sm:block w-full max-w-4xl rounded-2xl bg-transparent text-white mb-8 px-8 p-6" style={{ backdropFilter: 'none', fontFamily: 'Lato, Arial, sans-serif', color: 'white', borderColor: '#FFD700', marginTop: '-2.5rem' }}>
           <div className="mb-4">
               <div><span className="font-semibold">Date:</span> {formatDate(comp.date)}</div>
               <div><span className="font-semibold">Course:</span> {comp.club || '-'}</div>
@@ -107,7 +195,6 @@ export default function CompetitionInfo({ user }) {
                           {Array.isArray(group.players) && group.players.length > 0 ? (
                             <div className="flex flex-row items-center gap-2 justify-center">
                               {group.players.map((name, i, arr) => {
-                                // If this is a guest slot and displayNames is present, show the display name
                                 if (['Guest 1','Guest 2','Guest 3'].includes(name) && Array.isArray(group.displayNames) && group.displayNames[i]) {
                                   return (
                                     <span key={i} style={{ whiteSpace: 'nowrap', color: 'white', fontWeight: 700 }}>

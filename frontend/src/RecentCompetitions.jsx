@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { apiUrl } from './api';
 import OpenCompModal from './OpenCompModal';
 import { PlusIcon, EyeIcon, PencilSquareIcon, ScissorsIcon, XMarkIcon, TrashIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
@@ -169,7 +169,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
           </div>
           <div className="w-full max-w-4xl bg-transparent text-white mb-8 px-8" style={{ backdropFilter: 'none' }}>
             {isAdmin(user) && (
-              <div className="mb-4">
+              <div className="mb-8 sm:mb-4 flex justify-center sm:justify-start">
                 <button
                   className="flex flex-row items-center gap-2 py-2 px-6 border border-white text-white font-extrabold rounded-2xl transition text-lg bg-[#1B3A6B] hover:bg-white hover:text-[#1B3A6B]"
                   style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
@@ -187,6 +187,101 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 </button>
               </div>
             )}
+            {/* Mobile: stacked table rows for better responsiveness (keeps table feel) */}
+            <table className="w-full sm:hidden border-collapse text-base shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700', borderRadius: 8, border: '2px solid #FFD700' }}>
+              <tbody>
+                {loading ? (
+                  <tr><td className="px-3 py-4 text-white/80">Loading competition data...</td></tr>
+                ) : competitionList.length === 0 ? (
+                  <tr><td className="px-3 py-4 text-white/80">No competitions found.</td></tr>
+                ) : competitionList.map((comp, idx) => {
+                  const keyBase = comp.id || comp.joinCode || comp.joincode || idx;
+                  let status = comp.status;
+                  if (!status) {
+                    status = 'Open';
+                    if (comp._forceClosed) {
+                      status = 'Closed';
+                    } else if (comp.date) {
+                      const today = new Date();
+                      const compDate = new Date(comp.date);
+                      if (compDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+                        status = 'Closed';
+                      }
+                    }
+                  }
+                  return (
+                    <React.Fragment key={keyBase + '-mobile'}>
+                      <tr className={`border-b border-white/20 ${status === 'Closed' ? 'bg-gray-800/60' : ''}`}>
+                        <td className="px-3 py-3"><strong className="text-[#FFD700]">Date:</strong> <span className={`${status === 'Closed' ? 'text-gray-300' : 'text-white'}`}>{formatDate(comp.date)}</span></td>
+                      </tr>
+                      <tr className={`border-b border-white/20 ${status === 'Closed' ? 'bg-gray-800/60' : ''}`}>
+                        <td className="px-3 py-3"><strong className="text-[#FFD700]">Type:</strong> <span className={`${status === 'Closed' ? 'text-gray-300' : 'text-white'}`}>{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</span></td>
+                      </tr>
+                      <tr className={`border-b border-white/20 ${status === 'Closed' ? 'bg-gray-800/60' : ''}`}>
+                        <td className="px-3 py-3"><strong className="text-[#FFD700]">Course:</strong> <span className={`${status === 'Closed' ? 'text-gray-300' : 'text-white'}`}>{comp.club || comp.joinCode || comp.joincode || '-'}</span></td>
+                      </tr>
+                      <tr className={`border-b border-white/20 ${status === 'Closed' ? 'bg-gray-800/60' : ''}`}>
+                        <td className="px-3 py-3"><strong className="text-[#FFD700]">Status:</strong> <span className={`px-2 py-1 rounded ${status === 'Open' ? 'bg-[#1B3A6B] text-white' : 'text-gray-300'}`}>{status}</span></td>
+                      </tr>
+                      <tr className={`border-b border-white/20 ${status === 'Closed' ? 'bg-gray-800/60' : ''}`}>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-col gap-2">
+                            {/* Info button: disabled when Closed */}
+                            <button
+                              onClick={() => { if (status !== 'Closed') navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}`, { state: { comp } }); }}
+                              className={status === 'Closed' ? 'w-full py-2 rounded-2xl bg-gray-700 text-gray-400 font-semibold flex items-center justify-center gap-2 cursor-not-allowed' : 'w-full py-2 rounded-2xl bg-[#FFD700] text-[#002F5F] font-semibold flex items-center justify-center gap-2'}
+                              disabled={status === 'Closed'}
+                            >
+                              <EyeIcon className="h-5 w-5" />
+                              <span>Info</span>
+                            </button>
+                            {isAdmin(user) && (
+                              <>
+                                {/* Edit button: disabled when Closed */}
+                                <button
+                                  onClick={() => { if (status !== 'Closed') navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}/edit`, { state: { comp } }); }}
+                                  className={status === 'Closed' ? 'w-full py-2 rounded-2xl bg-gray-700 text-gray-400 font-semibold flex items-center justify-center gap-2 cursor-not-allowed' : 'w-full py-2 rounded-2xl bg-[#FFD700] text-[#002F5F] font-semibold flex items-center justify-center gap-2'}
+                                  disabled={status === 'Closed'}
+                                >
+                                  <ScissorsIcon className="h-5 w-5" />
+                                  <span>Edit</span>
+                                </button>
+                                {/* End / Re-open button */}
+                                <button
+                                  onClick={async () => {
+                                    if (status !== 'Open' && openComps.length > 0) { setShowOpenCompModal('reopen'); return; }
+                                    const newStatus = status === 'Open' ? 'Closed' : 'Open';
+                                    const patchUrl = apiUrl(`/api/competitions/${comp.id}`);
+                                    const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+                                    if (!adminSecret) { alert('Admin secret missing.'); return; }
+                                    try {
+                                      const res = await fetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret }, body: JSON.stringify({ status: newStatus }) });
+                                      if (!res.ok) { const txt = await res.text(); alert('Failed: ' + txt); return; }
+                                      await fetchCompetitions();
+                                    } catch (e) { alert('Error: ' + (e?.message || e)); }
+                                  }}
+                                  className={status === 'Open' ? 'w-full py-2 rounded-2xl bg-[#FFD700] text-[#002F5F] font-semibold flex items-center justify-center gap-2' : 'w-full py-2 rounded-2xl bg-[#FFD700] text-[#002F5F] font-semibold flex items-center justify-center gap-2'}
+                                >
+                                  {status === 'Open' ? <XMarkIcon className="h-5 w-5" /> : <ArrowPathIcon className="h-5 w-5" />}
+                                  <span>{status === 'Open' ? 'End' : 'Re-open'}</span>
+                                </button>
+                                <button onClick={() => { setShowDeleteModal(true); setDeleteCompId(comp.id); }} className="w-full py-2 rounded-2xl bg-red-600 text-white font-semibold flex items-center justify-center gap-2">
+                                  <TrashIcon className="h-5 w-5" />
+                                  <span>Delete</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Desktop table (hidden on small screens) */}
+            <div className="hidden sm:block">
             <table className="w-full border-collapse text-base shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
               <thead>
                 <tr style={{ background: '#00204A' }}>
@@ -346,7 +441,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 );
               })}
             </tbody>
-          </table>
+            </table>
+            </div>
         </div>
         {/* Delete Competition Modal */}
         {showDeleteModal && (
