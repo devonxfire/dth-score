@@ -372,37 +372,69 @@ export default function MedalScorecard(props) {
           Medal Competition: Scorecard
         </h1>
         {/* Comp Info Section */}
-        <div className="max-w-4xl w-full mb-4 p-4 rounded-xl border-2 border-[#FFD700] text-white flex flex-col gap-2" style={{ fontFamily: 'Lato, Arial, sans-serif', background: 'rgba(0,47,95,0.95)' }}>
-          <div className="flex flex-nowrap justify-between gap-x-6 text-sm font-normal w-full overflow-x-auto">
-            <div className="flex-1 min-w-[140px] whitespace-nowrap">Date: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.date ? (new Date(comp.date).toLocaleDateString()) : '-'}</span></div>
-            <div className="flex-1 min-w-[140px] whitespace-nowrap">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.club || '-'}</span></div>
-            <div className="flex-1 min-w-[140px] whitespace-nowrap">Tee Time: <span className="font-bold" style={{ color: '#FFD700' }}>{groups[groupIdx]?.teeTime || '-'}</span></div>
-            <div className="flex-1 min-w-[180px] whitespace-nowrap">Allowance: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.handicapallowance ? comp.handicapallowance + '%' : '-'}</span></div>
+        <div className="max-w-4xl w-full mb-4 p-4 rounded-xl border-2 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', background: 'rgba(0,47,95,0.95)' }}>
+          {/* Mobile: two columns each with two lines (visible on xs, hidden on sm+) */}
+          <div className="flex w-full sm:hidden text-xs font-normal">
+            <div className="w-1/2 pr-2">
+              <div className="whitespace-normal">Date: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.date ? (new Date(comp.date).toLocaleDateString()) : '-'}</span></div>
+              <div className="whitespace-normal">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.club || '-'}</span></div>
+            </div>
+            <div className="w-1/2 pl-2">
+              <div className="whitespace-normal">Tee Time: <span className="font-bold" style={{ color: '#FFD700' }}>{groups[groupIdx]?.teeTime || '-'}</span></div>
+              <div className="whitespace-normal">Allowance: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.handicapallowance ? comp.handicapallowance + '%' : '-'}</span></div>
+            </div>
+          </div>
+          {/* Desktop/tablet: single-line row with four items (hidden on xs, visible on sm+) */}
+          <div className="hidden sm:flex w-full text-sm font-normal justify-between">
+            <div className="flex-1 min-w-[140px]">Date: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.date ? (new Date(comp.date).toLocaleDateString()) : '-'}</span></div>
+            <div className="flex-1 min-w-[140px]">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.club || '-'}</span></div>
+            <div className="flex-1 min-w-[140px]">Tee Time: <span className="font-bold" style={{ color: '#FFD700' }}>{groups[groupIdx]?.teeTime || '-'}</span></div>
+            <div className="flex-1 min-w-[180px]">Allowance: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.handicapallowance ? comp.handicapallowance + '%' : '-'}</span></div>
           </div>
         </div>
         <div className="max-w-4xl w-full bg-[#002F5F] rounded-2xl shadow-2xl p-8 border-4 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
           {/* Group buttons removed above mini table */}
           {/* Mini Table for Waters, Dog, 2 Clubs, etc. */}
-          <div className="flex items-start justify-between mb-6" style={{ gap: '1rem' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <table className="min-w-[300px] border text-white text-sm rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
+          <div className="flex flex-col items-start mb-6" style={{ gap: '1rem' }}>
+            <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
+              <h3 className="text-sm font-semibold text-white mb-2 text-center">Handicaps and Tees</h3>
+              <table className="w-full min-w-[300px] border text-white text-xs sm:text-sm rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
             <thead>
-              <tr>
+                <tr>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}></th>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Tee</th>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>CH</th>
                 <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>PH</th>
-                <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
-                <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
-                <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
               </tr>
             </thead>
             <tbody>
                 {players.map((name, idx) => (
                   <tr key={name}>
                     <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
-                    <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>{name}</td>
+                    <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>
+                      {/* Mobile: show Initial + Surname only. Desktop: full name */}
+                      <span className="block sm:hidden truncate whitespace-nowrap" title={name}>
+                        {(() => {
+                          try {
+                            const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+                            if (parts.length === 0) return '';
+                            if (parts.length === 1) return parts[0];
+                            // remove nickname tokens wrapped in quotes or parentheses from initial detection
+                            const first = parts[0].replace(/^["'\(]+|["'\)]+$/g, '');
+                            const surname = parts[parts.length - 1].replace(/^["'\(]+|["'\)]+$/g, '');
+                            const initial = (first && first[0]) ? first[0].toUpperCase() : '';
+                            return initial ? `${initial}. ${surname}` : surname;
+                          } catch (e) {
+                            return name;
+                          }
+                        })()}
+                      </span>
+                      <span className="hidden sm:block truncate whitespace-nowrap" title={name}>{name}</span>
+                    </td>
                     <td className="border px-2 py-1 text-center">
                       <select
                         value={playerData[name]?.teebox || ''}
@@ -438,13 +470,13 @@ export default function MedalScorecard(props) {
                     <td className="border border-white px-2 py-1 text-center font-bold" style={{ color: '#FFD700' }}>
                       {computePH(playerData[name]?.handicap)}
                     </td>
-                    <td className="border px-2 py-1 text-center">
+                    <td className="hidden sm:table-cell border px-2 py-1 text-center">
                       <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => handleMiniTableChange(name, 'waters', e.target.value)} />
                     </td>
-                    <td className="border px-2 py-1 text-center">
+                    <td className="hidden sm:table-cell border px-2 py-1 text-center">
                       <input type="checkbox" checked={!!miniTableStats[name]?.dog} onChange={e => handleMiniTableChange(name, 'dog', e.target.checked)} />
                     </td>
-                    <td className="border px-2 py-1 text-center">
+                    <td className="hidden sm:table-cell border px-2 py-1 text-center">
                       <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.twoClubs || ''} onChange={e => handleMiniTableChange(name, 'twoClubs', e.target.value)} />
                     </td>
                   </tr>
@@ -453,9 +485,59 @@ export default function MedalScorecard(props) {
             
               </table>
             </div>
-            <div className="flex-shrink-0 ml-4 self-start">
+            {/* Extras mobile table: quick access to Waters/Dog/2 Clubs */}
+            <div className="sm:hidden w-full mb-3 mt-2">
+              <h3 className="text-sm font-semibold text-white mb-2 text-center">Extras</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full border text-white text-xs rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', borderColor: '#FFD700' }}>
+                  <thead>
+                    <tr>
+                      <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}></th>
+                      <th className="border px-2 py-1 text-left" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}>Name</th>
+                      <th className="border px-2 py-1 text-center" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}>Waters</th>
+                      <th className="border px-2 py-1 text-center" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}>Dog</th>
+                      <th className="border px-2 py-1 text-center" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}>2 Clubs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {players.map((name, idx) => (
+                      <tr key={'extras-' + name}>
+                        <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
+                        <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>
+                          <span className="truncate whitespace-nowrap" title={name}>
+                            {(() => {
+                              try {
+                                const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+                                if (parts.length === 0) return '';
+                                if (parts.length === 1) return parts[0];
+                                const first = parts[0].replace(/^["'\(]+|["'\)]+$/g, '');
+                                const surname = parts[parts.length - 1].replace(/^["'\(]+|["'\)]+$/g, '');
+                                const initial = (first && first[0]) ? first[0].toUpperCase() : '';
+                                return initial ? `${initial}. ${surname}` : surname;
+                              } catch (e) {
+                                return name;
+                              }
+                            })()}
+                          </span>
+                        </td>
+                        <td className="border px-2 py-1 text-center">
+                          <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => handleMiniTableChange(name, 'waters', e.target.value)} />
+                        </td>
+                        <td className="border px-2 py-1 text-center">
+                          <input type="checkbox" checked={!!miniTableStats[name]?.dog} onChange={e => handleMiniTableChange(name, 'dog', e.target.checked)} />
+                        </td>
+                        <td className="border px-2 py-1 text-center">
+                          <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none' }} value={miniTableStats[name]?.twoClubs || ''} onChange={e => handleMiniTableChange(name, 'twoClubs', e.target.value)} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="w-full sm:w-auto mt-3">
               <button
-                className="py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
+                className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
                 style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
                 onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
                 onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
@@ -753,7 +835,7 @@ export default function MedalScorecard(props) {
       {/* Waters Popup */}
       {showWatersPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700]">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
             <span className="text-6xl mb-2" role="img" aria-label="Splash">💧</span>
             <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Splash!</h2>
             <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{watersPlayer} has just earned a water</div>
@@ -764,7 +846,7 @@ export default function MedalScorecard(props) {
       {/* Dog Popup */}
       {showDogPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700]">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
             <span className="text-6xl mb-2" role="img" aria-label="Dog">🐶</span>
             <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Woof!</h2>
             <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{dogPlayer} has just gotten the dog</div>
