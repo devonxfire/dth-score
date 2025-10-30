@@ -503,12 +503,44 @@ app.post('/api/login', async (req, res) => {
     return res.status(400).json({ error: 'Username and password required' });
   }
   try {
-    const user = await prisma.users.findFirst({ where: { username, password } });
-    if (user) {
-      res.json({ success: true, user });
-    } else {
-      res.status(401).json({ success: false, error: 'Invalid credentials' });
+    // Only allow first-letter case-insensitive matches for username and password.
+    // Strategy:
+    // 1) Try an exact username match.
+    // 2) If not found, try the username with the first character's case toggled (Dev <-> dev).
+    // 3) For password, accept exact match or the provided password with only the first
+    //    character's case toggled.
+    const toggleFirstChar = (s) => {
+      if (!s || s.length === 0) return s;
+      const first = s[0];
+      const rest = s.slice(1);
+      const toggledFirst = first === first.toUpperCase() ? first.toLowerCase() : first.toUpperCase();
+      return toggledFirst + rest;
+    };
+
+    // 1) exact username
+    let user = await prisma.users.findFirst({ where: { username } });
+    // 2) try toggled-first username if not found
+    if (!user) {
+      const altUsername = toggleFirstChar(username);
+      if (altUsername !== username) {
+        user = await prisma.users.findFirst({ where: { username: altUsername } });
+      }
     }
+
+    if (user) {
+      const stored = user.password || '';
+      const provided = password || '';
+      // exact match OK
+      if (stored === provided) {
+        return res.json({ success: true, user });
+      }
+      // allow only first-letter toggled match
+      if (toggleFirstChar(provided) === stored) {
+        return res.json({ success: true, user });
+      }
+    }
+    // Fallback: credentials invalid
+    res.status(401).json({ success: false, error: 'Invalid credentials' });
   } catch (err) {
     console.error('Error during login:', err);
     res.status(500).json({ error: 'Database error' });
