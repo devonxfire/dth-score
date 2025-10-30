@@ -26,6 +26,12 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Active-path helpers for mobile menu highlighting
+  const isDashboardPath = location.pathname === '/dashboard';
+  const isLeaderboardPath = location.pathname.startsWith('/medal-leaderboard');
+  const isRecentPath = location.pathname === '/recent';
+  const isScorecardPath = location.pathname.startsWith('/scorecard');
+
   // If `user` prop isn't provided (some pages don't pass it), try to recover from localStorage
   let resolvedUser = user;
   if (!resolvedUser) {
@@ -76,7 +82,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
 
   return (
     <div
-      className="flex flex-wrap justify-between gap-6 mt-8 mb-4 w-full max-w-4xl mx-auto px-8 rounded-2xl"
+      className="flex flex-wrap justify-between gap-6 mt-8 mb-4 w-full px-4 sm:px-8 sm:max-w-4xl sm:mx-auto rounded-none sm:rounded-2xl"
       style={{ background: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}
     >
       {/* Mobile header: hamburger + title + sign out */}
@@ -113,88 +119,96 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
         </button>
       </div>
 
-      {/* Desktop menu (hidden on small screens) */}
-      <div className="hidden sm:flex items-center justify-between gap-6 w-full">
-        <div className="flex items-center gap-4">
-          <button
-            className={`text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150 ${location.pathname === '/dashboard' ? 'border-b-4' : ''}`}
-            style={location.pathname === '/dashboard' ? { color: '#FFD700', borderColor: '#FFD700', borderBottomWidth: 3, background: 'none', borderStyle: 'solid', fontFamily: 'Merriweather, Georgia, serif' } : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
-            onClick={() => navigate('/dashboard')}
-          >
-            Dashboard
-          </button>
-          <button
-            className="text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150 "
-            style={{ color: compId ? 'white' : '#888', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
-            disabled={!compId}
-            onClick={() => {
-              if (scorecardComp && compId && resolvedName) {
-                // ...existing code...
-                let group = null;
-                let playerObj = null;
-                if (scorecardComp.groups) {
-                  group = scorecardComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
-                  if (group && Array.isArray(group.members)) {
-                    playerObj = group.members.find(m => (m.name === resolvedName || m.displayName === resolvedName)) || null;
+      {/* Desktop menu (hidden on small screens) - render each item as an equal-width cell */}
+      <div className="hidden sm:flex items-center w-full">
+        <div className="flex items-center w-full">
+          <div className="flex-1 min-w-0 text-center">
+            <button
+              className={`w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150`}
+                style={location.pathname === '/dashboard' ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif' } : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
+              onClick={() => navigate('/dashboard')}
+            >
+              Dashboard
+            </button>
+          </div>
+          <div className="flex-1 min-w-0 text-center">
+            <button
+              className="w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150"
+                style={{ color: (location.pathname.startsWith('/scorecard') || (location.pathname.startsWith('/scorecard') && compId)) ? '#FFD700' : (compId ? 'white' : '#888'), background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
+              disabled={!compId}
+              onClick={() => {
+                if (scorecardComp && compId && resolvedName) {
+                  let group = null;
+                  let playerObj = null;
+                  if (scorecardComp.groups) {
+                    group = scorecardComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
+                    if (group && Array.isArray(group.members)) {
+                      playerObj = group.members.find(m => (m.name === resolvedName || m.displayName === resolvedName)) || null;
+                    }
+                    if (!playerObj) {
+                      const teamId = group?.teamId || group?.id || group?.team_id || group?.group_id;
+                      playerObj = {
+                        name: resolvedName,
+                        id: resolvedUser?.id,
+                        user_id: resolvedUser?.id,
+                        team_id: teamId,
+                        teebox: group?.teeboxes?.[resolvedName] || '',
+                        course_handicap: group?.handicaps?.[resolvedName] || '',
+                      };
+                    }
                   }
-                  if (!playerObj) {
-                    const teamId = group?.teamId || group?.id || group?.team_id || group?.group_id;
-                    playerObj = {
-                      name: resolvedName,
-                      id: resolvedUser?.id,
-                      user_id: resolvedUser?.id,
-                      team_id: teamId,
-                      teebox: group?.teeboxes?.[resolvedName] || '',
-                      course_handicap: group?.handicaps?.[resolvedName] || '',
-                    };
-                  }
+                  navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: scorecardComp } });
+                } else {
+                  navigate('/dashboard');
                 }
-                navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: scorecardComp } });
-              } else {
-                navigate('/dashboard');
-              }
-            }}
-          >
-            My Scorecard
-          </button>
-          <button
-            className={`text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150 ${location.pathname.startsWith('/medal-leaderboard') ? 'border-b-4' : ''}`}
-            style={location.pathname.startsWith('/medal-leaderboard') ? { color: '#FFD700', borderColor: '#FFD700', borderBottomWidth: 3, background: 'none', borderStyle: 'solid', fontFamily: 'Merriweather, Georgia, serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' } : { color: compId ? 'white' : '#888', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
-            disabled={!compId}
-            onClick={() => compId ? navigate(`/medal-leaderboard/${compId}`) : null}
-          >
-            Leaderboard
-          </button>
-          <button
-            className={`text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150 ${location.pathname === '/recent' ? 'border-b-4' : ''}`}
-            style={location.pathname === '/recent' ? { color: '#FFD700', borderColor: '#FFD700', borderBottomWidth: 3, background: 'none', borderStyle: 'solid', fontFamily: 'Merriweather, Georgia, serif' } : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
-            onClick={() => navigate('/recent')}
-          >
-            Competitions
-          </button>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <span
-            className="text-sm font-semibold px-2 py-1 cursor-default select-none"
-            style={{ color: 'white', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', lineHeight: '2.25rem' }}
-          >
-            Welcome, {firstName}!
-          </span>
-          <button
-            className="text-sm font-semibold px-2 py-1 cursor-pointer transition-colors duration-150"
-            style={{ color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
-            onClick={onSignOut || (() => {
-              if (typeof window.onSignOut === 'function') window.onSignOut();
-              else if (typeof window.signOut === 'function') window.signOut();
-              else {
-                localStorage.removeItem('user');
-                window.location.href = '/';
-              }
-            })}
-          >
-            Sign Out
-          </button>
+              }}
+            >
+              My Scorecard
+            </button>
+          </div>
+          <div className="flex-1 min-w-0 text-center">
+            <button
+              className={`w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150`}
+                style={location.pathname.startsWith('/medal-leaderboard') ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' } : { color: compId ? 'white' : '#888', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
+              disabled={!compId}
+              onClick={() => compId ? navigate(`/medal-leaderboard/${compId}`) : null}
+            >
+              Leaderboard
+            </button>
+          </div>
+          <div className="flex-1 min-w-0 text-center">
+            <button
+              className={`w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150`}
+                style={location.pathname === '/recent' ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif' } : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
+              onClick={() => navigate('/recent')}
+            >
+              Competitions
+            </button>
+          </div>
+          <div className="flex-1 min-w-0 text-center">
+            <span
+              className="text-sm font-semibold cursor-default select-none block py-1"
+              style={{ color: 'white', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', lineHeight: '2.25rem' }}
+            >
+              Welcome, {firstName}!
+            </span>
+          </div>
+          <div className="flex-1 min-w-0 text-center">
+            <button
+              className="w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150"
+              style={{ color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
+              onClick={onSignOut || (() => {
+                if (typeof window.onSignOut === 'function') window.onSignOut();
+                else if (typeof window.signOut === 'function') window.signOut();
+                else {
+                  localStorage.removeItem('user');
+                  window.location.href = '/';
+                }
+              })}
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
 
@@ -203,9 +217,16 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/40" />
           <div ref={menuRef} className="absolute top-0 left-0 right-0 bg-[#002F5F] p-4">
-            <div className="flex flex-col">
-              <button onClick={() => { setMenuOpen(false); navigate('/dashboard'); }} className="text-left text-white py-3 text-lg font-semibold">Dashboard</button>
-              <button onClick={() => {
+              <div className="flex flex-col">
+                <button
+                  onClick={() => { setMenuOpen(false); navigate('/dashboard'); }}
+                  className="text-left py-3 text-lg font-semibold"
+                  style={{ color: isDashboardPath ? '#FFD700' : 'white' }}
+                  aria-current={isDashboardPath ? 'page' : undefined}
+                >
+                  Dashboard
+                </button>
+                <button onClick={() => {
                 setMenuOpen(false);
                 if (scorecardComp && compId && resolvedName) {
                   let group = null;
@@ -231,10 +252,36 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                 } else {
                   navigate('/dashboard');
                 }
-              }} className="text-left text-white py-3 text-lg font-semibold">My Scorecard</button>
-              <button onClick={() => { setMenuOpen(false); compId ? navigate(`/medal-leaderboard/${compId}`) : null; }} className="text-left text-white py-3 text-lg font-semibold">Leaderboard</button>
-              <button onClick={() => { setMenuOpen(false); navigate('/recent'); }} className="text-left text-white py-3 text-lg font-semibold">Competitions</button>
-              <button onClick={() => { setMenuOpen(false); (onSignOut || (() => { localStorage.removeItem('user'); window.location.href = '/'; }))(); }} className="text-left text-white py-3 text-lg font-semibold">Sign Out</button>
+              }}
+                className="text-left py-3 text-lg font-semibold"
+                style={{ color: isScorecardPath ? '#FFD700' : 'white' }}
+                aria-current={isScorecardPath ? 'page' : undefined}
+              >
+                My Scorecard
+              </button>
+              <button
+                onClick={() => { setMenuOpen(false); compId ? navigate(`/medal-leaderboard/${compId}`) : null; }}
+                className="text-left py-3 text-lg font-semibold"
+                style={{ color: isLeaderboardPath ? '#FFD700' : 'white' }}
+                aria-current={isLeaderboardPath ? 'page' : undefined}
+              >
+                Leaderboard
+              </button>
+              <button
+                onClick={() => { setMenuOpen(false); navigate('/recent'); }}
+                className="text-left py-3 text-lg font-semibold"
+                style={{ color: isRecentPath ? '#FFD700' : 'white' }}
+                aria-current={isRecentPath ? 'page' : undefined}
+              >
+                Competitions
+              </button>
+              <button
+                onClick={() => { setMenuOpen(false); (onSignOut || (() => { localStorage.removeItem('user'); window.location.href = '/'; }))(); }}
+                className="text-left py-3 text-lg font-semibold"
+                style={{ color: 'white' }}
+              >
+                Sign Out
+              </button>
             </div>
           </div>
         </div>
