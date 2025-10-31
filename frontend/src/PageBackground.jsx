@@ -19,7 +19,7 @@ export default function PageBackground({ children, hideFooter }) {
       </div>
       {!hideFooter && (
         <footer className="relative z-10 text-center text-white py-4 text-sm mt-auto">
-          Dog Tag Hackers Golf Group
+          &copy; 2025 Devon Martindale
         </footer>
       )}
     </div>
