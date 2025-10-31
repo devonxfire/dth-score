@@ -165,7 +165,7 @@ export default function Dashboard({ user, onSignOut }) {
                               onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
                             >
                               <EyeIcon className="h-6 w-6 text-white" aria-hidden="true" />
-                              View All Competition
+                              View All Competitions
                             </button>
                           </div>
                         </div>
