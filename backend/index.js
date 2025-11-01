@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
 app.use(cors());
@@ -422,10 +424,25 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
       }
       // 7. Update team_points in teams table
       // If bbScore is provided by frontend, use it. Otherwise, use backend calculation.
-      await prisma.teams.update({
+      const updatedTeam = await prisma.teams.update({
         where: { id: Number(teamId) },
         data: { team_points: typeof bbScore === 'number' ? bbScore : teamPoints }
       });
+      // Prepare delta payload: include changed user ids, team points and mapped scores (holeIndex)
+      try {
+        const compIdNum = Number(competitionId);
+        if (global.io && compIdNum) {
+          // allScores variable contains score rows for this team and competition
+          const changedUserIds = Array.from(new Set(allScores.map(s => s.user_id)));
+          // Map hole_id to hole index (0-based) using holes array
+          const holeIdToIndex = {};
+          holes.forEach((h, idx) => { holeIdToIndex[h.id] = idx; });
+          const mappedScores = allScores.map(s => ({ userId: s.user_id, holeIndex: holeIdToIndex[s.hole_id] ?? null, strokes: s.strokes }));
+          global.io.to(`competition:${compIdNum}`).emit('scores-updated', { competitionId: compIdNum, teamId: Number(teamId), teamPoints: updatedTeam.team_points, changedUserIds, mappedScores });
+        }
+      } catch (e) {
+        console.error('Error emitting scores-updated socket event', e);
+      }
     }
     res.json({ success: true });
   } catch (err) {
@@ -582,6 +599,15 @@ app.patch('/api/teams/:teamId/users/:userId', async (req, res) => {
         }
       });
     }
+    // Emit socket event to notify clients who are viewing this competition
+    try {
+      const team = await prisma.teams.findUnique({ where: { id: Number(teamId) } });
+      if (team && team.competition_id && global.io) {
+        global.io.to(`competition:${team.competition_id}`).emit('team-user-updated', { competitionId: team.competition_id, teamId: Number(teamId), userId: Number(userId) });
+      }
+    } catch (e) {
+      console.error('Error emitting team-user-updated', e);
+    }
     res.json(record);
   } catch (err) {
     console.error('Error upserting teams_users:', err);
@@ -647,6 +673,13 @@ app.patch('/api/competitions/:compId/players/:playerName/fines', async (req, res
     } else {
       record = await prisma.teams_users.create({ data: { team_id: foundTeam.id, user_id: user.id, ...updateData } });
     }
+    try {
+      if (foundTeam && foundTeam.competition_id && global.io) {
+        global.io.to(`competition:${foundTeam.competition_id}`).emit('fines-updated', { competitionId: foundTeam.competition_id, teamId: foundTeam.id, userId: user.id });
+      }
+    } catch (e) {
+      console.error('Error emitting fines-updated', e);
+    }
     res.json(record);
   } catch (err) {
     console.error('Error upserting fines by competition/player:', err);
@@ -665,8 +698,38 @@ app.patch('/api/test', (req, res) => {
   res.json({ ok: true });
 });
 
+// Create HTTP server and attach Socket.IO
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*' }
+});
+
+// Expose io globally so route handlers can emit events
+global.io = io;
+
+io.on('connection', (socket) => {
+  console.log('Socket connected:', socket.id);
+  socket.on('join', ({ competitionId }) => {
+    if (competitionId != null) {
+      const room = `competition:${competitionId}`;
+      socket.join(room);
+      console.log(`Socket ${socket.id} joined room ${room}`);
+    }
+  });
+  socket.on('leave', ({ competitionId }) => {
+    if (competitionId != null) {
+      const room = `competition:${competitionId}`;
+      socket.leave(room);
+      console.log(`Socket ${socket.id} left room ${room}`);
+    }
+  });
+  socket.on('disconnect', () => {
+    // console.log('Socket disconnected:', socket.id);
+  });
+});
+
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
@@ -737,6 +800,15 @@ app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req
       data: { groups: comp.groups }
     });
     console.log('Updated groups:', JSON.stringify(comp.groups));
+    try {
+      if (global.io) {
+        // Emit the updated group object so clients can merge locally without a full refetch
+        const updatedGroup = (updated && Array.isArray(updated.groups)) ? updated.groups[groupIdx] : comp.groups[groupIdx];
+        global.io.to(`competition:${Number(id)}`).emit('medal-player-updated', { competitionId: Number(id), groupId: Number(groupId), playerName, group: updatedGroup });
+      }
+    } catch (e) {
+      console.error('Error emitting medal-player-updated', e);
+    }
     res.json({ success: true, group });
   } catch (err) {
     console.error('Error updating Medal player data:', err);

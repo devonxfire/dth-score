@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { apiUrl } from './api';
+import socket from './socket';
 import { useBackendTeams } from './hooks/useBackendTeams';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
@@ -147,6 +148,117 @@ function MedalLeaderboard() {
         })();
       });
   }, [id]);
+
+  // Real-time: join competition room and listen for updates
+  useEffect(() => {
+    if (!comp || !comp.id) return;
+    const compId = comp.id;
+    try { socket.emit('join', { competitionId: compId }); } catch (e) {}
+
+    const handler = (msg) => {
+      try {
+        if (!msg || Number(msg.competitionId) !== Number(compId)) return;
+
+        // If server provided a full group update, merge into comp/groups
+        if (msg.group && (msg.groupId != null)) {
+          setComp(prev => {
+            try {
+              const copy = prev ? { ...prev } : prev;
+              if (!copy || !Array.isArray(copy.groups)) return prev;
+              const gidx = Number(msg.groupId);
+              const groupsCopy = [...copy.groups];
+              groupsCopy[gidx] = msg.group;
+              copy.groups = groupsCopy;
+              return copy;
+            } catch (e) { return prev; }
+          });
+          setGroups(prev => {
+            try {
+              const copy = Array.isArray(prev) ? [...prev] : [];
+              copy[Number(msg.groupId)] = msg.group;
+              return copy;
+            } catch (e) { return prev; }
+          });
+          // Rebuild entries minimally if possible
+          if (msg.group && Array.isArray(msg.group.players)) {
+            setEntries(prev => {
+              try {
+                const updated = prev.map(e => ({ ...e }));
+                const usersList = Array.isArray(comp?.users) ? comp.users : [];
+                msg.group.players.forEach(name => {
+                  const mappedScores = msg.group.scores?.[name];
+                  const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
+                  const userId = matchedUser?.id || null;
+                  for (let i = 0; i < updated.length; i++) {
+                    if ((updated[i].name || '').trim().toLowerCase() === (name || '').trim().toLowerCase()) {
+                      if (Array.isArray(mappedScores)) {
+                        updated[i] = { ...updated[i], scores: mappedScores.map(v => v == null ? '' : v), total: mappedScores.reduce((s, v) => s + (parseInt(v, 10) || 0), 0) };
+                      }
+                    }
+                  }
+                });
+                return updated;
+              } catch (e) { return prev; }
+            });
+          }
+          return;
+        }
+
+        // If delta mappedScores were provided, apply them to entries
+        if (Array.isArray(msg.mappedScores) && msg.mappedScores.length > 0) {
+          setEntries(prev => {
+            try {
+              const copy = prev.map(e => ({ ...e }));
+              for (const ms of msg.mappedScores) {
+                const userId = ms.userId ?? ms.user_id ?? ms.user;
+                const holeIdx = ms.holeIndex ?? ms.hole_index ?? ms.hole;
+                const strokes = ms.strokes ?? ms.value ?? '';
+                if (userId == null || holeIdx == null) continue;
+                // find entry by userId first, else by name mapping from comp.users
+                let idx = copy.findIndex(en => Number(en.userId) === Number(userId));
+                if (idx === -1 && comp && Array.isArray(comp.users)) {
+                  const u = comp.users.find(u => Number(u.id) === Number(userId));
+                  if (u && u.name) {
+                    idx = copy.findIndex(en => (en.name || '').trim().toLowerCase() === (u.name || '').trim().toLowerCase());
+                  }
+                }
+                if (idx >= 0) {
+                  const arr = Array.isArray(copy[idx].scores) ? [...copy[idx].scores] : Array(18).fill('');
+                  arr[holeIdx] = strokes == null ? '' : String(strokes);
+                  copy[idx].scores = arr;
+                  copy[idx].total = arr.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                } else {
+                  // cannot map -> fallback to full fetch
+                  return prev;
+                }
+              }
+              return copy;
+            } catch (e) { console.error('Error applying mappedScores to entries', e); return prev; }
+          });
+          return;
+        }
+
+        // fallback: refetch full competition
+        fetch(apiUrl(`/api/competitions/${compId}`))
+          .then(r => r.ok ? r.json() : null)
+          .then(data => { if (data) { setComp(data); setGroups(Array.isArray(data.groups) ? data.groups : []); } })
+          .catch(() => {});
+      } catch (e) { console.error('Socket handler error', e); }
+    };
+
+    socket.on('scores-updated', handler);
+    socket.on('medal-player-updated', handler);
+    socket.on('team-user-updated', handler);
+    socket.on('fines-updated', handler);
+
+    return () => {
+      try { socket.emit('leave', { competitionId: compId }); } catch (e) {}
+      socket.off('scores-updated', handler);
+      socket.off('medal-player-updated', handler);
+      socket.off('team-user-updated', handler);
+      socket.off('fines-updated', handler);
+    };
+  }, [comp && comp.id]);
 
   // Get comp type and date from comp object
   let compRaw = comp?.type || comp?.competitionType || '';

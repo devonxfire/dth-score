@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { apiUrl } from './api';
+import socket from './socket';
 import { TrophyIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageBackground from './PageBackground';
@@ -211,6 +212,106 @@ export default function Scorecard4BBB(props) {
     fetchCompetition();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Real-time: join competition room and listen for updates
+  useEffect(() => {
+    if (!competition || !competition.id) return;
+    const compId = competition.id;
+    try {
+      socket.emit('join', { competitionId: compId });
+    } catch (e) {}
+
+    const handler = (msg) => {
+      try {
+        if (!msg || Number(msg.competitionId) !== Number(compId)) return;
+
+        // If server sent mappedScores (delta), apply them locally to avoid refetch
+        if (Array.isArray(msg.mappedScores) && msg.mappedScores.length > 0 && competition && Array.isArray(competition.users)) {
+          setScores(prev => {
+            try {
+              const updated = prev.map(r => [...r]);
+              for (const ms of msg.mappedScores) {
+                const userId = ms.userId ?? ms.user_id ?? ms.user;
+                const holeIdx = ms.holeIndex ?? ms.hole_index ?? ms.hole;
+                const strokes = ms.strokes ?? ms.value ?? '';
+                if (userId == null || holeIdx == null) continue;
+                const userObj = competition.users.find(u => Number(u.id) === Number(userId));
+                const playerName = userObj?.name;
+                const pIdx = groupPlayers.findIndex(n => n === playerName);
+                if (pIdx >= 0 && updated[pIdx]) {
+                  updated[pIdx][holeIdx] = strokes == null ? '' : String(strokes);
+                } else {
+                  // if we cannot map one of the scores, fallback to full refetch
+                  return prev;
+                }
+              }
+              return updated;
+            } catch (e) {
+              console.error('Error applying mappedScores', e);
+              return prev;
+            }
+          });
+          return;
+        }
+
+        // If server sent a full updated group (medal-player-updated), merge it
+        if (msg.group && Number(msg.groupId) === Number(groupForPlayer?.id ?? groupIdx)) {
+          // Merge group into competition object
+          setCompetition(prev => {
+            try {
+              const copy = prev ? { ...prev } : prev;
+              if (!copy || !Array.isArray(copy.groups)) return prev;
+              const gidx = Number(msg.groupId ?? groupIdx);
+              const groupsCopy = [...copy.groups];
+              groupsCopy[gidx] = msg.group;
+              copy.groups = groupsCopy;
+              return copy;
+            } catch (e) {
+              return prev;
+            }
+          });
+          // Also update scores array to reflect new group scores if provided
+          if (msg.group && msg.group.scores) {
+            try {
+              const groupScores = msg.group.scores;
+              setScores(prev => {
+                const updated = prev.map(r => [...r]);
+                for (let i = 0; i < groupPlayers.length; i++) {
+                  const name = groupPlayers[i];
+                  const userScores = groupScores?.[name];
+                  if (Array.isArray(userScores) && updated[i]) {
+                    updated[i] = userScores.map(v => v == null ? '' : String(v));
+                  }
+                }
+                return updated;
+              });
+            } catch (e) {}
+          }
+          return;
+        }
+
+        // Fallback: refetch full competition
+        fetch(apiUrl(`/api/competitions/${compId}`))
+          .then(r => r.ok ? r.json() : null)
+          .then(data => { if (data) setCompetition(data); })
+          .catch(() => {});
+      } catch (e) { console.error('Socket handler error', e); }
+    };
+
+    socket.on('scores-updated', handler);
+    socket.on('medal-player-updated', handler);
+    socket.on('team-user-updated', handler);
+    socket.on('fines-updated', handler);
+
+    return () => {
+      try { socket.emit('leave', { competitionId: compId }); } catch (e) {}
+      socket.off('scores-updated', handler);
+      socket.off('medal-player-updated', handler);
+      socket.off('team-user-updated', handler);
+      socket.off('fines-updated', handler);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [competition && competition.id]);
 
   // --- Move groupForPlayer, groupPlayers, groupTeamId above the modal useEffect ---
   let groupPlayers = [];

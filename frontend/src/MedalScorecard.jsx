@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { apiUrl } from './api';
+import socket from './socket';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -70,6 +71,107 @@ export default function MedalScorecard(props) {
         setLoading(false);
       });
   }, [compId, groupIdx]);
+
+  // Real-time: join competition room and listen for updates
+  useEffect(() => {
+    if (!compId) return;
+    const compNum = Number(compId);
+    try { socket.emit('join', { competitionId: compNum }); } catch (e) {}
+
+    const handler = (msg) => {
+      try {
+        if (!msg || Number(msg.competitionId) !== compNum) return;
+
+        // If a full group object is included (medal-player-updated), merge into groups
+        if (msg.group && (msg.groupId != null)) {
+          const gidx = Number(msg.groupId);
+          setGroups(prev => {
+            try {
+              const copy = Array.isArray(prev) ? [...prev] : [];
+              copy[gidx] = msg.group;
+              return copy;
+            } catch (e) { return prev; }
+          });
+          // Update playerData and miniTableStats if scores/waters present in payload
+          if (msg.group.scores) {
+            setPlayerData(prev => {
+              try {
+                const copy = { ...(prev || {}) };
+                const names = msg.group.players || [];
+                for (const name of names) {
+                  const s = msg.group.scores?.[name];
+                  if (Array.isArray(s)) {
+                    copy[name] = { ...(copy[name] || {}), scores: s.map(v => v == null ? '' : String(v)) };
+                  }
+                }
+                return copy;
+              } catch (e) { return prev; }
+            });
+          }
+          if (msg.group.waters || msg.group.dog) {
+            setMiniTableStats(prev => {
+              try {
+                const copy = { ...(prev || {}) };
+                const names = msg.group.players || [];
+                for (const name of names) {
+                  copy[name] = {
+                    waters: msg.group.waters?.[name] ?? copy[name]?.waters ?? '',
+                    dog: msg.group.dog?.[name] ?? copy[name]?.dog ?? false,
+                    twoClubs: msg.group.two_clubs?.[name] ?? copy[name]?.twoClubs ?? ''
+                  };
+                }
+                return copy;
+              } catch (e) { return prev; }
+            });
+          }
+          return;
+        }
+
+        // If server sent mappedScores delta, apply to playerData
+        if (Array.isArray(msg.mappedScores) && msg.mappedScores.length > 0 && comp) {
+          setPlayerData(prev => {
+            try {
+              const copy = { ...(prev || {}) };
+              for (const ms of msg.mappedScores) {
+                const userId = ms.userId ?? ms.user_id ?? ms.user;
+                const holeIdx = ms.holeIndex ?? ms.hole_index ?? ms.hole;
+                const strokes = ms.strokes ?? ms.value ?? '';
+                if (userId == null || holeIdx == null) continue;
+                const u = comp.users?.find(u => Number(u.id) === Number(userId));
+                const name = u?.name;
+                if (!name) continue;
+                const pd = copy[name] || { scores: Array(18).fill(''), teebox: '', handicap: '' };
+                const arr = Array.isArray(pd.scores) ? [...pd.scores] : Array(18).fill('');
+                arr[holeIdx] = strokes == null ? '' : String(strokes);
+                copy[name] = { ...pd, scores: arr };
+              }
+              return copy;
+            } catch (e) { console.error('Error applying mappedScores to playerData', e); return prev; }
+          });
+          return;
+        }
+
+        // Fallback: refetch full competition data
+        fetch(apiUrl(`/api/competitions/${compNum}`))
+          .then(r => r.ok ? r.json() : null)
+          .then(data => { if (data) { setComp(data); setGroups(Array.isArray(data.groups) ? data.groups : []); } })
+          .catch(() => {});
+      } catch (e) { console.error('Socket handler error', e); }
+    };
+
+    socket.on('scores-updated', handler);
+    socket.on('medal-player-updated', handler);
+    socket.on('team-user-updated', handler);
+    socket.on('fines-updated', handler);
+
+    return () => {
+      try { socket.emit('leave', { competitionId: compNum }); } catch (e) {}
+      socket.off('scores-updated', handler);
+      socket.off('medal-player-updated', handler);
+      socket.off('team-user-updated', handler);
+      socket.off('fines-updated', handler);
+    };
+  }, [compId]);
 
   // Fetch player data for current group (always trust backend)
   useEffect(() => {
