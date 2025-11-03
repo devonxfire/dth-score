@@ -124,8 +124,8 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
       });
       return teams;
     }
-    const teams = splitFourballsToTeams(groupsWithDisplay);
-    onAssign(teams);
+    // Pass the full 4-player groups back to the caller so the competition keeps 4-ball units.
+    onAssign(groupsWithDisplay);
   }
 
   return (

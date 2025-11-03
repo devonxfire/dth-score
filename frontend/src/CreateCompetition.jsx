@@ -279,26 +279,30 @@ function CreateCompetition({ user, onSignOut }) {
             </h1>
             <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, width: '100%', background: 'white', opacity: 0.7, borderRadius: 2}}></div>
           </div>
+          {/** Update 4 Balls button moved into the form and styled to match the Update Competition button. */}
         </div>
       )}
   <div className="relative z-10 flex flex-col items-center px-4 mt-2">
   <div className="w-full max-w-2xl rounded-2xl shadow-lg p-8 flex flex-col gap-6 border-4 border-[#FFD700]" style={{ background: 'rgba(0,47,95,0.95)', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}>
           {showGroups ? (
-            ((form.type && ['medalStrokeplay', 'medal strokeplay', 'stroke'].includes((form.type || '').replace(/\s+/g, ''))) ? (
-              <MedalAssignment
-                compId={compId}
-                initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
-                user={user}
-                onSignOut={onSignOut}
-                onAssign={handleAssign}
-              />
-            ) : (
-              <FourballAssignment
-                fourballs={1}
-                onAssign={handleAssign}
-                initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
-              />
-            ))
+            // Add padding around the 4-ball assignment UI so content isn't flush to the blue container
+            <div className="w-full p-6">
+              {((form.type && ['medalStrokeplay', 'medal strokeplay', 'stroke'].includes((form.type || '').replace(/\s+/g, ''))) ? (
+                <MedalAssignment
+                  compId={compId}
+                  initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
+                  user={user}
+                  onSignOut={onSignOut}
+                  onAssign={handleAssign}
+                />
+              ) : (
+                <FourballAssignment
+                  fourballs={1}
+                  onAssign={handleAssign}
+                  initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
+                />
+              ))}
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
               <div className="mb-4">
@@ -403,6 +407,23 @@ function CreateCompetition({ user, onSignOut }) {
                   placeholder="Optional notes (e.g. special rules, sponsor etc.)"
                 />
               </div>
+              {editingComp && (user && (user.role === 'admin' || user.isAdmin || user.isadmin || user.role === 'captain' || user.isCaptain)) && (
+                <div className="w-full max-w-2xl mb-2 px-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Navigate to assign page with current groups preloaded
+                      navigate(`/assign-4balls/${editingComp.id}`, { state: { initialGroups: editingComp.groups || [] } });
+                    }}
+                    className="w-full py-3 px-4 border border-white text-[#1B3A6B] font-extrabold rounded-2xl transition text-lg"
+                    style={{ backgroundColor: '#FFD700', boxShadow: '0 2px 8px 0 rgba(255,215,0,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
+                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#FFE066'}
+                    onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
+                  >
+                    Update 4 Balls
+                  </button>
+                </div>
+              )}
               <button
                 type="submit"
                 className="w-full py-3 px-4 border border-white text-white font-extrabold rounded-2xl transition text-lg"

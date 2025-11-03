@@ -174,19 +174,19 @@ export default function MedalAssignment(props) {
                 ))}
               </div>
               <button
-                className="mt-2 px-4 py-1 rounded bg-red-700 text-white font-bold"
+                className="mt-2 px-4 py-2 rounded bg-red-700 text-white font-bold"
                 onClick={() => removeGroup(idx)}
                 disabled={groups.length <= 1}
               >Remove Group</button>
             </div>
           ))}
           <button
-            className="w-full py-2 px-4 mt-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+            className="w-full py-3 px-4 mt-2 rounded-2xl font-bold shadow border border-white transition text-lg"
             style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
             onClick={addGroup}
           >{groups.length === 0 ? 'Add A Tee Time' : 'Add Another Tee Time'}</button>
           <button
-            className="w-full py-2 px-4 mt-4 rounded-2xl font-bold shadow border border-white transition text-lg"
+            className="w-full py-3 px-4 mt-4 rounded-2xl font-bold shadow border border-white transition text-lg"
             style={{ backgroundColor: '#1B3A6B', color: 'white', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
             onClick={handleSave}
             disabled={saving}

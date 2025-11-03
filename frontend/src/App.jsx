@@ -18,6 +18,7 @@ import MedalLeaderboard from './MedalLeaderboard';
 import FourballAssignment from './FourballAssignment';
 import FourballScorecard from './FourballScorecard';
 import FourballLeaderboard from './FourballLeaderboard';
+import AssignFourballsPage from './AssignFourballsPage';
 
 function AppRoutes({ user, setUser }) {
   const navigate = useNavigate();
@@ -60,6 +61,7 @@ function AppRoutes({ user, setUser }) {
           <Route path="/leaderboard-medal/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/medal-leaderboard/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/assign-fourball" element={<FourballAssignment user={user} onSignOut={handleSignOut} />} />
+          <Route path="/assign-4balls/:id" element={<AssignFourballsPage user={user} />} />
           <Route path="/scorecard-fourball/:id" element={<FourballScorecard user={user} onSignOut={handleSignOut} />} />
           <Route path="/leaderboard-fourball/:id" element={<FourballLeaderboard user={user} onSignOut={handleSignOut} />} />
         </>

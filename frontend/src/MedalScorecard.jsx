@@ -39,11 +39,22 @@ export default function MedalScorecard(props) {
   }
   const resolvedName = (resolvedUser && (resolvedUser.name || resolvedUser.displayName || (resolvedUser.firstName ? `${resolvedUser.firstName} ${resolvedUser.lastName || ''}` : null))) || null;
   const isAdmin = !!(resolvedUser && (resolvedUser.role === 'admin' || resolvedUser.isAdmin || resolvedUser.isadmin));
+  const isCaptain = !!(resolvedUser && (resolvedUser.role === 'captain' || resolvedUser.isCaptain || resolvedUser.iscaptain));
+  // Allow edits when:
+  // - viewer is admin
+  // - OR viewer is a member of the current 4-ball (they can edit any player's data)
   const canEdit = (playerName) => {
     if (isAdmin) return true;
     if (!resolvedName) return false;
-    // normalize simple compare
-    return (playerName || '').trim().toLowerCase() === resolvedName.trim().toLowerCase();
+    try {
+      const normViewer = resolvedName.trim().toLowerCase();
+      // if viewer is in the current players list, allow edits for anyone in that group
+      if (Array.isArray(players) && players.some(p => (p || '').trim().toLowerCase() === normViewer)) return true;
+      // otherwise only allow editing own row (fallback)
+      return (playerName || '').trim().toLowerCase() === normViewer;
+    } catch (e) {
+      return false;
+    }
   };
   const [comp, setComp] = useState(null);
   const [groups, setGroups] = useState([]);
@@ -64,8 +75,34 @@ export default function MedalScorecard(props) {
   const [mobileSelectedPlayer, setMobileSelectedPlayer] = useState('');
 
   useEffect(() => {
-    if (!mobileSelectedPlayer && players && players.length) setMobileSelectedPlayer(players[0]);
-  }, [players, mobileSelectedPlayer]);
+    if (!players || !players.length) return;
+    if (mobileSelectedPlayer) return;
+    // If viewer is admin or captain, keep default as Player A (players[0])
+    if (isAdmin || isCaptain) {
+      setMobileSelectedPlayer(players[0]);
+      return;
+    }
+    // Prefer selecting the logged-in player when present in the group
+    if (resolvedName) {
+      const normalize = s => (s || '').toString().toLowerCase().replace(/["'()]/g, '').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+      const viewerNorm = normalize(resolvedName);
+      let match = null;
+      for (const p of players) {
+        const pNorm = normalize(p);
+        // exact match
+        if (pNorm === viewerNorm) { match = p; break; }
+        // viewer name contained in player name (handles nicknames removed)
+        if (pNorm.includes(viewerNorm) || viewerNorm.includes(pNorm)) { match = p; break; }
+        // match by last name token
+        const pParts = pNorm.split(' ').filter(Boolean);
+        const vParts = viewerNorm.split(' ').filter(Boolean);
+        if (pParts.length && vParts.length && pParts[pParts.length - 1] === vParts[vParts.length - 1]) { match = p; break; }
+      }
+      setMobileSelectedPlayer(match || players[0]);
+    } else {
+      setMobileSelectedPlayer(players[0]);
+    }
+  }, [players, mobileSelectedPlayer, resolvedName, isAdmin, isCaptain]);
 
   // Fetch comp info and groups
   useEffect(() => {
@@ -84,6 +121,18 @@ export default function MedalScorecard(props) {
         setLoading(false);
       });
   }, [compId, groupIdx]);
+
+  // Default non-admin viewers to the group they are playing in (admins keep current selection)
+  useEffect(() => {
+    if (!groups || !groups.length) return;
+    if (isAdmin) return; // admins can pick any group
+    if (!resolvedName) return;
+    const normalize = (s) => (s || '').toString().trim().toLowerCase();
+    const foundIdx = groups.findIndex(g => Array.isArray(g.players) && g.players.some(p => normalize(p) === normalize(resolvedName)));
+    if (foundIdx >= 0 && foundIdx !== groupIdx) {
+      setGroupIdx(foundIdx);
+    }
+  }, [groups, resolvedName, isAdmin]);
 
   // Real-time: join competition room and listen for updates
   useEffect(() => {
@@ -716,22 +765,41 @@ export default function MedalScorecard(props) {
               <div className="whitespace-normal">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.club || '-'}</span></div>
             </div>
             <div className="w-1/2 pl-2">
-              <div className="whitespace-normal">Tee Time: <span className="font-bold" style={{ color: '#FFD700' }}>{groups[groupIdx]?.teeTime || '-'}</span></div>
               <div className="whitespace-normal">Allowance: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.handicapallowance ? comp.handicapallowance + '%' : '-'}</span></div>
             </div>
           </div>
-          {/* Desktop/tablet: single-line row with four items (hidden on xs, visible on sm+) */}
-          <div className="hidden sm:flex w-full text-sm font-normal justify-between">
-            <div className="flex-1 min-w-[140px]">Date: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.date ? (new Date(comp.date).toLocaleDateString()) : '-'}</span></div>
-            <div className="flex-1 min-w-[140px]">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.club || '-'}</span></div>
-            <div className="flex-1 min-w-[140px]">Tee Time: <span className="font-bold" style={{ color: '#FFD700' }}>{groups[groupIdx]?.teeTime || '-'}</span></div>
-            <div className="flex-1 min-w-[180px]">Allowance: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.handicapallowance ? comp.handicapallowance + '%' : '-'}</span></div>
+          {/* Desktop/tablet: single-line row with three equal columns (hidden on xs, visible on sm+) */}
+          <div className="hidden sm:flex w-full text-sm font-normal">
+            <div className="flex-1 min-w-0 text-center">Date: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.date ? (new Date(comp.date).toLocaleDateString()) : '-'}</span></div>
+            <div className="flex-1 min-w-0 text-center">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.club || '-'}</span></div>
+            <div className="flex-1 min-w-0 text-center">Allowance: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.handicapallowance ? comp.handicapallowance + '%' : '-'}</span></div>
           </div>
         </div>
+
+        
+
         <div className="max-w-4xl w-full bg-[#002F5F] rounded-2xl shadow-2xl p-8 border-4 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
           {/* Group buttons removed above mini table */}
           {/* Mini Table for Waters, Dog, 2 Clubs, etc. */}
           <div className="flex flex-col items-start mb-6" style={{ gap: '1rem' }}>
+            {/* Tee Time selector: admin-visible, placed immediately above the Handicaps table */}
+            <div className="w-full flex items-center justify-center mb-2">
+              <div className="text-sm text-white mr-3">Tee Time:</div>
+              {isAdmin && groups && groups.length > 1 ? (
+                <select
+                  value={groupIdx}
+                  onChange={e => setGroupIdx(Number(e.target.value))}
+                  className="inline-block bg-transparent text-white font-bold rounded px-3 py-1 h-8 align-middle"
+                  style={{ border: '1px solid #FFD700', lineHeight: '1.5' }}
+                >
+                  {groups.map((g, i) => (
+                    <option key={i} value={i} style={{ color: '#002F5F' }}>{g.teeTime ? `${g.teeTime} — 4 Ball ${i + 1}` : `4 Ball ${i + 1}`}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="font-bold" style={{ color: '#FFD700' }}>{groups[groupIdx]?.teeTime || '-'}</div>
+              )}
+            </div>
             <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
               <h3 className="text-sm font-semibold text-white mb-2 text-center">Handicaps and Tees</h3>
               <table className="w-full min-w-[300px] border text-white text-xs sm:text-sm rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
