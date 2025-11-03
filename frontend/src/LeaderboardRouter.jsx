@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import Leaderboard from './Leaderboard';
 import Leaderboard4BBB from './Leaderboard4BBB';
+import AllianceLeaderboard from './AllianceLeaderboard';
 import { apiUrl } from './api';
 
 export default function LeaderboardRouter(props) {
@@ -40,6 +41,11 @@ export default function LeaderboardRouter(props) {
   if (is4BBB) {
     console.log('LeaderboardRouter: Rendering Leaderboard4BBB for compType:', compType);
     return <Leaderboard4BBB {...props} competition={competition} />;
+  }
+  const isAlliance = compType.includes('alliance');
+  if (isAlliance) {
+    console.log('LeaderboardRouter: Rendering AllianceLeaderboard for compType:', compType);
+    return <AllianceLeaderboard {...props} competition={competition} />;
   }
   console.log('LeaderboardRouter: Rendering standard Leaderboard for compType:', compType);
   return <Leaderboard {...props} competition={competition} />;

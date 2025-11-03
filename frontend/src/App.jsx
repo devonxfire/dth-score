@@ -13,8 +13,11 @@ import Login from './Login';
 import Dashboard from './Dashboard';
 import ResultsMedal from './ResultsMedal';
 import MedalAssignment from './MedalAssignment';
+import AllianceAssignment from './AllianceAssignment';
 import MedalScorecard from './MedalScorecard';
 import MedalLeaderboard from './MedalLeaderboard';
+import AllianceScorecard from './AllianceScorecard';
+import AllianceLeaderboard from './AllianceLeaderboard';
 import FourballAssignment from './FourballAssignment';
 import FourballScorecard from './FourballScorecard';
 import FourballLeaderboard from './FourballLeaderboard';
@@ -57,9 +60,15 @@ function AppRoutes({ user, setUser }) {
           <Route path="/results/:id" element={<ResultsMedal />} />
           <Route path="/profile" element={<div className="p-8">User Profile (coming soon)</div>} />
           <Route path="/assign-medal" element={<MedalAssignment user={user} onSignOut={handleSignOut} />} />
+          <Route path="/assign-alliance" element={<AllianceAssignment user={user} onSignOut={handleSignOut} />} />
           <Route path="/scorecard-medal/:id" element={<MedalScorecard user={user} onSignOut={handleSignOut} />} />
           <Route path="/leaderboard-medal/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/medal-leaderboard/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
+          {/* Alliance routes: reuse Medal assignment UI, but separate scorecard/leaderboard wrappers */}
+          <Route path="/assign-alliance" element={<MedalAssignment user={user} onSignOut={handleSignOut} />} />
+          <Route path="/scorecard-alliance/:id" element={<AllianceScorecard user={user} onSignOut={handleSignOut} />} />
+          <Route path="/leaderboard-alliance/:id" element={<AllianceLeaderboard user={user} onSignOut={handleSignOut} />} />
+          <Route path="/alliance-leaderboard/:id" element={<AllianceLeaderboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/assign-fourball" element={<FourballAssignment user={user} onSignOut={handleSignOut} />} />
           <Route path="/assign-4balls/:id" element={<AssignFourballsPage user={user} />} />
           <Route path="/scorecard-fourball/:id" element={<FourballScorecard user={user} onSignOut={handleSignOut} />} />

@@ -12,6 +12,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import TopMenu from './TopMenu';
 import FourballAssignment from './FourballAssignment';
 import MedalAssignment from './MedalAssignment';
+import AllianceAssignment from './AllianceAssignment';
 
 // Display mapping for all comp types
 const COMP_TYPE_DISPLAY = {
@@ -284,17 +285,27 @@ function CreateCompetition({ user, onSignOut }) {
       )}
   <div className="relative z-10 flex flex-col items-center px-4 mt-2">
   <div className="w-full max-w-2xl rounded-2xl shadow-lg p-8 flex flex-col gap-6 border-4 border-[#FFD700]" style={{ background: 'rgba(0,47,95,0.95)', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}>
-          {showGroups ? (
-            // Add padding around the 4-ball assignment UI so content isn't flush to the blue container
-            <div className="w-full p-6">
-              {((form.type && ['medalStrokeplay', 'medal strokeplay', 'stroke'].includes((form.type || '').replace(/\s+/g, ''))) ? (
-                <MedalAssignment
-                  compId={compId}
-                  initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
-                  user={user}
-                  onSignOut={onSignOut}
-                  onAssign={handleAssign}
-                />
+              {showGroups ? (
+                // Add padding around the 4-ball assignment UI so content isn't flush to the blue container
+                <div className="w-full p-6">
+              {((form.type && ['medalStrokeplay', 'medal strokeplay', 'stroke', 'alliance'].includes((form.type || '').replace(/\s+/g, ''))) ? (
+                ((form.type || '').toString().toLowerCase().includes('alliance')) ? (
+                  <AllianceAssignment
+                    compId={compId}
+                    initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
+                    user={user}
+                    onSignOut={onSignOut}
+                    onAssign={handleAssign}
+                  />
+                ) : (
+                  <MedalAssignment
+                    compId={compId}
+                    initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
+                    user={user}
+                    onSignOut={onSignOut}
+                    onAssign={handleAssign}
+                  />
+                )
               ) : (
                 <FourballAssignment
                   fourballs={1}

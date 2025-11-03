@@ -38,7 +38,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
 
   // Active-path helpers for mobile menu highlighting
   const isDashboardPath = location.pathname === '/dashboard';
-  const isLeaderboardPath = location.pathname.startsWith('/medal-leaderboard');
+  const isLeaderboardPath = location.pathname.startsWith('/medal-leaderboard') || location.pathname.startsWith('/leaderboard-alliance') || location.pathname.startsWith('/alliance-leaderboard');
   const isRecentPath = location.pathname === '/recent';
   const isScorecardPath = location.pathname.startsWith('/scorecard');
 
@@ -101,6 +101,14 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
     const pick = (openComps.length > 0 ? openComps.sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0] : competitionList.sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]);
     if (pick) compId = (pick.joinCode || pick.joincode || pick.id || pick._id || pick.competitionType);
   }
+
+  // Determine competition type to decide which leaderboard route to use.
+  let compType = (scorecardComp && scorecardComp.type) || '';
+  if (!compType && Array.isArray(competitionList) && compId) {
+    const found = competitionList.find(c => (c.joinCode || c.joincode || c.id || c._id || c.competitionType) == compId || (c.id || c._id) == compId);
+    compType = found?.type || '';
+  }
+  compType = (compType || '').toString().toLowerCase();
 
   return (
     <div
@@ -194,9 +202,13 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
           <div className="flex-1 min-w-0 text-center">
             <button
               className={`w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150`}
-                style={location.pathname.startsWith('/medal-leaderboard') ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' } : { color: compId ? 'white' : '#888', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
+                style={(location.pathname.startsWith('/medal-leaderboard') || location.pathname.startsWith('/leaderboard-alliance') || location.pathname.startsWith('/alliance-leaderboard')) ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' } : { color: compId ? 'white' : '#888', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
               disabled={!compId}
-              onClick={() => compId ? navigate(`/medal-leaderboard/${compId}`) : null}
+              onClick={() => {
+                if (!compId) return;
+                if (compType && compType.includes('alliance')) navigate(`/leaderboard-alliance/${compId}`);
+                else navigate(`/medal-leaderboard/${compId}`);
+              }}
             >
               Leaderboard
             </button>
@@ -288,7 +300,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                 My Scorecard
               </button>
               <button
-                onClick={() => { setMenuOpen(false); compId ? navigate(`/medal-leaderboard/${compId}`) : null; }}
+                onClick={() => { setMenuOpen(false); if (!compId) return; if (compType && compType.includes('alliance')) navigate(`/leaderboard-alliance/${compId}`); else navigate(`/medal-leaderboard/${compId}`); }}
                 className="text-left py-3 text-lg font-semibold"
                 style={{ color: isLeaderboardPath ? '#FFD700' : 'white' }}
                 aria-current={isLeaderboardPath ? 'page' : undefined}

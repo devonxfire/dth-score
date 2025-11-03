@@ -25,6 +25,69 @@ export default function MedalScorecard(props) {
     const parsedCh = parseFloat(ch) || 0;
     return Math.round(parsedCh * (parseFloat(allowance) / 100));
   };
+  // Stableford mapping: given net (strokes relative to par) and par, return points
+  const stablefordPoints = (net, par) => {
+    if (net == null || Number.isNaN(net)) return 0;
+    if (net <= par - 4) return 6;
+    if (net === par - 3) return 5;
+    if (net === par - 2) return 4;
+    if (net === par - 1) return 3;
+    if (net === par) return 2;
+    if (net === par + 1) return 1;
+    return 0;
+  };
+
+  // Compute per-player stableford totals (front/back/total) and per-hole points array
+  const computePlayerStablefordTotals = (name) => {
+    const perHole = Array(18).fill(null);
+    let front = 0;
+    let back = 0;
+    let total = 0;
+    const playingHandicap = computePH(playerData[name]?.handicap) || 0;
+    defaultHoles.forEach((hole, idx) => {
+      const raw = playerData[name]?.scores?.[idx];
+      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+      if (!Number.isFinite(gross)) {
+        perHole[idx] = null;
+        return;
+      }
+      // compute strokes received using same logic as medal net
+      let strokesReceived = 0;
+      if (playingHandicap > 0) {
+        if (playingHandicap >= 18) {
+          strokesReceived = 1;
+          if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+          else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+        } else if (hole.index <= playingHandicap) {
+          strokesReceived = 1;
+        }
+      }
+      const net = gross - strokesReceived;
+      const pts = stablefordPoints(net, hole.par);
+      perHole[idx] = pts;
+      if (idx < 9) front += pts;
+      else back += pts;
+      total += pts;
+    });
+    return { perHole, front, back, total };
+  };
+  // Compute group/team best-two stableford totals (sum of the best two players)
+  const computeGroupBestTwoTotals = (group) => {
+    // Return per-hole best-two sums as well as front/back/total sums.
+    if (!group || !Array.isArray(group.players)) return { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
+    const playerTotals = group.players.map(name => computePlayerStablefordTotals(name) || { perHole: Array(18).fill(null), front: 0, back: 0, total: 0 });
+    // Build per-hole best-two sums
+    const perHole = Array(18).fill(0).map((_, idx) => {
+      const vals = playerTotals.map(t => (t.perHole && Number.isFinite(t.perHole[idx]) ? t.perHole[idx] : 0));
+      vals.sort((a,b) => b - a);
+      // sum top two
+      return (vals[0] || 0) + (vals[1] || 0);
+    });
+    const front = perHole.slice(0,9).reduce((s,v) => s + (v || 0), 0);
+    const back = perHole.slice(9,18).reduce((s,v) => s + (v || 0), 0);
+    const total = front + back;
+    return { perHole, front, back, total };
+  };
   // ...existing code...
   // ...existing code...
   // Tee Box/Handicap modal bypass: always show scorecard, modal logic enforced
@@ -754,7 +817,7 @@ export default function MedalScorecard(props) {
       <TopMenu {...props} userComp={comp} competitionList={comp ? [comp] : []} />
       <div className="flex flex-col items-center px-4 mt-12">
         <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
-          Medal Competition: Scorecard
+          {props.overrideTitle || 'Medal Competition: Scorecard'}
         </h1>
         {/* Comp Info Section */}
         <div className="max-w-4xl w-full mb-4 p-4 rounded-xl border-2 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', background: 'rgba(0,47,95,0.95)' }}>
@@ -925,7 +988,7 @@ export default function MedalScorecard(props) {
                           </span>
                         </td>
                         <td className="border px-2 py-1 text-center">
-                          <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => handleMiniTableChange(name, 'waters', e.target.value)} />
+                          <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'waters', e.target.value); }} disabled={!canEdit(name)} />
                         </td>
                         <td className="border px-2 py-1 text-center">
                           <input type="checkbox" checked={!!miniTableStats[name]?.dog} onChange={e => handleMiniTableChange(name, 'dog', e.target.checked)} />
@@ -1024,7 +1087,7 @@ export default function MedalScorecard(props) {
                     }, 0);
                     const grossTotal = outTotal + inTotal;
 
-                    // Net: only include holes with entered gross values
+                    // Net/Result: only include holes with entered gross values
                     const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                     let netTotal = 0;
                     let holesWithScore = 0;
@@ -1064,6 +1127,9 @@ export default function MedalScorecard(props) {
                       scoreToParLabel = `${scoreToPar >= 0 ? '+' + scoreToPar : String(scoreToPar)}`;
                     }
 
+                    const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                    const resultLabel = isAlliance ? 'Result' : 'Net';
+
                     return (
                       <div className="mt-3 text-sm font-bold">
                         <div className="flex justify-between">
@@ -1072,7 +1138,7 @@ export default function MedalScorecard(props) {
                         </div>
                         <div className="flex justify-between mt-1">
                           <div>Total: {grossTotal}</div>
-                          <div>Net: {holesWithScore ? netTotal : ''}</div>
+                          <div>{resultLabel}: {holesWithScore ? netTotal : ''}</div>
                         </div>
 
                         <div className="flex justify-center mt-4">
@@ -1118,7 +1184,11 @@ export default function MedalScorecard(props) {
                 </tr>
               </thead>
               <tbody>
-                {players.map((name, pIdx) => (
+                {players.map((name, pIdx) => {
+                  const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                  const resultLabel = isAlliance ? 'Result' : 'Net';
+                  const stable = isAlliance ? computePlayerStablefordTotals(name) : null;
+                  return (
                   <React.Fragment key={name + '-rows-front'}>
                     {/* Gross row */}
                     <tr key={name + '-gross-front'}>
@@ -1147,10 +1217,9 @@ export default function MedalScorecard(props) {
                     </tr>
                     {/* Net row (no player label cell) */}
                     <tr key={name + '-net-front'}>
-                      <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Net</td>
+                      <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>{resultLabel}</td>
                       {defaultHoles.slice(0,9).map((hole, hIdx) => {
-                        // Medal net calculation: gross - strokes received
-                        // Use playing handicap (PH) for strokes allocation
+                        // For Medal: show net (gross - strokesReceived). For Alliance: show stableford points.
                         const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                         let strokesReceived = 0;
                         if (playingHandicap > 0) {
@@ -1162,17 +1231,35 @@ export default function MedalScorecard(props) {
                             strokesReceived = 1;
                           }
                         }
-                        const gross = parseInt(playerData[name]?.scores?.[hIdx], 10) || 0;
-                        const net = gross ? gross - strokesReceived : '';
+                        const rawGross = playerData[name]?.scores?.[hIdx];
+                        const gross = rawGross === '' || rawGross == null ? NaN : parseInt(rawGross, 10);
+                        if (!Number.isFinite(gross)) {
+                          return <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}></td>;
+                        }
+                        const net = gross - strokesReceived;
+                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) {
+                          const pts = stablefordPoints(net, hole.par);
+                          return (
+                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                              {pts}
+                            </td>
+                          );
+                        }
                         return (
                           <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
-                            {gross ? net : ''}
+                            {net}
                           </td>
                         );
                       })}
                       {/* Net front 9 total */}
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
+                          const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                          if (isAlliance) {
+                            // sum stableford points for front 9
+                            const pts = computePlayerStablefordTotals(name);
+                            return pts.front;
+                          }
                           const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netFrontTotal = 0;
                           defaultHoles.slice(0,9).forEach((hole, hIdx) => {
@@ -1195,7 +1282,30 @@ export default function MedalScorecard(props) {
                       </td>
                     </tr>
                   </React.Fragment>
-                ))}
+                  );
+                })}
+                {/* Alliance team 'Score' row: sum of best two stableford totals */}
+                {((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) && (
+                  (() => {
+                    const group = groups[groupIdx] || { players: [] };
+                    const best = computeGroupBestTwoTotals(group);
+                    return (
+                      <tr key={`group-score-front-${groupIdx}`}>
+                        <td className="border px-2 py-1 bg-white/5" />
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Score</td>
+                        {defaultHoles.slice(0,9).map((_, hIdx) => {
+                          const val = best.perHole ? best.perHole[hIdx] : 0;
+                          return (
+                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                              {val != null ? val : 0}
+                            </td>
+                          );
+                        })}
+                        <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{best.front}</td>
+                      </tr>
+                    );
+                  })()
+                )}
               </tbody>
             </table>
             {/* Back 9 Table */}
@@ -1231,7 +1341,11 @@ export default function MedalScorecard(props) {
                 </tr>
               </thead>
               <tbody>
-                {players.map((name, pIdx) => (
+                {players.map((name, pIdx) => {
+                  const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                  const resultLabel = isAlliance ? 'Result' : 'Net';
+                  const stable = isAlliance ? computePlayerStablefordTotals(name) : null;
+                  return (
                   <React.Fragment key={name + '-rows-back'}>
                     {/* Gross row */}
                     <tr key={name + '-gross-back'}>
@@ -1265,7 +1379,7 @@ export default function MedalScorecard(props) {
                     </tr>
                     {/* Net row (no player label cell) */}
                     <tr key={name + '-net-back'}>
-                      <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Net</td>
+                      <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>{resultLabel}</td>
                       {defaultHoles.slice(9,18).map((hole, hIdx) => {
                         const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                         let strokesReceived = 0;
@@ -1278,17 +1392,34 @@ export default function MedalScorecard(props) {
                             strokesReceived = 1;
                           }
                         }
-                        const gross = parseInt(playerData[name]?.scores?.[hIdx+9], 10) || 0;
-                        const net = gross ? gross - strokesReceived : '';
+                        const rawGross = playerData[name]?.scores?.[hIdx+9];
+                        const gross = rawGross === '' || rawGross == null ? NaN : parseInt(rawGross, 10);
+                        if (!Number.isFinite(gross)) {
+                          return <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}></td>;
+                        }
+                        const net = gross - strokesReceived;
+                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) {
+                          const pts = stablefordPoints(net, hole.par);
+                          return (
+                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                              {pts}
+                            </td>
+                          );
+                        }
                         return (
                           <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
-                            {gross ? net : ''}
+                            {net}
                           </td>
                         );
                       })}
                       {/* Net back 9 and total */}
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
+                          const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                          if (isAlliance) {
+                            const pts = stable ? stable.back : computePlayerStablefordTotals(name).back;
+                            return pts;
+                          }
                           const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netBackTotal = 0;
                           defaultHoles.slice(9,18).forEach((hole, hIdx) => {
@@ -1311,6 +1442,11 @@ export default function MedalScorecard(props) {
                       </td>
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
+                          const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                          if (isAlliance) {
+                            const pts = stable ? stable.total : computePlayerStablefordTotals(name).total;
+                            return pts;
+                          }
                           const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netTotal = 0;
                           defaultHoles.forEach((hole, hIdx) => {
@@ -1333,7 +1469,32 @@ export default function MedalScorecard(props) {
                       </td>
                     </tr>
                   </React.Fragment>
-                ))}
+                  );
+                })}
+                {/* Alliance team 'Score' row for Back 9: show best-two back and total */}
+                {((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) && (
+                  (() => {
+                    const group = groups[groupIdx] || { players: [] };
+                    const best = computeGroupBestTwoTotals(group);
+                    return (
+                      <tr key={`group-score-back-${groupIdx}`}>
+                        <td className="border px-2 py-1 bg-white/5" />
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Score</td>
+                        {defaultHoles.slice(9,18).map((_, hIdx) => {
+                          const idx = 9 + hIdx;
+                          const val = best.perHole ? best.perHole[idx] : 0;
+                          return (
+                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                              {val != null ? val : 0}
+                            </td>
+                          );
+                        })}
+                        <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{best.back}</td>
+                        <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{best.total}</td>
+                      </tr>
+                    );
+                  })()
+                )}
               </tbody>
             </table>
           </div>

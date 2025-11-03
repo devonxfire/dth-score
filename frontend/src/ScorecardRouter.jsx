@@ -4,6 +4,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import Scorecard from './Scorecard';
 import Scorecard4BBB from './Scorecard4BBB';
 import MedalScorecard from './MedalScorecard';
+import AllianceScorecard from './AllianceScorecard';
 import { apiUrl } from './api';
 
 // This router fetches the competition if not provided, then renders the correct scorecard
@@ -50,6 +51,11 @@ export default function ScorecardRouter(props) {
   if (is4BBB) {
     console.log('Rendering Scorecard4BBB for compType:', compType);
     return <Scorecard4BBB {...props} competition={competition} />;
+  }
+  const isAlliance = compTypeLower.includes('alliance');
+  if (isAlliance) {
+    console.log('Rendering AllianceScorecard for compType:', compType);
+    return <AllianceScorecard {...props} competition={competition} />;
   }
   // Medal logic: render MedalScorecard for Medal comps
   const isMedal = compTypeLower.includes('medal');

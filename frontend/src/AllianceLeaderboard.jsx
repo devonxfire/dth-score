@@ -1,0 +1,436 @@
+import React, { useEffect, useState } from 'react';
+import { apiUrl } from './api';
+import PageBackground from './PageBackground';
+import TopMenu from './TopMenu';
+
+const defaultHoles = [
+  { number: 1, par: 4, index: 5 },
+  { number: 2, par: 4, index: 7 },
+  { number: 3, par: 3, index: 17 },
+  { number: 4, par: 5, index: 1 },
+  { number: 5, par: 4, index: 11 },
+  { number: 6, par: 3, index: 15 },
+  { number: 7, par: 5, index: 3 },
+  { number: 8, par: 4, index: 13 },
+  { number: 9, par: 4, index: 9 },
+  { number: 10, par: 4, index: 10 },
+  { number: 11, par: 4, index: 4 },
+  { number: 12, par: 4, index: 12 },
+  { number: 13, par: 5, index: 2 },
+  { number: 14, par: 4, index: 14 },
+  { number: 15, par: 3, index: 18 },
+  { number: 16, par: 5, index: 6 },
+  { number: 17, par: 3, index: 16 },
+  { number: 18, par: 4, index: 8 }
+];
+
+function getPlayingHandicap(entry, comp) {
+  const ch = parseFloat(entry.handicap || 0);
+  // Support both casing variants for allowance and default to 100
+  const allowanceRaw = comp?.handicapallowance ?? comp?.handicapAllowance ?? 100;
+  const allowance = parseFloat(allowanceRaw) || 100;
+  return Math.round(ch * (allowance / 100));
+}
+
+function stablefordPoints(net, par) {
+  if (net == null || Number.isNaN(net)) return 0;
+  if (net <= par - 4) return 6;
+  if (net === par - 3) return 5;
+  if (net === par - 2) return 4;
+  if (net === par - 1) return 3;
+  if (net === par) return 2;
+  if (net === par + 1) return 1;
+  return 0;
+}
+
+export default function AllianceLeaderboard() {
+  const [comp, setComp] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [entries, setEntries] = useState([]);
+  const [backendTeamPointsMap, setBackendTeamPointsMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    // load current user from localStorage if present
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) setCurrentUser(JSON.parse(raw));
+    } catch (e) {}
+
+    const id = window.location.pathname.split('/').pop();
+    setLoading(true);
+    fetch(apiUrl(`/api/competitions/${id}`))
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data) return;
+        setComp(data);
+        setGroups(Array.isArray(data.groups) ? data.groups : []);
+        const usersList = Array.isArray(data.users) ? data.users : [];
+        const built = [];
+        if (Array.isArray(data.groups)) {
+          data.groups.forEach((group, groupIdx) => {
+            if (Array.isArray(group.players)) {
+              group.players.forEach((name, i) => {
+                const scores = group.scores?.[name] || Array(18).fill('');
+                const handicap = group.handicaps?.[name] ?? '';
+                const gross = scores.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
+                const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
+                const userId = matchedUser?.id || null;
+                const displayNameFromUser = matchedUser?.displayName || matchedUser?.display_name || matchedUser?.displayname || '';
+                const nickFromUser = matchedUser?.nick || matchedUser?.nickname || '';
+                const waters = group.waters?.[name] ?? '';
+                const dog = group.dog?.[name] ?? false;
+                const twoClubs = group.two_clubs?.[name] ?? group.twoClubs?.[name] ?? '';
+                const fines = group.fines?.[name] ?? '';
+                const teamId = group.teamId || group.id || group.team_id || group.group_id || null;
+                built.push({ name, scores, total: gross || 0, handicap, groupIdx, userId, displayName: displayNameFromUser, nick: nickFromUser, waters, dog, twoClubs, fines, teamId });
+              });
+            }
+          });
+        }
+        setEntries(built);
+        // After we have groups, try to fetch any backend team_points for groups that have teamId
+        const teamIds = Array.from(new Set((data.groups || []).map(g => g && (g.teamId || g.id || g.team_id || g.group_id)).filter(Boolean)));
+        if (teamIds.length > 0) {
+          Promise.all(teamIds.map(async tid => {
+            try {
+              const res = await fetch(apiUrl(`/api/teams/${tid}`));
+              if (!res.ok) return [tid, null];
+              const t = await res.json();
+              return [tid, t.team_points ?? t.team_points === 0 ? t.team_points : (t.team_points || t.teamPoints || null)];
+            } catch (e) { return [tid, null]; }
+          })).then(results => {
+            const map = {};
+            results.forEach(([tid, pts]) => { if (tid) map[tid] = pts; });
+            setBackendTeamPointsMap(map);
+          }).catch(() => {});
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  // Compute player stableford totals
+  function playerStableford(entry) {
+    const ph = getPlayingHandicap(entry, comp);
+    const perHole = Array(18).fill(null);
+    let total = 0;
+    for (let i = 0; i < 18; i++) {
+      const raw = entry.scores?.[i];
+      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+      if (!Number.isFinite(gross)) { perHole[i] = null; continue; }
+      // Match the scorecard's stroke allocation logic:
+      // - if PH >= 18 then at least 1 stroke; possibly 2 depending on (PH-18) and remainder
+      // - else if PH < 18 then receive 1 stroke on holes where hole.index <= PH
+      let strokesReceived = 0;
+      if (ph > 0) {
+        if (ph >= 18) {
+          strokesReceived = 1;
+          // If PH - 18 >= hole.index then this hole gets 2 strokes
+          if ((ph - 18) >= defaultHoles[i].index) strokesReceived = 2;
+          else if (defaultHoles[i].index <= (ph % 18)) strokesReceived = 2;
+        } else if (defaultHoles[i].index <= ph) {
+          strokesReceived = 1;
+        }
+      }
+      const net = gross - strokesReceived;
+      const pts = stablefordPoints(net, defaultHoles[i].par);
+      perHole[i] = pts;
+      total += pts;
+    }
+    return { perHole, total };
+  }
+
+  // Compact display name: prefer explicit nickname/displayName, then parenthetical nickname, then first name
+  function compactDisplayName(entry) {
+    if (!entry) return '';
+    if (entry.displayName && entry.displayName.trim()) return entry.displayName.trim();
+    if (entry.nick && entry.nick.trim()) return entry.nick.trim();
+    if (entry.name && typeof entry.name === 'string') {
+      const m = entry.name.match(/\(([^)]+)\)/);
+      if (m && m[1]) return m[1].trim();
+      const q = entry.name.match(/"([^"]+)"/);
+      if (q && q[1]) return q[1].trim();
+      const s = entry.name.match(/'([^']+)'/);
+      if (s && s[1]) return s[1].trim();
+      return '';
+    }
+    return '';
+  }
+
+  function isAdmin(user) {
+    return user && (user.role === 'admin' || user.isAdmin || user.isadmin || (user.username && ['devon','arno','arno_cap'].includes(user.username.toLowerCase())) );
+  }
+
+  async function saveFines(teamId, userId, fines, playerName, compId) {
+    try {
+      if (teamId && userId) {
+        const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+        const url = apiUrl(`/api/teams/${teamId}/users/${userId}`);
+        const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
+        const res = await fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(adminSecret ? { 'X-Admin-Secret': adminSecret } : {})
+          },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          alert('Failed to save fines: ' + res.status + ' ' + text);
+          return;
+        }
+        const data = await res.json();
+        setEntries(es => es.map(e => (e.teamId === teamId && e.userId === userId) ? { ...e, fines: data.fines ?? (fines !== '' ? fines : '') } : e));
+        return;
+      }
+      // fallback to competition player fines endpoint
+      if (!compId || !playerName) {
+        alert('Cannot save fines: missing team/user and insufficient fallback data');
+        return;
+      }
+      const url = apiUrl(`/api/competitions/${compId}/players/${encodeURIComponent(playerName)}/fines`);
+      const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
+      const res = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) {
+        const text = await res.text();
+        alert('Fallback save failed: ' + res.status + ' ' + text);
+        return;
+      }
+      const data = await res.json();
+      setEntries(es => es.map(e => (e.name === playerName ? { ...e, fines: data.fines ?? (fines !== '' ? fines : '') } : e)));
+    } catch (err) {
+      console.error('Failed to save fines', err);
+      alert('Failed to save fines: ' + (err.message || err));
+    }
+  }
+
+  // Build teams with player stats + team points (sum of best two player totals)
+  function buildTeams() {
+    const teams = (groups || []).map((group, idx) => {
+      const groupPlayers = (group.players || []).map((name, i) => {
+        // find player entry
+        let ent = entries.find(e => (e.name || '').trim().toLowerCase() === (name || '').trim().toLowerCase());
+        if (!ent && Array.isArray(group.displayNames) && group.displayNames[i]) {
+          const guestName = group.displayNames[i].trim().toLowerCase();
+          ent = entries.find(e => (e.name || '').trim().toLowerCase() === guestName);
+        }
+        if (!ent) {
+          // fallback minimal entry
+          const scores = group.scores?.[name] || Array(18).fill('');
+          const handicap = group.handicaps?.[name] ?? '';
+          const gross = scores.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+          ent = { name, scores, total: gross, handicap, groupIdx: idx };
+        }
+  const ch = ent.handicap !== '' ? parseFloat(ent.handicap) || 0 : 0;
+  const ph = getPlayingHandicap(ent, comp);
+  const dthNet = (ent.total || 0) - ch;
+        const stable = playerStableford(ent);
+        return {
+          name: ent.name,
+          displayName: ent.displayName || '',
+          userId: ent.userId || null,
+          teamId: ent.teamId || null,
+          waters: ent.waters || '',
+          dog: ent.dog || false,
+          twoClubs: ent.twoClubs || '',
+          fines: ent.fines || '',
+          scores: ent.scores || Array(18).fill(''),
+          gross: ent.total || 0,
+          ph,
+          ch,
+          net: (ent.total || 0) - ph,
+          dthNet,
+          points: stable.total,
+          perHole: stable.perHole
+        };
+      });
+      // compute team points as per-scorecard: per-hole best-two sums (allows different
+      // players to contribute on different holes). This matches the Alliance scorecard
+      // which sums the top two stableford points on each hole and then totals front/back.
+      const perHoleBestTwo = Array(18).fill(0).map((_, idx) => {
+        const vals = groupPlayers.map(p => (p.perHole && Number.isFinite(p.perHole[idx]) ? p.perHole[idx] : 0));
+        vals.sort((a,b) => b - a);
+        return (vals[0] || 0) + (vals[1] || 0);
+      });
+      const front = perHoleBestTwo.slice(0,9).reduce((s, v) => s + (v || 0), 0);
+      const back = perHoleBestTwo.slice(9,18).reduce((s, v) => s + (v || 0), 0);
+      const teamPoints = front + back;
+      // Prefer backend team_points if available for this group's teamId
+      const backendPoints = (group && (group.teamId || group.id || group.team_id || group.group_id)) ? backendTeamPointsMap[(group.teamId || group.id || group.team_id || group.group_id)] : null;
+      return {
+        groupIdx: idx,
+        players: groupPlayers,
+        teamPoints: (typeof backendPoints === 'number' ? backendPoints : teamPoints),
+        teeTime: group.teeTime || ''
+      };
+    });
+    // sort teams by teamPoints desc
+    teams.sort((a,b) => b.teamPoints - a.teamPoints);
+    // assign positions (dense ranking: equal points -> same pos, next pos increments by 1)
+    let lastPoints = null;
+    let lastPos = 0;
+    const ranked = teams.map((t, i) => {
+      if (i === 0) {
+        lastPos = 1; lastPoints = t.teamPoints;
+        return { ...t, pos: 1 };
+      }
+      if (t.teamPoints === lastPoints) {
+        return { ...t, pos: lastPos };
+      }
+      lastPos = lastPos + 1;
+      lastPoints = t.teamPoints;
+      return { ...t, pos: lastPos };
+    });
+    return ranked;
+  }
+
+  if (loading) return <PageBackground><TopMenu userComp={comp} competitionList={comp ? [comp] : []} /><div className="p-8 text-white">Loading leaderboard...</div></PageBackground>;
+
+  const teams = buildTeams();
+
+  // Flatten teams into rows with team pos and team score included
+  const rows = [];
+  teams.forEach(team => {
+    team.players.forEach(p => {
+      const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0;
+      const thru = holesPlayed === 18 ? 'F' : holesPlayed;
+      rows.push({
+        pos: team.pos,
+        teamPoints: team.teamPoints,
+        teeTime: team.teeTime,
+        name: p.name,
+        displayName: p.displayName || '',
+        userId: p.userId || null,
+        teamId: p.teamId || null,
+        dog: p.dog || false,
+        waters: p.waters || '',
+        twoClubs: p.twoClubs || '',
+        fines: p.fines || '',
+        gross: p.gross,
+        net: p.net,
+        dthNet: p.dthNet,
+        points: p.points,
+        thru
+      });
+    });
+  });
+
+  // Sort rows by team pos asc, then by player points desc
+  rows.sort((a, b) => {
+    if (a.pos !== b.pos) return a.pos - b.pos;
+    return (b.points || 0) - (a.points || 0);
+  });
+
+  // Good scores (use dthNet similar to Medal)
+  const goodScores = rows.filter(r => typeof r.dthNet === 'number' && r.dthNet < 70 && r.thru === 'F');
+
+  return (
+    <PageBackground>
+      <TopMenu userComp={comp} competitionList={comp ? [comp] : []} />
+      <div className="flex flex-col items-center px-4 mt-12" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+        <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <span style={{lineHeight:1}}>Leaderboard</span>
+        </h1>
+        {comp?.date && (
+          <div className="text-lg text-white text-center mb-2 font-semibold" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+            {new Date(comp.date).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+        )}
+        <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
+      </div>
+      <div className="flex flex-col items-center px-4 mt-8">
+        <div className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+          <div className="flex justify-center mb-4">
+            {/* Keep Export button area but do not implement export here (can reuse Medal's later) */}
+            <div className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>Alliance Results</div>
+          </div>
+          {/* Competition Info Section */}
+          {comp && (
+            <div className="text-white/90 text-base mb-4" style={{minWidth: 260, textAlign: 'left'}}>
+              <span className="font-semibold">Date:</span> {comp.date ? (new Date(comp.date).toLocaleDateString('en-GB')) : '-'} <br />
+              <span className="font-semibold">Type:</span> {comp.type || ''} <br />
+              <span className="font-semibold">Course:</span> {comp?.club || comp?.course || '-'} <br />
+              <span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance && comp.handicapallowance !== 'N/A' ? comp.handicapallowance + '%' : 'N/A'} <br />
+              <span className="font-semibold">Notes:</span> {comp.notes || '-'}
+              <div className="mt-4 mb-2 text-white text-base font-semibold" style={{maxWidth: '100%', textAlign: 'left'}}>
+                <div style={{marginBottom: 4, marginLeft: 0, textDecoration: 'underline', textUnderlineOffset: 3}}>Good Scores</div>
+                {goodScores.length === 0
+                  ? <div style={{marginLeft: 0}}>No one. Everyone shit.</div>
+                  : goodScores.map(p => (
+                      <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{(p.displayName || p.name).toUpperCase()}: Net {p.dthNet}</div>
+                    ))}
+              </div>
+            </div>
+          )}
+
+          {/* Leaderboard Table (match Medal styles) */}
+          {rows.length === 0 ? (
+            <div className="text-white/80">No scores submitted yet.</div>
+          ) : (
+            <div className="w-full overflow-x-auto">
+              <table className="min-w-full border text-center mb-8 text-[10px] sm:text-base" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
+                <thead>
+                  <tr style={{ background: '#00204A' }}>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Pos</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5 text-left" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Thru</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Score</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
+                    {/* Points column intentionally omitted for Alliance (team score shown in Score column) */}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((entry, idx) => (
+                    <tr key={`${entry.name}-${idx}`} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
+                      <td className="border px-0.5 sm:px-2 py-0.5 font-bold">{entry.pos}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>
+                        <div className="max-w-[8ch] sm:max-w-none truncate">{(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}</div>
+                      </td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.teamPoints}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.gross}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.dthNet}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.dog ? '🐶' : ''}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.waters || ''}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.twoClubs || ''}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">
+                        {isAdmin(currentUser) ? (
+                          <input
+                            type="number"
+                            min="0"
+                            value={entry.fines || ''}
+                            onChange={e => {
+                              const v = e.target.value;
+                              // optimistic UI
+                              setEntries(es => es.map(x => x.name === entry.name ? { ...x, fines: v } : x));
+                              // save immediately; pass player name and comp id for fallback when team/user ids are missing
+                              saveFines(entry.teamId, entry.userId, v, entry.name, comp?.id || id);
+                            }}
+                            className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                            style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
+                          />
+                        ) : (
+                          entry.fines || ''
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </PageBackground>
+  );
+}
