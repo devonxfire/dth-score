@@ -51,7 +51,7 @@ export default function Login({ onLogin }) {
           style={{ objectFit: 'contain' }}
         />
   <h1 className="text-6xl font-extrabold drop-shadow-lg text-center mb-1" style={{ color: 'white', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px', fontSize: '4rem' }}>DTH Score</h1>
-  <p className="text-sm text-center mb-6 drop-shadow" style={{ color: 'white', fontFamily: 'Lato, Arial, sans-serif', fontWeight: 200 }}>DOG TAG HACKERS ESTABLISHED CIRCA 1996.</p>
+  <p className="text-sm text-center mb-6 drop-shadow" style={{ color: 'white', fontFamily: 'Lato, Arial, sans-serif', fontWeight: 200 }}>DOG TAG HACKERS ESTABLISHED CIRCA 1995.</p>
       </div>
       {/* Form below heading */}
   <div className="relative z-10 flex flex-col items-center px-4 mt-2">
