@@ -97,6 +97,11 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
     setGroups(newGroups);
   }
 
+  function addGroup() {
+    setGroups(prev => [...prev, { players: Array(4).fill(''), teeTime: '' }]);
+    setGuestNames(prev => [...prev, Array(4).fill('')]);
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     // Attach displayNames to each group for frontend use
@@ -140,7 +145,7 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
         <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, width: '100%', background: 'white', opacity: 0.7, borderRadius: 2}}></div>
       </div>
       <div className="flex flex-col items-center bg-transparent">
-        <form onSubmit={handleSubmit} className="w-full max-w-4xl rounded-2xl text-white mx-auto" style={{ background: 'rgba(0,47,95,0.95)' }}>
+  <form onSubmit={handleSubmit} className="w-full max-w-4xl rounded-2xl text-white mx-auto p-6" style={{ background: 'rgba(0,47,95,0.95)' }}>
           {groups.map((group, idx) => (
             <div key={idx} className="mb-6 border-b border-white/30 pb-4">
               <div className="mb-2 font-extrabold" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.2rem' }}>4 Ball {idx + 1}</div>
@@ -194,15 +199,28 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
               ))}
             </div>
           ))}
-          <button
-            type="submit"
-            className="w-full py-3 px-4 border border-white text-[#1B3A6B] font-extrabold rounded-2xl transition text-lg"
-            style={{ backgroundColor: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', boxShadow: '0 2px 8px 0 rgba(255,215,0,0.10)' }}
-            onMouseOver={e => e.currentTarget.style.backgroundColor = '#FFE066'}
-            onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
-          >
-            Save Groups
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              className="w-full py-3 px-4 border border-white text-[#1B3A6B] font-extrabold rounded-2xl transition text-lg"
+              style={{ backgroundColor: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', boxShadow: '0 2px 8px 0 rgba(255,215,0,0.10)' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#FFE066'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
+              onClick={addGroup}
+            >
+              Add Another Tee Time
+            </button>
+
+            <button
+              type="submit"
+              className="w-full py-3 px-4 border border-white text-[#1B3A6B] font-extrabold rounded-2xl transition text-lg"
+              style={{ backgroundColor: '#1B3A6B', color: 'white', fontFamily: 'Merriweather, Georgia, serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+            >
+              Save Groups
+            </button>
+          </div>
         </form>
       </div>
     </>

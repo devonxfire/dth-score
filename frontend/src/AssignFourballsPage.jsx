@@ -145,11 +145,13 @@ export default function AssignFourballsPage({ user }) {
           {/* Title removed per UI request */}
           {loading && <div className="text-white">Loading groups...</div>}
           {!loading && (
-            <FourballAssignment
-              fourballs={(initialGroups && initialGroups.length) || 1}
-              initialGroups={initialGroups}
-              onAssign={handleAssign}
-            />
+            <div className="w-full p-6">
+              <FourballAssignment
+                fourballs={(initialGroups && initialGroups.length) || 1}
+                initialGroups={initialGroups}
+                onAssign={handleAssign}
+              />
+            </div>
           )}
         </div>
       </div>

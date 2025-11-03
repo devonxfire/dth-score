@@ -58,12 +58,6 @@ const defaultHoles = [
   { number: 18, par: 4, index: 8 },
 ];
 
-export default function Scorecard(props) {
-  // ...all hooks, logic, helpers, and event handlers...
-  // ...all UI, modals, tables, and logic go here, as in your working version...
-  return (
-    <PageBackground>
-      {/* ...all UI, modals, tables, and logic go here, as in your working version... */}
-    </PageBackground>
-  );
-}
+// Deprecated temporary scorecard file. Cleared as part of cleanup.
+// If you need the original contents, check your Git history or the snapshot file.
+export default null;
