@@ -23,6 +23,16 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
   }, [menuOpen]);
+
+  // Prevent body scroll while mobile menu is open
+  useEffect(() => {
+    if (menuOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+    return undefined;
+  }, [menuOpen]);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -52,6 +62,9 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
   // resolvedName: canonical name string to match against group.player entries
   const resolvedName = (resolvedUser && (resolvedUser.name || resolvedUser.displayName || (resolvedUser.firstName ? `${resolvedUser.firstName} ${resolvedUser.lastName || ''}` : null))) || null;
 
+  // Determine if current user is admin (several possible flags present across the app)
+  const isAdmin = !!(resolvedUser && (resolvedUser.role === 'admin' || resolvedUser.isAdmin || resolvedUser.isadmin));
+
   if (!scorecardComp && competitionList && resolvedName) {
     // Prefer open competitions where user is assigned to a group
     const today = new Date();
@@ -78,11 +91,20 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
       scorecardComp = competitionList.find(comp => comp.users && comp.users.some(u => (u.name || u.displayName) === resolvedName));
     }
   }
-  const compId = scorecardComp && (scorecardComp.joinCode || scorecardComp.joincode || scorecardComp.id || scorecardComp._id || scorecardComp.competitionType);
+  // Decide which competition id to use for top-menu navigation. Prefer the user's scorecardComp
+  // but allow admins to target the current/latest open competition when not assigned to a group.
+  let compId = scorecardComp && (scorecardComp.joinCode || scorecardComp.joincode || scorecardComp.id || scorecardComp._id || scorecardComp.competitionType);
+  if (!compId && isAdmin && Array.isArray(competitionList) && competitionList.length > 0) {
+    // Prefer an open competition (status === 'Open') and the most recent one
+    const today = new Date();
+    const openComps = competitionList.filter(comp => comp && (comp.status === 'Open' || (comp.date && new Date(comp.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))));
+    const pick = (openComps.length > 0 ? openComps.sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0] : competitionList.sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]);
+    if (pick) compId = (pick.joinCode || pick.joincode || pick.id || pick._id || pick.competitionType);
+  }
 
   return (
     <div
-      className="flex flex-wrap justify-between gap-6 mt-8 mb-4 w-full px-4 sm:px-8 sm:max-w-4xl sm:mx-auto rounded-none sm:rounded-2xl"
+      className="flex flex-wrap justify-between gap-6 mt-0 sm:mt-8 mb-4 w-full px-4 sm:px-8 sm:max-w-4xl sm:mx-auto rounded-none sm:rounded-2xl"
       style={{ background: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}
     >
       {/* Mobile header: hamburger + title + sign out */}
@@ -134,34 +156,37 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
           <div className="flex-1 min-w-0 text-center">
             <button
               className="w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150"
-                style={{ color: (location.pathname.startsWith('/scorecard') || (location.pathname.startsWith('/scorecard') && compId)) ? '#FFD700' : (compId ? 'white' : '#888'), background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
-              disabled={!compId}
-              onClick={() => {
-                if (scorecardComp && compId && resolvedName) {
-                  let group = null;
-                  let playerObj = null;
-                  if (scorecardComp.groups) {
-                    group = scorecardComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
-                    if (group && Array.isArray(group.members)) {
-                      playerObj = group.members.find(m => (m.name === resolvedName || m.displayName === resolvedName)) || null;
+                  style={{ color: (location.pathname.startsWith('/scorecard') || (location.pathname.startsWith('/scorecard') && compId)) ? '#FFD700' : (compId ? 'white' : '#888'), background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
+                disabled={!compId}
+                onClick={() => {
+                  if (scorecardComp && compId && resolvedName) {
+                    let group = null;
+                    let playerObj = null;
+                    if (scorecardComp.groups) {
+                      group = scorecardComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
+                      if (group && Array.isArray(group.members)) {
+                        playerObj = group.members.find(m => (m.name === resolvedName || m.displayName === resolvedName)) || null;
+                      }
+                      if (!playerObj) {
+                        const teamId = group?.teamId || group?.id || group?.team_id || group?.group_id;
+                        playerObj = {
+                          name: resolvedName,
+                          id: resolvedUser?.id,
+                          user_id: resolvedUser?.id,
+                          team_id: teamId,
+                          teebox: group?.teeboxes?.[resolvedName] || '',
+                          course_handicap: group?.handicaps?.[resolvedName] || '',
+                        };
+                      }
                     }
-                    if (!playerObj) {
-                      const teamId = group?.teamId || group?.id || group?.team_id || group?.group_id;
-                      playerObj = {
-                        name: resolvedName,
-                        id: resolvedUser?.id,
-                        user_id: resolvedUser?.id,
-                        team_id: teamId,
-                        teebox: group?.teeboxes?.[resolvedName] || '',
-                        course_handicap: group?.handicaps?.[resolvedName] || '',
-                      };
-                    }
+                    navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: scorecardComp } });
+                  } else if (compId) {
+                    // For admins (or fallback), allow navigating to the scorecard route without player state.
+                    navigate(`/scorecard/${compId}`);
+                  } else {
+                    navigate('/dashboard');
                   }
-                  navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: scorecardComp } });
-                } else {
-                  navigate('/dashboard');
-                }
-              }}
+                }}
             >
               My Scorecard
             </button>
@@ -214,9 +239,9 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
 
       {/* Mobile menu overlay */}
       {menuOpen && (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-50 overflow-hidden">
           <div className="absolute inset-0 bg-black/40" />
-          <div ref={menuRef} className="absolute top-0 left-0 right-0 bg-[#002F5F] p-4">
+          <div ref={menuRef} className="absolute top-0 left-0 right-0 bottom-0 bg-[#002F5F] p-4 overflow-auto">
               <div className="flex flex-col">
                 <button
                   onClick={() => { setMenuOpen(false); navigate('/dashboard'); }}
@@ -249,6 +274,9 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                     }
                   }
                   navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: scorecardComp } });
+                } else if (compId) {
+                  // Admins/fallback: allow opening scorecard without a player state
+                  navigate(`/scorecard/${compId}`);
                 } else {
                   navigate('/dashboard');
                 }

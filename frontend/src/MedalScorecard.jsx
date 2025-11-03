@@ -32,6 +32,19 @@ export default function MedalScorecard(props) {
   const params = useParams();
   const navigate = useNavigate();
   const compId = params.id;
+  // Resolve current user (try props.user then localStorage) and admin flag
+  let resolvedUser = props.user;
+  if (!resolvedUser) {
+    try { resolvedUser = JSON.parse(localStorage.getItem('user')); } catch (e) { resolvedUser = null; }
+  }
+  const resolvedName = (resolvedUser && (resolvedUser.name || resolvedUser.displayName || (resolvedUser.firstName ? `${resolvedUser.firstName} ${resolvedUser.lastName || ''}` : null))) || null;
+  const isAdmin = !!(resolvedUser && (resolvedUser.role === 'admin' || resolvedUser.isAdmin || resolvedUser.isadmin));
+  const canEdit = (playerName) => {
+    if (isAdmin) return true;
+    if (!resolvedName) return false;
+    // normalize simple compare
+    return (playerName || '').trim().toLowerCase() === resolvedName.trim().toLowerCase();
+  };
   const [comp, setComp] = useState(null);
   const [groups, setGroups] = useState([]);
   const [groupIdx, setGroupIdx] = useState(0);
@@ -82,9 +95,85 @@ export default function MedalScorecard(props) {
       try {
         if (!msg || Number(msg.competitionId) !== compNum) return;
 
+        // helper: schedule the same delayed popup checks we use for local edits
+        function schedulePopupCheck(name, idx, strokes) {
+          console.debug && console.debug('[socket-debug] schedulePopupCheck called', { name, idx, strokes });
+          try {
+            const gross = parseInt(strokes, 10);
+            const hole = defaultHoles[idx];
+            if (!gross || !hole) return;
+            if (gross === hole.par - 2) {
+              if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
+              eagleShowDelayRef.current = setTimeout(() => {
+                const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+                console.debug && console.debug('[socket-debug] eagle check', { name, idx, gross, latest });
+                if (latest === gross) {
+                  console.debug && console.debug('[socket-debug] triggering eagle popup', { name, idx, gross });
+                  setEagleHole(hole.number);
+                  setEaglePlayer(name);
+                  setShowEagle(true);
+                  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+                  if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+                  eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+                }
+              }, 2000);
+            } else {
+              if (eagleShowDelayRef.current) { clearTimeout(eagleShowDelayRef.current); eagleShowDelayRef.current = null; }
+            }
+            if (gross === hole.par - 1) {
+              if (birdieShowDelayRef.current) clearTimeout(birdieShowDelayRef.current);
+              birdieShowDelayRef.current = setTimeout(() => {
+                const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+                console.debug && console.debug('[socket-debug] birdie check', { name, idx, gross, latest });
+                if (latest === gross) {
+                  console.debug && console.debug('[socket-debug] triggering birdie popup', { name, idx, gross });
+                  setBirdieHole(hole.number);
+                  setBirdiePlayer(name);
+                  setShowBirdie(true);
+                  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                  if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+                  birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+                }
+              }, 2000);
+            } else {
+              if (birdieShowDelayRef.current) { clearTimeout(birdieShowDelayRef.current); birdieShowDelayRef.current = null; }
+            }
+            if (gross >= hole.par + 3) {
+              if (blowupShowDelayRef.current) clearTimeout(blowupShowDelayRef.current);
+              blowupShowDelayRef.current = setTimeout(() => {
+                const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+                console.debug && console.debug('[socket-debug] blowup check', { name, idx, gross, latest });
+                if (latest === gross) {
+                  console.debug && console.debug('[socket-debug] triggering blowup popup', { name, idx, gross });
+                  setBlowupHole(hole.number);
+                  setBlowupPlayer(name);
+                  setShowBlowup(true);
+                  if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
+                  if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+                  blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+                }
+              }, 2000);
+            } else {
+              if (blowupShowDelayRef.current) { clearTimeout(blowupShowDelayRef.current); blowupShowDelayRef.current = null; }
+            }
+          } catch (e) {}
+        }
+
         // If a full group object is included (medal-player-updated), merge into groups
         if (msg.group && (msg.groupId != null)) {
+          console.debug && console.debug('[socket-debug] medal-player-updated received', { groupId: msg.groupId, group: msg.group });
+          // Log current local playerData snapshot for debugging
+          try { console.debug && console.debug('[socket-debug] local playerData snapshot before merge', playerDataRef.current); } catch (e) {}
           const gidx = Number(msg.groupId);
+          // Capture prior local scores snapshot from playerDataRef so we can detect changes
+          const prevScores = {};
+          try {
+            const pd = playerDataRef.current || {};
+            for (const nm of msg.group.players || []) {
+              prevScores[nm] = Array.isArray(pd[nm]?.scores) ? pd[nm].scores.slice() : Array(18).fill('');
+            }
+          } catch (e) { /* ignore */ }
+
           setGroups(prev => {
             try {
               const copy = Array.isArray(prev) ? [...prev] : [];
@@ -107,6 +196,22 @@ export default function MedalScorecard(props) {
                 return copy;
               } catch (e) { return prev; }
             });
+            // schedule popup checks for any changed scores compared to prior local snapshot
+            try {
+              const names = msg.group.players || [];
+              for (const name of names) {
+                const newArr = msg.group.scores?.[name];
+                const oldArr = Array.isArray(prevScores[name]) ? prevScores[name] : Array(18).fill('');
+                if (!Array.isArray(newArr)) continue;
+                for (let i = 0; i < newArr.length; i++) {
+                  const oldVal = oldArr[i] == null ? '' : String(oldArr[i]);
+                  const newVal = newArr[i] == null ? '' : String(newArr[i]);
+                  if (oldVal !== newVal) {
+                    schedulePopupCheck(name, i, newArr[i]);
+                  }
+                }
+              }
+            } catch (e) {}
           }
           if (msg.group.waters || msg.group.dog) {
             setMiniTableStats(prev => {
@@ -129,6 +234,63 @@ export default function MedalScorecard(props) {
 
         // If server sent mappedScores delta, apply to playerData
         if (Array.isArray(msg.mappedScores) && msg.mappedScores.length > 0 && comp) {
+          // helper: schedule the same delayed popup checks we use for local edits
+          function schedulePopupCheck(name, idx, strokes) {
+            try {
+              const gross = parseInt(strokes, 10);
+              const hole = defaultHoles[idx];
+              if (!gross || !hole) return;
+              if (gross === hole.par - 2) {
+                if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
+                eagleShowDelayRef.current = setTimeout(() => {
+                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+                  if (latest === gross) {
+                    setEagleHole(hole.number);
+                    setEaglePlayer(name);
+                    setShowEagle(true);
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+                    if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+                    eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+                  }
+                }, 2000);
+              } else {
+                if (eagleShowDelayRef.current) { clearTimeout(eagleShowDelayRef.current); eagleShowDelayRef.current = null; }
+              }
+              if (gross === hole.par - 1) {
+                if (birdieShowDelayRef.current) clearTimeout(birdieShowDelayRef.current);
+                birdieShowDelayRef.current = setTimeout(() => {
+                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+                  if (latest === gross) {
+                    setBirdieHole(hole.number);
+                    setBirdiePlayer(name);
+                    setShowBirdie(true);
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+                    birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+                  }
+                }, 2000);
+              } else {
+                if (birdieShowDelayRef.current) { clearTimeout(birdieShowDelayRef.current); birdieShowDelayRef.current = null; }
+              }
+              if (gross >= hole.par + 3) {
+                if (blowupShowDelayRef.current) clearTimeout(blowupShowDelayRef.current);
+                blowupShowDelayRef.current = setTimeout(() => {
+                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+                  if (latest === gross) {
+                    setBlowupHole(hole.number);
+                    setBlowupPlayer(name);
+                    setShowBlowup(true);
+                    if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
+                    if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+                    blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+                  }
+                }, 2000);
+              } else {
+                if (blowupShowDelayRef.current) { clearTimeout(blowupShowDelayRef.current); blowupShowDelayRef.current = null; }
+              }
+            } catch (e) {}
+          }
+
           setPlayerData(prev => {
             try {
               const copy = { ...(prev || {}) };
@@ -148,6 +310,21 @@ export default function MedalScorecard(props) {
               return copy;
             } catch (e) { console.error('Error applying mappedScores to playerData', e); return prev; }
           });
+
+          // schedule popup checks after playerData is updated (use the provided mappedScores)
+          try {
+            for (const ms of msg.mappedScores) {
+              const userId = ms.userId ?? ms.user_id ?? ms.user;
+              const holeIdx = ms.holeIndex ?? ms.hole_index ?? ms.hole;
+              const strokes = ms.strokes ?? ms.value ?? '';
+              if (userId == null || holeIdx == null) continue;
+              const u = comp.users?.find(u => Number(u.id) === Number(userId));
+              const name = u?.name;
+              if (!name) continue;
+              schedulePopupCheck(name, Number(holeIdx), strokes);
+            }
+          } catch (e) {}
+
           return;
         }
 
@@ -240,6 +417,7 @@ export default function MedalScorecard(props) {
 
   // Save player data
   async function handleSavePlayer(name) {
+    if (!canEdit(name)) return;
     setSaving(prev => ({ ...prev, [name]: true }));
     setError('');
     const data = playerData[name];
@@ -273,6 +451,7 @@ export default function MedalScorecard(props) {
   }
 
   function handleChange(name, field, value) {
+    if (!canEdit(name)) return;
     setPlayerData(prev => ({
       ...prev,
       [name]: {
@@ -316,6 +495,7 @@ export default function MedalScorecard(props) {
   useEffect(() => { playerDataRef.current = playerData; }, [playerData]);
 
   async function handleScoreChange(name, idx, value) {
+    if (!canEdit(name)) return;
     setPlayerData(prev => ({
       ...prev,
       [name]: {
@@ -405,6 +585,7 @@ export default function MedalScorecard(props) {
   // ...existing code...
 
   async function handleMiniTableChange(name, field, value) {
+    if (!canEdit(name)) return;
     if (field === 'dog' && value) {
       // Only allow one player to have the dog
       setMiniTableStats(prev => {
@@ -626,13 +807,13 @@ export default function MedalScorecard(props) {
                       {computePH(playerData[name]?.handicap)}
                     </td>
                     <td className="hidden sm:table-cell border px-2 py-1 text-center">
-                      <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => handleMiniTableChange(name, 'waters', e.target.value)} />
+                      <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'waters', e.target.value); }} disabled={!canEdit(name)} />
                     </td>
                     <td className="hidden sm:table-cell border px-2 py-1 text-center">
-                      <input type="checkbox" checked={!!miniTableStats[name]?.dog} onChange={e => handleMiniTableChange(name, 'dog', e.target.checked)} />
+                      <input type="checkbox" checked={!!miniTableStats[name]?.dog} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'dog', e.target.checked); }} disabled={!canEdit(name)} />
                     </td>
                     <td className="hidden sm:table-cell border px-2 py-1 text-center">
-                      <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.twoClubs || ''} onChange={e => handleMiniTableChange(name, 'twoClubs', e.target.value)} />
+                      <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.twoClubs || ''} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'twoClubs', e.target.value); }} disabled={!canEdit(name)} />
                     </td>
                   </tr>
                 ))}
@@ -739,31 +920,23 @@ export default function MedalScorecard(props) {
                           <button
                             aria-label={`decrement-hole-${hole.number}-${name}`}
                             className="px-2 py-1 rounded bg-white/10"
-                            onClick={() => {
-                              const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0;
-                              const next = Math.max(0, cur - 1);
-                              handleScoreChange(name, hIdx, String(next));
-                            }}
+                            onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = Math.max(0, cur - 1); handleScoreChange(name, hIdx, String(next)); }}
+                            disabled={!canEdit(name)}
                           >−</button>
                           <input
                             inputMode="numeric"
                             pattern="[0-9]*"
                             className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none"
                             value={playerData[name]?.scores?.[hIdx] ?? ''}
-                            onChange={e => {
-                              const v = (e.target.value || '').replace(/[^0-9]/g, '');
-                              handleScoreChange(name, hIdx, v);
-                            }}
+                            onChange={e => { if (!canEdit(name)) return; const v = (e.target.value || '').replace(/[^0-9]/g, ''); handleScoreChange(name, hIdx, v); }}
+                            disabled={!canEdit(name)}
                             onFocus={e => e.currentTarget.scrollIntoView({ block: 'center' })}
                           />
                           <button
                             aria-label={`increment-hole-${hole.number}-${name}`}
                             className="px-2 py-1 rounded bg-white/10"
-                            onClick={() => {
-                              const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0;
-                              const next = cur + 1;
-                              handleScoreChange(name, hIdx, String(next));
-                            }}
+                            onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = cur + 1; handleScoreChange(name, hIdx, String(next)); }}
+                            disabled={!canEdit(name)}
                           >+</button>
                         </div>
                       </div>
@@ -893,7 +1066,8 @@ export default function MedalScorecard(props) {
                               min="0"
                               max="20"
                               value={playerData[name]?.scores?.[hIdx] || ''}
-                              onChange={e => handleScoreChange(name, hIdx, e.target.value)}
+                              onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx, e.target.value); }}
+                              disabled={!canEdit(name)}
                               className="w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 text-white"
                               inputMode="numeric"
                               style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
@@ -1005,7 +1179,8 @@ export default function MedalScorecard(props) {
                               min="0"
                               max="20"
                               value={playerData[name]?.scores?.[hIdx+9] || ''}
-                              onChange={e => handleScoreChange(name, hIdx+9, e.target.value)}
+                              onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx+9, e.target.value); }}
+                              disabled={!canEdit(name)}
                               className="w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 text-white"
                               inputMode="numeric"
                               style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}

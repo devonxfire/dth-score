@@ -108,6 +108,14 @@ export default function Scorecard4BBB(props) {
       return null;
     }
   })();
+  const resolvedUser = userMenu;
+  const resolvedName = (resolvedUser && (resolvedUser.name || resolvedUser.displayName || (resolvedUser.firstName ? `${resolvedUser.firstName} ${resolvedUser.lastName || ''}` : null))) || null;
+  const isAdmin = !!(resolvedUser && (resolvedUser.role === 'admin' || resolvedUser.isAdmin || resolvedUser.isadmin));
+  const canEdit = (playerName) => {
+    if (isAdmin) return true;
+    if (!resolvedName) return false;
+    return (playerName || '').trim().toLowerCase() === resolvedName.trim().toLowerCase();
+  };
 
   // Handler to reset all gross scores (local and backend)
   const handleResetScorecard = async () => {
@@ -224,9 +232,39 @@ export default function Scorecard4BBB(props) {
     const handler = (msg) => {
       try {
         if (!msg || Number(msg.competitionId) !== Number(compId)) return;
-
         // If server sent mappedScores (delta), apply them locally to avoid refetch
         if (Array.isArray(msg.mappedScores) && msg.mappedScores.length > 0 && competition && Array.isArray(competition.users)) {
+          // helper to trigger popups for a given player/hole
+          function triggerPopupsFor(playerIdx, holeIdx, strokes) {
+            try {
+              const gross = parseInt(strokes, 10);
+              const hole = defaultHoles[holeIdx];
+              if (!gross || !hole) return;
+              if (gross === hole.par - 2) {
+                setEagleHole(hole.number);
+                setEaglePlayer(groupPlayers[playerIdx]);
+                setShowEagle(true);
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+                if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+                eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+              } else if (gross === hole.par - 1) {
+                setBirdieHole(hole.number);
+                setBirdiePlayer(groupPlayers[playerIdx]);
+                setShowBirdie(true);
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+                birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+              } else if (gross >= hole.par + 3) {
+                setBlowupHole(hole.number);
+                setBlowupPlayer(groupPlayers[playerIdx]);
+                setShowBlowup(true);
+                if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
+                if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+                blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+              }
+            } catch (e) {}
+          }
+
           setScores(prev => {
             try {
               const updated = prev.map(r => [...r]);
@@ -240,6 +278,7 @@ export default function Scorecard4BBB(props) {
                 const pIdx = groupPlayers.findIndex(n => n === playerName);
                 if (pIdx >= 0 && updated[pIdx]) {
                   updated[pIdx][holeIdx] = strokes == null ? '' : String(strokes);
+                  try { triggerPopupsFor(pIdx, holeIdx, strokes); } catch (e) {}
                 } else {
                   // if we cannot map one of the scores, fallback to full refetch
                   return prev;
@@ -416,6 +455,8 @@ export default function Scorecard4BBB(props) {
   }, [groupPlayers.length, competition?.id, groupTeamId]);
 
   async function handleScoreChange(holeIdx, value, playerIdx) {
+    // Prevent editing other players when not admin
+    if (!canEdit(groupPlayers[playerIdx])) return;
     setScores(prev => {
       const updated = prev.map(row => [...row]);
       updated[playerIdx][holeIdx] = value;
@@ -978,6 +1019,8 @@ export default function Scorecard4BBB(props) {
                                     type="checkbox"
                                     checked={!!miniTableStats[name]?.dog}
                                     onChange={async e => {
+                                      // Guard: only allow edits if user can edit this player
+                                      if (!canEdit(name)) return;
                                       if (!groupTeamId || !competition.users) return;
                                       const user = competition.users.find(u => u.name === name);
                                       if (!user) return;
@@ -1028,6 +1071,7 @@ export default function Scorecard4BBB(props) {
                                         });
                                       }
                                     }}
+                                    disabled={!canEdit(name)}
                                   />
                                 </td>
                                 {/* 2 Clubs column */}
@@ -1039,6 +1083,7 @@ export default function Scorecard4BBB(props) {
                                     style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
                                     value={miniTableStats[name]?.twoClubs || ''}
                                     onChange={async e => {
+                                      if (!canEdit(name)) return;
                                       const val = e.target.value;
                                       setMiniTableStats(stats => ({
                                         ...stats,
@@ -1057,6 +1102,7 @@ export default function Scorecard4BBB(props) {
                                         body: JSON.stringify({ two_clubs: val })
                                       });
                                     }}
+                                    disabled={!canEdit(name)}
                                   />
                                 </td>
                               </tr>
@@ -1210,10 +1256,11 @@ export default function Scorecard4BBB(props) {
                                       min="0"
                                       max="20"
                                       value={val === undefined ? '' : val}
-                                      onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
+                                      onChange={e => { if (!canEdit(groupPlayers[pIdx])) return; handleScoreChange(hIdx, e.target.value, pIdx); }}
                                       className={inputClass}
                                       inputMode="numeric"
                                       style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
+                                      disabled={!canEdit(groupPlayers[pIdx])}
                                     />
                                   );
                                 })()}

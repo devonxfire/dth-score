@@ -793,7 +793,80 @@ app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req
     group.two_clubs = group.two_clubs || {};
     if (waters !== undefined) group.waters[playerName] = waters;
     if (dog !== undefined) group.dog[playerName] = dog;
-    if (two_clubs !== undefined) group.two_clubs[playerName] = two_clubs;
+    if (two_clubs !== undefined) {
+      group.two_clubs[playerName] = two_clubs;
+    }
+    // AUTOMATIC two_clubs assignment:
+    // If the submitted scores include a '2' on a par-3, compute the number of such
+    // occurrences and set group.two_clubs[playerName] to that count (capped at the
+    // total number of par-3 holes on the course). Also persist to teams_users if we
+    // can resolve a team and user record.
+    try {
+      if (Array.isArray(scores) && scores.length === 18) {
+        // Fetch holes for this competition to know which holes are par-3
+        const holes = await prisma.holes.findMany({ where: { competition_id: Number(id) }, orderBy: { number: 'asc' } });
+        const par3Count = holes.filter(h => Number(h.par) === 3).length || 0;
+        let twoOnPar3 = 0;
+        for (let hi = 0; hi < Math.min(holes.length, scores.length); hi++) {
+          const hole = holes[hi];
+          if (!hole) continue;
+          const stroke = scores[hi];
+          // Accept numeric 2 or string '2'
+          if (Number(hole.par) === 3 && stroke != null && String(stroke) !== '' && Number(stroke) === 2) {
+            twoOnPar3++;
+          }
+        }
+  const computedTwoClubs = Math.min(twoOnPar3, par3Count);
+  // Only update if a meaningful value (0 allowed) — set to 0 if none
+  group.two_clubs[playerName] = computedTwoClubs;
+  console.log(`two_clubs debug: competition=${id} player=${playerName} par3Count=${par3Count} twoOnPar3=${twoOnPar3} computedTwoClubs=${computedTwoClubs}`);
+        // Persist to teams_users when possible
+        try {
+          // Find the user by name (case-sensitive name match as elsewhere in code)
+          const user = await prisma.users.findFirst({ where: { name: playerName } });
+          if (user) {
+            // Find team in this competition that contains this player.
+            // Try exact array membership first, then fall back to a normalized string match
+            let team = await prisma.teams.findFirst({ where: { competition_id: Number(id), players: { has: playerName } } });
+            if (!team) {
+              const allTeams = await prisma.teams.findMany({ where: { competition_id: Number(id) } });
+              const normalize = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+              const target = normalize(playerName);
+              for (const t of allTeams) {
+                if (!Array.isArray(t.players)) continue;
+                for (const p of t.players) {
+                  if (normalize(p) === target) {
+                    team = t;
+                    break;
+                  }
+                }
+                if (team) break;
+              }
+              if (team) console.log(`two_clubs: matched team via normalized player name for player='${playerName}' -> team.id=${team.id}`);
+            }
+            if (team) {
+              // Upsert teams_users record with computed two_clubs
+              let tu = await prisma.teams_users.findFirst({ where: { team_id: team.id, user_id: user.id } });
+              if (tu) {
+                const updatedTu = await prisma.teams_users.update({ where: { id: tu.id }, data: { two_clubs: computedTwoClubs } });
+                console.log(`two_clubs persisted: updated teams_users id=${updatedTu.id} team_id=${team.id} user_id=${user.id} two_clubs=${updatedTu.two_clubs}`);
+              } else {
+                const createdTu = await prisma.teams_users.create({ data: { team_id: team.id, user_id: user.id, two_clubs: computedTwoClubs } });
+                console.log(`two_clubs persisted: created teams_users id=${createdTu.id} team_id=${team.id} user_id=${user.id} two_clubs=${createdTu.two_clubs}`);
+              }
+            } else {
+              console.log(`two_clubs persistence: team not found for competition=${id} player=${playerName}`);
+            }
+          } else {
+            console.log(`two_clubs persistence: user not found for playerName='${playerName}'`);
+          }
+        } catch (errTu) {
+          console.error('Error persisting two_clubs to teams_users:', errTu);
+        }
+      }
+    } catch (errAuto) {
+      console.error('Error computing automatic two_clubs:', errAuto);
+    }
     // Save updated groups array
     const updated = await prisma.competitions.update({
       where: { id: Number(id) },
