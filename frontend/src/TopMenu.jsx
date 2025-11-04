@@ -104,6 +104,30 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
     return undefined;
   }, [competitionList]);
 
+  // Listen for explicit competitions updates from other pages (e.g. RecentCompetitions)
+  useEffect(() => {
+    let mounted = true;
+    async function onUpdated(e) {
+      // Try to re-fetch authoritative competitions list; fallback to event.detail
+      try {
+        const res = await fetch(apiUrl('/api/competitions'));
+        if (res.ok) {
+          const data = await res.json();
+          if (mounted) setLocalCompetitionList(Array.isArray(data) ? data : []);
+          return;
+        }
+      } catch (err) {
+        // ignore and fallback
+      }
+      try {
+        const data = e?.detail;
+        if (mounted && Array.isArray(data)) setLocalCompetitionList(data);
+      } catch (err) {}
+    }
+    window.addEventListener('competitionsUpdated', onUpdated);
+    return () => { mounted = false; window.removeEventListener('competitionsUpdated', onUpdated); };
+  }, []);
+
   if (!scorecardComp && (localCompetitionList || []).length > 0 && resolvedName) {
     // Prefer open competitions where user is assigned to a group
     const today = new Date();
@@ -151,6 +175,12 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
   // competition is present, compId will be null and buttons will be disabled.
   const compId = openCompId;
   const leaderboardComp = openComp;
+
+  // Only allow navigation to Scorecard/Leaderboard when there is an OPEN competition
+  // available. Relying on `userComp` here can cause stale props to keep links active
+  // after an admin toggles status; use the locally-resolved `openComp` instead so
+  // TopMenu updates immediately when the competition list changes.
+  const allowCompLinks = Boolean(openComp);
 
   // Determine competition type to decide which leaderboard route to use.
   // Use the open competition type when available.
@@ -215,8 +245,8 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
           <div className="flex-1 min-w-0 text-center">
             <button
               className="w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150"
-                  style={{ color: (location.pathname.startsWith('/scorecard') || (location.pathname.startsWith('/scorecard') && compId)) ? '#FFD700' : (compId ? 'white' : '#888'), background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
-                disabled={!compId}
+                  style={{ color: (location.pathname.startsWith('/scorecard') || (location.pathname.startsWith('/scorecard') && compId)) ? '#FFD700' : (allowCompLinks ? 'white' : '#888'), background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: allowCompLinks ? 1 : 0.5, pointerEvents: allowCompLinks ? 'auto' : 'none' }}
+                  disabled={!allowCompLinks}
                 onClick={() => {
                   if (openComp && compId && resolvedName) {
                       let group = null;
@@ -253,8 +283,8 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
           <div className="flex-1 min-w-0 text-center">
               <button
                 className={`w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150`}
-                style={isLeaderboardPath ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' } : { color: compId ? 'white' : '#888', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
-              disabled={!compId}
+                style={isLeaderboardPath ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', opacity: allowCompLinks ? 1 : 0.5, pointerEvents: allowCompLinks ? 'auto' : 'none' } : { color: allowCompLinks ? 'white' : '#888', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: allowCompLinks ? 1 : 0.5, pointerEvents: allowCompLinks ? 'auto' : 'none' }}
+              disabled={!allowCompLinks}
               onClick={async () => {
                     // Always fetch the authoritative competitions list and navigate
                     // only when a current OPEN competition is found.
@@ -342,6 +372,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                 </button>
                 <button onClick={() => {
                 setMenuOpen(false);
+                if (!allowCompLinks) return; // disabled
                 if (openComp && compId && resolvedName) {
                   let group = null;
                   let playerObj = null;
@@ -371,13 +402,14 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                 }
               }}
                 className="text-left py-3 text-lg font-semibold"
-                style={{ color: isScorecardPath ? '#FFD700' : 'white' }}
+                style={{ color: isScorecardPath ? '#FFD700' : (allowCompLinks ? 'white' : '#888'), opacity: allowCompLinks ? 1 : 0.5 }}
                 aria-current={isScorecardPath ? 'page' : undefined}
               >
                 My Scorecard
               </button>
               <button
                 onClick={async () => { setMenuOpen(false);
+                  if (!allowCompLinks) return; // disabled
                     try {
                       const listRes = await fetch(apiUrl('/api/competitions'));
                       if (listRes.ok) {
@@ -409,7 +441,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
           navigate(`/leaderboard/${compId}`, { state: { competition: leaderboardComp } });
                 }}
                 className="text-left py-3 text-lg font-semibold"
-                style={{ color: isLeaderboardPath ? '#FFD700' : 'white' }}
+                style={{ color: isLeaderboardPath ? '#FFD700' : (allowCompLinks ? 'white' : '#888'), opacity: allowCompLinks ? 1 : 0.5 }}
                 aria-current={isLeaderboardPath ? 'page' : undefined}
               >
                 Leaderboard

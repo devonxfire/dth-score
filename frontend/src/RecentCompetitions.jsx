@@ -54,11 +54,13 @@ function RecentCompetitions({ user = {}, comps = [] }) {
   const res = await fetch(apiUrl('/api/competitions'));
       const data = await res.json();
       setCompetitionList(data);
+    try { window.dispatchEvent(new CustomEvent('competitionsUpdated', { detail: data })); } catch (e) {}
       const open = (data || []).filter(c => c.status === 'Open');
       setOpenComps(open);
     } catch {
       setCompetitionList([]);
       setOpenComps([]);
+  try { window.dispatchEvent(new CustomEvent('competitionsUpdated', { detail: [] })); } catch (e) {}
     } finally {
       setLoading(false);
     }
