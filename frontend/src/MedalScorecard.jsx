@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { apiUrl } from './api';
 import socket from './socket';
+import { shouldShowPopup, markShown, checkAndMark } from './popupDedupe';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -214,37 +215,43 @@ export default function MedalScorecard(props) {
             const gross = parseInt(strokes, 10);
             const hole = defaultHoles[idx];
             if (!gross || !hole) return;
-            if (gross === hole.par - 2) {
-              if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
-              eagleShowDelayRef.current = setTimeout(() => {
-                const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
-                console.debug && console.debug('[socket-debug] eagle check', { name, idx, gross, latest });
-                if (latest === gross) {
-                  console.debug && console.debug('[socket-debug] triggering eagle popup', { name, idx, gross });
-                  setEagleHole(hole.number);
-                  setEaglePlayer(name);
-                  setShowEagle(true);
-                  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-                  if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-                  eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
-                }
-              }, 2000);
-            } else {
-              if (eagleShowDelayRef.current) { clearTimeout(eagleShowDelayRef.current); eagleShowDelayRef.current = null; }
-            }
+                  if (gross === hole.par - 2) {
+                if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
+                eagleShowDelayRef.current = setTimeout(() => {
+                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+                  console.debug && console.debug('[socket-debug] eagle check', { name, idx, gross, latest });
+                  if (latest === gross) {
+                    const sig = `eagle:${name}:${hole.number}:${compId}`;
+                    if (checkAndMark(sig)) {
+                      console.debug && console.debug('[socket-debug] triggering eagle popup', { name, idx, gross });
+                      setEagleHole(hole.number);
+                      setEaglePlayer(name);
+                      setShowEagle(true);
+                      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+                      if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+                      eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+                    }
+                  }
+                }, 2000);
+              } else {
+                if (eagleShowDelayRef.current) { clearTimeout(eagleShowDelayRef.current); eagleShowDelayRef.current = null; }
+              }
             if (gross === hole.par - 1) {
               if (birdieShowDelayRef.current) clearTimeout(birdieShowDelayRef.current);
               birdieShowDelayRef.current = setTimeout(() => {
                 const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
                 console.debug && console.debug('[socket-debug] birdie check', { name, idx, gross, latest });
                 if (latest === gross) {
-                  console.debug && console.debug('[socket-debug] triggering birdie popup', { name, idx, gross });
-                  setBirdieHole(hole.number);
-                  setBirdiePlayer(name);
-                  setShowBirdie(true);
-                  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                  if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
-                  birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+                  const sig = `birdie:${name}:${hole.number}:${compId}`;
+                  if (checkAndMark(sig)) {
+                    console.debug && console.debug('[socket-debug] triggering birdie popup', { name, idx, gross });
+                    setBirdieHole(hole.number);
+                    setBirdiePlayer(name);
+                    setShowBirdie(true);
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+                    birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+                  }
                 }
               }, 2000);
             } else {
@@ -256,13 +263,16 @@ export default function MedalScorecard(props) {
                 const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
                 console.debug && console.debug('[socket-debug] blowup check', { name, idx, gross, latest });
                 if (latest === gross) {
-                  console.debug && console.debug('[socket-debug] triggering blowup popup', { name, idx, gross });
-                  setBlowupHole(hole.number);
-                  setBlowupPlayer(name);
-                  setShowBlowup(true);
-                  if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
-                  if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-                  blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+                  const sig = `blowup:${name}:${hole.number}:${compId}`;
+                  if (checkAndMark(sig)) {
+                    console.debug && console.debug('[socket-debug] triggering blowup popup', { name, idx, gross });
+                    setBlowupHole(hole.number);
+                    setBlowupPlayer(name);
+                    setShowBlowup(true);
+                    if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
+                    if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+                    blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+                  }
                 }
               }, 2000);
             } else {
@@ -357,12 +367,15 @@ export default function MedalScorecard(props) {
                 eagleShowDelayRef.current = setTimeout(() => {
                   const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
                   if (latest === gross) {
-                    setEagleHole(hole.number);
-                    setEaglePlayer(name);
-                    setShowEagle(true);
-                    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-                    if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-                    eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+                    const sig = `eagle:${name}:${hole.number}:${compId}`;
+                    if (checkAndMark(sig)) {
+                      setEagleHole(hole.number);
+                      setEaglePlayer(name);
+                      setShowEagle(true);
+                      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+                      if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+                      eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+                    }
                   }
                 }, 2000);
               } else {
@@ -373,12 +386,15 @@ export default function MedalScorecard(props) {
                 birdieShowDelayRef.current = setTimeout(() => {
                   const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
                   if (latest === gross) {
-                    setBirdieHole(hole.number);
-                    setBirdiePlayer(name);
-                    setShowBirdie(true);
-                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                    if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
-                    birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+                    const sig = `birdie:${name}:${hole.number}:${compId}`;
+                    if (checkAndMark(sig)) {
+                      setBirdieHole(hole.number);
+                      setBirdiePlayer(name);
+                      setShowBirdie(true);
+                      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                      if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+                      birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+                    }
                   }
                 }, 2000);
               } else {
@@ -389,12 +405,15 @@ export default function MedalScorecard(props) {
                 blowupShowDelayRef.current = setTimeout(() => {
                   const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
                   if (latest === gross) {
-                    setBlowupHole(hole.number);
-                    setBlowupPlayer(name);
-                    setShowBlowup(true);
-                    if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
-                    if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-                    blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+                    const sig = `blowup:${name}:${hole.number}:${compId}`;
+                    if (checkAndMark(sig)) {
+                      setBlowupHole(hole.number);
+                      setBlowupPlayer(name);
+                      setShowBlowup(true);
+                      if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
+                      if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+                      blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+                    }
                   }
                 }, 2000);
               } else {
@@ -554,6 +573,13 @@ export default function MedalScorecard(props) {
         throw new Error('Failed to save: ' + errText);
       }
       console.log('Save successful for', name);
+      try {
+        // Immediately notify server to rebroadcast this saved medal update so other
+        // clients see popups instantly (optimistic global popups). The server will
+        // rebroadcast this as `medal-player-updated` to the competition room.
+  const payload = { competitionId: Number(compId), groupId: Number(groupIdx), playerName: name, group: groups[groupIdx], _clientBroadcast: true };
+        try { socket.emit('client-medal-saved', payload); } catch (e) { /* ignore socket emit errors */ }
+      } catch (e) { }
     } catch (e) {
       setError('Failed to save for ' + name + ': ' + (e.message || e));
       console.error('Save error:', e);
@@ -625,12 +651,15 @@ export default function MedalScorecard(props) {
         eagleShowDelayRef.current = setTimeout(() => {
           const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
           if (latest === gross) {
-            setEagleHole(hole.number);
-            setEaglePlayer(name);
-            setShowEagle(true);
-            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-            if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-            eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+            const sig = `eagle:${name}:${hole.number}:${compId}`;
+            if (checkAndMark(sig)) {
+              setEagleHole(hole.number);
+              setEaglePlayer(name);
+              setShowEagle(true);
+              if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+              if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+              eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+            }
           }
         }, 2000);
       } else {
@@ -643,12 +672,15 @@ export default function MedalScorecard(props) {
         birdieShowDelayRef.current = setTimeout(() => {
           const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
           if (latest === gross) {
-            setBirdieHole(hole.number);
-            setBirdiePlayer(name);
-            setShowBirdie(true);
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-            if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
-            birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+            const sig = `birdie:${name}:${hole.number}:${compId}`;
+            if (checkAndMark(sig)) {
+              setBirdieHole(hole.number);
+              setBirdiePlayer(name);
+              setShowBirdie(true);
+              if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+              if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+              birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+            }
           }
         }, 2000);
       } else {
@@ -661,12 +693,15 @@ export default function MedalScorecard(props) {
         blowupShowDelayRef.current = setTimeout(() => {
           const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
           if (latest === gross) {
-            setBlowupHole(hole.number);
-            setBlowupPlayer(name);
-            setShowBlowup(true);
-            if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
-            if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-            blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+            const sig = `blowup:${name}:${hole.number}:${compId}`;
+            if (checkAndMark(sig)) {
+              setBlowupHole(hole.number);
+              setBlowupPlayer(name);
+              setShowBlowup(true);
+              if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
+              if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+              blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+            }
           }
         }, 2000);
       } else {
@@ -724,10 +759,15 @@ export default function MedalScorecard(props) {
       } catch (err) {
         setError('Failed to save dog for group: ' + (err.message || err));
       }
-      setDogPlayer(name);
-      setShowDogPopup(true);
-      if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
-      watersTimeoutRef.current = setTimeout(() => setShowDogPopup(false), 30000);
+      {
+    const sig = `dog:${name}:g:${groupIdx ?? ''}:c:${compId}`;
+        if (checkAndMark(sig)) {
+          setDogPlayer(name);
+          setShowDogPopup(true);
+          if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
+          watersTimeoutRef.current = setTimeout(() => setShowDogPopup(false), 30000);
+        }
+      }
       return;
     }
     // Normal update for other fields
@@ -767,10 +807,13 @@ export default function MedalScorecard(props) {
     }
     // Show popups for Waters
     if (field === 'waters' && value && Number(value) > 0) {
-      setWatersPlayer(name);
-      setShowWatersPopup(true);
-      if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
-      watersTimeoutRef.current = setTimeout(() => setShowWatersPopup(false), 30000);
+  const sig = `waters:${name}:g:${groupIdx ?? ''}:c:${compId}`;
+      if (checkAndMark(sig)) {
+        setWatersPlayer(name);
+        setShowWatersPopup(true);
+        if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
+        watersTimeoutRef.current = setTimeout(() => setShowWatersPopup(false), 30000);
+      }
     }
   }
 

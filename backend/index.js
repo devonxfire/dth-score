@@ -937,6 +937,20 @@ io.on('connection', (socket) => {
       console.log(`Socket ${socket.id} left room ${room}`);
     }
   });
+  // Re-broadcast client-sent saved medal updates to the competition room.
+  // This allows clients to notify other clients immediately (optimistic global popups)
+  socket.on('client-medal-saved', (payload) => {
+    try {
+      const compId = Number(payload?.competitionId);
+      if (!compId) return;
+      // Echo the payload as a server-originated `medal-player-updated` event so
+      // clients receive the same shape they expect from server-side saves.
+      console.log(`Rebroadcasting client-medal-saved to competition:${compId}`);
+      global.io.to(`competition:${compId}`).emit('medal-player-updated', payload);
+    } catch (e) {
+      console.error('Error handling client-medal-saved', e);
+    }
+  });
   socket.on('disconnect', () => {
     // console.log('Socket disconnected:', socket.id);
   });

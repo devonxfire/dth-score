@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiUrl } from './api';
 import socket from './socket';
+import { checkAndMark } from './popupDedupe';
 import { TrophyIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageBackground from './PageBackground';
@@ -241,26 +242,35 @@ export default function Scorecard4BBB(props) {
               const hole = defaultHoles[holeIdx];
               if (!gross || !hole) return;
               if (gross === hole.par - 2) {
-                setEagleHole(hole.number);
-                setEaglePlayer(groupPlayers[playerIdx]);
-                setShowEagle(true);
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-                if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-                eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+                const sig = `eagle:${groupPlayers[playerIdx]}:${hole.number}:${competition.id}`;
+                if (checkAndMark(sig)) {
+                  setEagleHole(hole.number);
+                  setEaglePlayer(groupPlayers[playerIdx]);
+                  setShowEagle(true);
+                  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+                  if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+                  eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+                }
               } else if (gross === hole.par - 1) {
-                setBirdieHole(hole.number);
-                setBirdiePlayer(groupPlayers[playerIdx]);
-                setShowBirdie(true);
-                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
-                birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+                const sig = `birdie:${groupPlayers[playerIdx]}:${hole.number}:${competition.id}`;
+                if (checkAndMark(sig)) {
+                  setBirdieHole(hole.number);
+                  setBirdiePlayer(groupPlayers[playerIdx]);
+                  setShowBirdie(true);
+                  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                  if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+                  birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+                }
               } else if (gross >= hole.par + 3) {
-                setBlowupHole(hole.number);
-                setBlowupPlayer(groupPlayers[playerIdx]);
-                setShowBlowup(true);
-                if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
-                if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-                blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+                const sig = `blowup:${groupPlayers[playerIdx]}:${hole.number}:${competition.id}`;
+                if (checkAndMark(sig)) {
+                  setBlowupHole(hole.number);
+                  setBlowupPlayer(groupPlayers[playerIdx]);
+                  setShowBlowup(true);
+                  if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
+                  if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+                  blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+                }
               }
             } catch (e) {}
           }
@@ -466,32 +476,41 @@ export default function Scorecard4BBB(props) {
       if (gross > 0 && hole) {
         // Eagle: 2 under par
         if (gross === hole.par - 2) {
-          setEagleHole(hole.number);
-          setEaglePlayer(groupPlayers[playerIdx]);
-          setShowEagle(true);
-          if (navigator.vibrate) {
-            navigator.vibrate([200, 100, 200, 100, 200]);
+          const sig = `eagle:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
+          if (checkAndMark(sig)) {
+            setEagleHole(hole.number);
+            setEaglePlayer(groupPlayers[playerIdx]);
+            setShowEagle(true);
+            if (navigator.vibrate) {
+              navigator.vibrate([200, 100, 200, 100, 200]);
+            }
+            if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
+            eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
           }
-          if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-          eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
         } else if (gross === hole.par - 1) {
-          setBirdieHole(hole.number);
-          setBirdiePlayer(groupPlayers[playerIdx]);
-          setShowBirdie(true);
-          if (navigator.vibrate) {
-            navigator.vibrate([100, 50, 100]);
+          const sig = `birdie:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
+          if (checkAndMark(sig)) {
+            setBirdieHole(hole.number);
+            setBirdiePlayer(groupPlayers[playerIdx]);
+            setShowBirdie(true);
+            if (navigator.vibrate) {
+              navigator.vibrate([100, 50, 100]);
+            }
+            if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
+            birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
           }
-          if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
-          birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
         } else if (gross >= hole.par + 3) {
-          setBlowupHole(hole.number);
-          setBlowupPlayer(groupPlayers[playerIdx]);
-          setShowBlowup(true);
-          if (navigator.vibrate) {
-            navigator.vibrate([400, 100, 400]);
+          const sig = `blowup:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
+          if (checkAndMark(sig)) {
+            setBlowupHole(hole.number);
+            setBlowupPlayer(groupPlayers[playerIdx]);
+            setShowBlowup(true);
+            if (navigator.vibrate) {
+              navigator.vibrate([400, 100, 400]);
+            }
+            if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
+            blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
           }
-          if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-          blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
         }
       }
       return updated;
@@ -983,10 +1002,13 @@ export default function Scorecard4BBB(props) {
                                         body: JSON.stringify({ waters: val })
                                       });
                                       if (val && Number(val) > 0) {
-                                        setWatersPlayer(name);
-                                        setShowWatersPopup(true);
-                                        if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
-                                        watersTimeoutRef.current = setTimeout(() => setShowWatersPopup(false), 30000);
+                                        const sig = `waters:${name}:g:${groupForPlayer?.id ?? ''}:c:${competition?.id ?? ''}`;
+                                        if (checkAndMark(sig)) {
+                                          setWatersPlayer(name);
+                                          setShowWatersPopup(true);
+                                          if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
+                                          watersTimeoutRef.current = setTimeout(() => setShowWatersPopup(false), 30000);
+                                        }
                                       }
                                     }}
                                   />
@@ -1052,10 +1074,15 @@ export default function Scorecard4BBB(props) {
                                             body: JSON.stringify({ dog: otherName === name })
                                           });
                                         }
-                                        setDogPlayer(name);
-                                        setShowDogPopup(true);
-                                        if (dogTimeoutRef.current) clearTimeout(dogTimeoutRef.current);
-                                        dogTimeoutRef.current = setTimeout(() => setShowDogPopup(false), 30000);
+                                        {
+                                          const sig = `dog:${name}:g:${groupForPlayer?.id ?? ''}:c:${competition?.id ?? ''}`;
+                                          if (checkAndMark(sig)) {
+                                            setDogPlayer(name);
+                                            setShowDogPopup(true);
+                                            if (dogTimeoutRef.current) clearTimeout(dogTimeoutRef.current);
+                                            dogTimeoutRef.current = setTimeout(() => setShowDogPopup(false), 30000);
+                                          }
+                                        }
                                       } else {
                                         setMiniTableStats(stats => ({
                                           ...stats,
