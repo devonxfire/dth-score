@@ -86,6 +86,7 @@ function Leaderboard() {
   if (compKey === 'alliance') compKey = 'alliance';
   const date = entries[0]?.date || '';
   // Determine comp type
+  const comp = compRaw || '';
   const isMedal = comp.toLowerCase().includes('medal');
   const isStableford = comp.toLowerCase().includes('stableford');
   const isAlliance = comp.toLowerCase().includes('alliance');

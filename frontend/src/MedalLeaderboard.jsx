@@ -69,6 +69,8 @@ function MedalLeaderboard() {
   const location = useLocation();
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
   // Get comp id from URL if using react-router
   const id = location.pathname.split('/').pop();
 
@@ -148,6 +150,51 @@ function MedalLeaderboard() {
         })();
       });
   }, [id]);
+
+  // when comp is loaded, seed notesDraft
+  useEffect(() => {
+    setNotesDraft(comp?.notes || '');
+  }, [comp]);
+
+  function isCaptain(user, competition) {
+    if (!user || !competition) return false;
+    const capNames = [competition.captain, competition.captainName, competition.captain_name].filter(Boolean).map(s => String(s).trim().toLowerCase());
+    if (capNames.length === 0) return false;
+    const username = (user.username || user.name || '').toString().trim().toLowerCase();
+    if (!username) return false;
+    return capNames.includes(username);
+  }
+
+  function canEditNotes(user, competition) {
+    return isAdmin(user) || isCaptain(user, competition);
+  }
+
+  async function saveNotes() {
+    if (!comp || !comp.id) return;
+    const url = apiUrl(`/api/competitions/${comp.id}`);
+    try {
+      const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adminSecret ? { 'X-Admin-Secret': adminSecret } : {})
+        },
+        body: JSON.stringify({ notes: notesDraft })
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        alert('Failed to save notes: ' + res.status + ' ' + txt);
+        return;
+      }
+      const updated = await res.json();
+      setComp(prev => ({ ...prev, notes: updated.notes ?? notesDraft }));
+      setEditingNotes(false);
+    } catch (err) {
+      console.error('saveNotes error', err);
+      alert('Failed to save notes: ' + (err.message || err));
+    }
+  }
 
   // Real-time: join competition room and listen for updates
   useEffect(() => {
@@ -437,7 +484,20 @@ function MedalLeaderboard() {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${(comp?.name || 'results').replace(/[^a-z0-9_-]/gi, '_')}_leaderboard.pdf`);
+      // Filename: YYYYMMDD_DTH_LEADERBOARD_COMPTYPE
+      try {
+        const d = comp?.date ? new Date(comp.date) : new Date();
+        const y = String(d.getFullYear());
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const datePart = `${y}${m}${dd}`;
+        const compTypeDisplay = (COMP_TYPE_DISPLAY[comp?.type] || comp?.type || '').toString().toUpperCase();
+        const typePart = compTypeDisplay.replace(/[^A-Z0-9 ]/g, '').trim().replace(/\s+/g, '_') || 'COMPETITION';
+        const filename = `${datePart}_DTH_LEADERBOARD_${typePart}.pdf`;
+        pdf.save(filename);
+      } catch (e) {
+        pdf.save(`${(comp?.name || 'results').replace(/[^a-z0-9_-]/gi, '_')}_leaderboard.pdf`);
+      }
     } catch (err) {
       console.error('Export to PDF failed', err);
       console.warn('Falling back to text-only PDF export');
@@ -551,7 +611,19 @@ function MedalLeaderboard() {
       y += lineHeight;
     });
 
-    pdf.save(`${(comp?.name || 'results').replace(/[^a-z0-9_-]/gi, '_')}_leaderboard_text.pdf`);
+    try {
+      const d = comp?.date ? new Date(comp.date) : new Date();
+      const y = String(d.getFullYear());
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const datePart = `${y}${m}${dd}`;
+      const compTypeDisplay = (COMP_TYPE_DISPLAY[comp?.type] || comp?.type || '').toString().toUpperCase();
+      const typePart = compTypeDisplay.replace(/[^A-Z0-9 ]/g, '').trim().replace(/\s+/g, '_') || 'COMPETITION';
+      const filename = `${datePart}_DTH_LEADERBOARD_${typePart}.pdf`;
+      pdf.save(filename);
+    } catch (e) {
+      pdf.save(`${(comp?.name || 'results').replace(/[^a-z0-9_-]/gi, '_')}_leaderboard.pdf`);
+    }
   }
 
   // Determine if any player has played less than 18 holes
@@ -679,7 +751,30 @@ function MedalLeaderboard() {
               <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type || ''} <br />
               <span className="font-semibold">Course:</span> {comp?.club || comp?.course || '-'} <br />
               <span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance && comp.handicapallowance !== 'N/A' ? comp.handicapallowance + '%' : 'N/A'} <br />
-              <span className="font-semibold">Notes:</span> {comp.notes || '-'}
+              <div style={{ marginTop: 8, marginBottom: 6, textDecoration: 'underline', textUnderlineOffset: 3 }} className="font-semibold">Notes:</div>
+              {canEditNotes(currentUser, comp) ? (
+                editingNotes ? (
+                  <div className="mt-2">
+                    <textarea
+                      value={notesDraft}
+                      onChange={e => setNotesDraft(e.target.value)}
+                      placeholder={notesDraft ? '' : 'Captain, click to add more notes...'}
+                      className="w-full bg-white/5 text-white p-2 rounded resize-y h-24 focus:outline-none"
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button onClick={saveNotes} className="py-1 px-3 bg-[#FFD700] text-[#002F5F] rounded font-semibold">Save</button>
+                      <button onClick={() => { setNotesDraft(comp?.notes || ''); setEditingNotes(false); }} className="py-1 px-3 bg-transparent border border-white/20 rounded">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 cursor-text" onClick={() => setEditingNotes(true)}>
+                    <div className="whitespace-pre-wrap">{comp.notes}</div>
+                    <div className="text-white/60 italic mt-2">Captain, click to add more notes...</div>
+                  </div>
+                )
+              ) : (
+                <div className="mt-2">{comp.notes || '-'}</div>
+              )}
               {/* Good Scores section */}
               <div className="mt-4 mb-2 text-white text-base font-semibold" style={{maxWidth: '100%', textAlign: 'left'}}>
                 <div style={{marginBottom: 4, marginLeft: 0, textDecoration: 'underline', textUnderlineOffset: 3}}>Good Scores</div>

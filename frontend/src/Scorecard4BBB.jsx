@@ -1119,14 +1119,22 @@ export default function Scorecard4BBB(props) {
                   {/* Dashboard button removed */}
                   <button
                     onClick={() => {
-                      if (competition && (competition.id || competition._id || competition.joinCode || competition.joincode)) {
-                        const compId = competition.id || competition._id || competition.joinCode || competition.joincode;
-                        navigate(`/leaderboard/${compId}`);
+                      if (!competition) { alert('Competition not found.'); return; }
+                      const compId = competition.id || competition._id || competition.joinCode || competition.joincode;
+                      const today = new Date();
+                      const isOpen = competition && (competition.status === 'Open' || (competition.date && new Date(competition.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate())));
+                      if (!isOpen) {
+                        // Disabled when competition is not open
+                        return;
+                      }
+                      if (compId) {
+                        navigate(`/leaderboard/${compId}`, { state: { competition } });
                       } else {
                         alert('Competition ID not found.');
                       }
                     }}
                     className="py-2 px-4 w-44 bg-[#1B3A6B] text-white font-semibold rounded-2xl hover:bg-white hover:text-[#1B3A6B] border border-white transition"
+                    style={{ opacity: (competition && (competition.status === 'Open' || (competition.date && new Date(competition.date) >= new Date()))) ? 1 : 0.5, pointerEvents: (competition && (competition.status === 'Open' || (competition.date && new Date(competition.date) >= new Date()))) ? 'auto' : 'none' }}
                   >
                     <TrophyIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" style={{ color: '#FFD700', filter: 'drop-shadow(0 1px 2px #bfa100)' }} />
                     Leaderboard

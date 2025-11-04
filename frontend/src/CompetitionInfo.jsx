@@ -34,6 +34,10 @@ export default function CompetitionInfo({ user }) {
   const [comp, setComp] = useState(location.state?.comp || null);
   const compId = comp?.id || params.id;
 
+  // Determine if this competition is currently open (status or date-based)
+  const today = new Date();
+  const isOpenComp = comp && (comp.status === 'Open' || (comp.date && new Date(comp.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate())));
+
   useEffect(() => {
     if (!compId) return;
     fetch(apiUrl(`/api/competitions/${compId}`))
@@ -141,7 +145,7 @@ export default function CompetitionInfo({ user }) {
               <ArrowLeftIcon className="h-5 w-5" />
               <span>Back to Competitions</span>
             </button>
-            {isPlayerInComp && (
+            {isPlayerInComp && isOpenComp && (
               <button onClick={() => {
                 const medalTypes = ['medalStrokeplay', 'medal strokeplay', 'stroke'];
                 if (medalTypes.includes((comp.type || '').toLowerCase().replace(/\s+/g, ''))) {
@@ -154,7 +158,11 @@ export default function CompetitionInfo({ user }) {
                 <span>My Scorecard</span>
               </button>
             )}
-            <button onClick={() => navigate(`/medal-leaderboard/${compId}`)} className="w-full py-2 rounded-2xl bg-[#1B3A6B] text-white font-semibold flex items-center justify-center gap-2">
+            <button
+              onClick={() => { if (!isOpenComp) return; navigate(`/leaderboard/${compId}`, { state: { competition: comp } }); }}
+              className="w-full py-2 rounded-2xl bg-[#1B3A6B] text-white font-semibold flex items-center justify-center gap-2"
+              style={{ opacity: isOpenComp ? 1 : 0.5, pointerEvents: isOpenComp ? 'auto' : 'none' }}
+            >
               <TrophyIcon className="h-5 w-5" style={{ color: '#FFD700' }} />
               <span>Leaderboard</span>
             </button>
@@ -246,7 +254,7 @@ export default function CompetitionInfo({ user }) {
                 <ArrowLeftIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
                 Back to Competitions
               </button>
-              {isPlayerInComp && (
+              {isPlayerInComp && isOpenComp && (
                 <button
                   className="py-2 px-4 border border-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap scorecard-pulse"
                   style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
@@ -266,12 +274,12 @@ export default function CompetitionInfo({ user }) {
                 </button>
               )}
               <button
-                className="py-2 px-4 border border-white text-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap"
-                style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                onClick={() => navigate(`/medal-leaderboard/${compId}`)}
-                onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-                onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-              >
+                  className="py-2 px-4 border border-white text-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap"
+                  style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', opacity: isOpenComp ? 1 : 0.5, pointerEvents: isOpenComp ? 'auto' : 'none' }}
+                  onClick={() => { if (!isOpenComp) return; navigate(`/leaderboard/${compId}`, { state: { competition: comp } }); }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
+                >
                 <TrophyIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" style={{ color: '#FFD700' }} />
                 Leaderboard
               </button>

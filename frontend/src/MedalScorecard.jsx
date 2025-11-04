@@ -1127,8 +1127,28 @@ export default function MedalScorecard(props) {
                       scoreToParLabel = `${scoreToPar >= 0 ? '+' + scoreToPar : String(scoreToPar)}`;
                     }
 
+                    // compute team best-two totals for alliance comps (per-hole aggregation)
                     const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
                     const resultLabel = isAlliance ? 'Result' : 'Net';
+                    // For Alliance comps the mobile Result should show the player's stableford total, not net
+                    let allianceResultTotal = null;
+                    if (isAlliance) {
+                      try {
+                        const stableTotals = computePlayerStablefordTotals(name);
+                        allianceResultTotal = holesWithScore ? stableTotals.total : '';
+                      } catch (e) {
+                        allianceResultTotal = '';
+                      }
+                    }
+                    let teamScoreTotal = null;
+                    if (isAlliance && Array.isArray(groups) && groups[groupIdx]) {
+                      try {
+                        const best = computeGroupBestTwoTotals(groups[groupIdx]);
+                        teamScoreTotal = best.total;
+                      } catch (e) {
+                        teamScoreTotal = null;
+                      }
+                    }
 
                     return (
                       <div className="mt-3 text-sm font-bold">
@@ -1138,8 +1158,15 @@ export default function MedalScorecard(props) {
                         </div>
                         <div className="flex justify-between mt-1">
                           <div>Total: {grossTotal}</div>
-                          <div>{resultLabel}: {holesWithScore ? netTotal : ''}</div>
+                          <div>{resultLabel}: {isAlliance ? (allianceResultTotal != null ? allianceResultTotal : '') : (holesWithScore ? netTotal : '')}</div>
                         </div>
+
+                        {isAlliance && teamScoreTotal != null && (
+                          <div className="flex justify-between mt-2 text-yellow-300 font-extrabold">
+                            <div>Team Score:</div>
+                            <div>{teamScoreTotal}</div>
+                          </div>
+                        )}
 
                         <div className="flex justify-center mt-4">
                           <div className="text-center px-6 py-3 rounded-2xl border-4 font-extrabold text-2xl" style={{ borderColor: '#FFD700', background: '#1B3A6B', color: 'white' }}>
@@ -1184,7 +1211,7 @@ export default function MedalScorecard(props) {
                 </tr>
               </thead>
               <tbody>
-                {players.map((name, pIdx) => {
+                  {players.map((name, pIdx) => {
                   const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
                   const resultLabel = isAlliance ? 'Result' : 'Net';
                   const stable = isAlliance ? computePlayerStablefordTotals(name) : null;

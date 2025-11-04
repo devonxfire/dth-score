@@ -21,7 +21,15 @@
   margin: 0;
 }
 .no-spinner {
+  appearance: textfield;
   -moz-appearance: textfield;
+}
+
+/* Make textarea placeholder italic and slightly transparent for better visual match */
+textarea::placeholder {
+  font-style: italic;
+  opacity: 0.75;
+  color: inherit;
 }
 /* @tailwind base;
 @tailwind components;

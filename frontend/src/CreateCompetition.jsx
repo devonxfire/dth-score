@@ -62,7 +62,8 @@ function CreateCompetition({ user, onSignOut }) {
         type: editingComp.type || 'fourBbbStableford',
         date: editingComp.date ? new Date(editingComp.date) : null,
         club: editingComp.club || 'Westlake Golf Club',
-        handicapAllowance: editingComp.handicapAllowance || '95',
+        // Support both casing variants coming from backend: handicapallowance or handicapAllowance
+        handicapAllowance: (editingComp.handicapallowance ?? editingComp.handicapAllowance) || '95',
         notes: editingComp.notes || '',
       };
     }
@@ -155,15 +156,18 @@ function CreateCompetition({ user, onSignOut }) {
           type: updatedComp.type,
           date: updatedComp.date ? new Date(updatedComp.date) : null,
           club: updatedComp.club,
-          handicapAllowance: updatedComp.handicapAllowance,
+          // backend may return either casing -- prefer provided value
+          handicapAllowance: (updatedComp.handicapallowance ?? updatedComp.handicapAllowance),
           notes: updatedComp.notes
         }));
         // Overwrite editingComp for popup
-        editingComp.type = updatedComp.type;
-        editingComp.date = updatedComp.date;
-        editingComp.club = updatedComp.club;
-        editingComp.handicapAllowance = updatedComp.handicapAllowance;
-        editingComp.notes = updatedComp.notes;
+  editingComp.type = updatedComp.type;
+  editingComp.date = updatedComp.date;
+  editingComp.club = updatedComp.club;
+  // mirror backend casing when overwriting editingComp so further navigations/readers see the correct value
+  editingComp.handicapallowance = updatedComp.handicapallowance ?? updatedComp.handicapAllowance;
+  editingComp.handicapAllowance = updatedComp.handicapallowance ?? updatedComp.handicapAllowance;
+  editingComp.notes = updatedComp.notes;
         // Now move to group assignment if fourballs entered
         if (form.fourballs && !showGroups) {
           setShowGroups(true);

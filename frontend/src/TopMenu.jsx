@@ -1,5 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { apiUrl } from './api';
+
+// Note: TopMenu may be rendered on pages that only pass a single `comp` via
+// `competitionList` (e.g. CompetitionInfo). To reliably find the currently OPEN
+// competition we fetch the full competitions list when a full list isn't provided
+// via props. This prevents the menu from thinking a single (possibly closed)
+// comp is the open comp.
 
 export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, competitionList }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -38,7 +45,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
 
   // Active-path helpers for mobile menu highlighting
   const isDashboardPath = location.pathname === '/dashboard';
-  const isLeaderboardPath = location.pathname.startsWith('/medal-leaderboard') || location.pathname.startsWith('/leaderboard-alliance') || location.pathname.startsWith('/alliance-leaderboard');
+  const isLeaderboardPath = location.pathname.startsWith('/leaderboard');
   const isRecentPath = location.pathname === '/recent';
   const isScorecardPath = location.pathname.startsWith('/scorecard');
 
@@ -64,12 +71,44 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
 
   // Determine if current user is admin (several possible flags present across the app)
   const isAdmin = !!(resolvedUser && (resolvedUser.role === 'admin' || resolvedUser.isAdmin || resolvedUser.isadmin));
+  // Local copy of competitions: prefer the prop `competitionList` when a full list
+  // is provided. If the prop is absent or only contains a single comp (common when
+  // pages pass `[comp]`), fetch the full list so we can correctly determine the
+  // currently OPEN competition across all comps.
+  const [localCompetitionList, setLocalCompetitionList] = useState(Array.isArray(competitionList) && competitionList.length > 1 ? competitionList : []);
 
-  if (!scorecardComp && competitionList && resolvedName) {
+  useEffect(() => {
+    // keep local list in sync when a full list is supplied by the caller
+    if (Array.isArray(competitionList) && competitionList.length > 1) {
+      setLocalCompetitionList(competitionList);
+    }
+  }, [competitionList]);
+
+  useEffect(() => {
+  // If caller didn't provide a full competition list (or only passed a single
+  // comp), fetch the full list so we can find the true open competition.
+  if (!Array.isArray(competitionList) || competitionList.length <= 1) {
+      let cancelled = false;
+      (async () => {
+        try {
+          const res = await fetch(apiUrl('/api/competitions'));
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!cancelled) setLocalCompetitionList(Array.isArray(data) ? data : []);
+        } catch (e) {
+          // ignore fetch errors
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+    return undefined;
+  }, [competitionList]);
+
+  if (!scorecardComp && (localCompetitionList || []).length > 0 && resolvedName) {
     // Prefer open competitions where user is assigned to a group
     const today = new Date();
     // Find open comps with user assigned to a group
-    const openComps = competitionList.filter(comp => {
+    const openComps = localCompetitionList.filter(comp => {
       if (!comp.date || !Array.isArray(comp.groups)) return false;
       const compDate = new Date(comp.date);
       const isOpen = compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -88,22 +127,34 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
       scorecardComp = openComps[0];
     } else {
       // Fallback: any comp where user is a player (old logic)
-      scorecardComp = competitionList.find(comp => comp.users && comp.users.some(u => (u.name || u.displayName) === resolvedName));
+      scorecardComp = (localCompetitionList || []).find(comp => comp.users && comp.users.some(u => (u.name || u.displayName) === resolvedName));
     }
   }
-  // Decide which competition id to use for top-menu navigation. Prefer the user's scorecardComp
-  // but allow admins to target the current/latest open competition when not assigned to a group.
-  let compId = scorecardComp && (scorecardComp.joinCode || scorecardComp.joincode || scorecardComp.id || scorecardComp._id || scorecardComp.competitionType);
-  if (!compId && isAdmin && Array.isArray(competitionList) && competitionList.length > 0) {
-    // Prefer an open competition (status === 'Open') and the most recent one
+
+
+  // Determine the currently OPEN competition (most recent). Links to Scorecard/Leaderboard
+  // should only point to the open competition. If no open competition exists, those links
+  // will be disabled and greyed out.
+  let openComp = null;
+  let openCompId = null;
+  if (Array.isArray(localCompetitionList) && localCompetitionList.length > 0) {
     const today = new Date();
-    const openComps = competitionList.filter(comp => comp && (comp.status === 'Open' || (comp.date && new Date(comp.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))));
-    const pick = (openComps.length > 0 ? openComps.sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0] : competitionList.sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]);
-    if (pick) compId = (pick.joinCode || pick.joincode || pick.id || pick._id || pick.competitionType);
+    const openCompsAll = localCompetitionList.filter(c => c && (c.status === 'Open' || (c.date && new Date(c.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))));
+    if (openCompsAll.length > 0) {
+      openCompsAll.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      openComp = openCompsAll[0];
+      openCompId = openComp.id || openComp._id || openComp.joinCode || openComp.joincode || null;
+    }
   }
 
+  // Use the open competition id/object for leaderboard/scorecard navigation. If no open
+  // competition is present, compId will be null and buttons will be disabled.
+  const compId = openCompId;
+  const leaderboardComp = openComp;
+
   // Determine competition type to decide which leaderboard route to use.
-  let compType = (scorecardComp && scorecardComp.type) || '';
+  // Use the open competition type when available.
+  let compType = (openComp && openComp.type) || (scorecardComp && scorecardComp.type) || '';
   if (!compType && Array.isArray(competitionList) && compId) {
     const found = competitionList.find(c => (c.joinCode || c.joincode || c.id || c._id || c.competitionType) == compId || (c.id || c._id) == compId);
     compType = found?.type || '';
@@ -167,30 +218,30 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                   style={{ color: (location.pathname.startsWith('/scorecard') || (location.pathname.startsWith('/scorecard') && compId)) ? '#FFD700' : (compId ? 'white' : '#888'), background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
                 disabled={!compId}
                 onClick={() => {
-                  if (scorecardComp && compId && resolvedName) {
-                    let group = null;
-                    let playerObj = null;
-                    if (scorecardComp.groups) {
-                      group = scorecardComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
-                      if (group && Array.isArray(group.members)) {
-                        playerObj = group.members.find(m => (m.name === resolvedName || m.displayName === resolvedName)) || null;
+                  if (openComp && compId && resolvedName) {
+                      let group = null;
+                      let playerObj = null;
+                      if (openComp.groups) {
+                        group = openComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
+                        if (group && Array.isArray(group.members)) {
+                          playerObj = group.members.find(m => (m.name === resolvedName || m.displayName === resolvedName)) || null;
+                        }
+                        if (!playerObj) {
+                          const teamId = group?.teamId || group?.id || group?.team_id || group?.group_id;
+                          playerObj = {
+                            name: resolvedName,
+                            id: resolvedUser?.id,
+                            user_id: resolvedUser?.id,
+                            team_id: teamId,
+                            teebox: group?.teeboxes?.[resolvedName] || '',
+                            course_handicap: group?.handicaps?.[resolvedName] || '',
+                          };
+                        }
                       }
-                      if (!playerObj) {
-                        const teamId = group?.teamId || group?.id || group?.team_id || group?.group_id;
-                        playerObj = {
-                          name: resolvedName,
-                          id: resolvedUser?.id,
-                          user_id: resolvedUser?.id,
-                          team_id: teamId,
-                          teebox: group?.teeboxes?.[resolvedName] || '',
-                          course_handicap: group?.handicaps?.[resolvedName] || '',
-                        };
-                      }
-                    }
-                    navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: scorecardComp } });
-                  } else if (compId) {
-                    // For admins (or fallback), allow navigating to the scorecard route without player state.
-                    navigate(`/scorecard/${compId}`);
+                      navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: openComp } });
+                    } else if (compId) {
+                      // For admins (or fallback), allow navigating to the scorecard route without player state.
+                      navigate(`/scorecard/${compId}`);
                   } else {
                     navigate('/dashboard');
                   }
@@ -200,14 +251,40 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
             </button>
           </div>
           <div className="flex-1 min-w-0 text-center">
-            <button
-              className={`w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150`}
-                style={(location.pathname.startsWith('/medal-leaderboard') || location.pathname.startsWith('/leaderboard-alliance') || location.pathname.startsWith('/alliance-leaderboard')) ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' } : { color: compId ? 'white' : '#888', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
+              <button
+                className={`w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150`}
+                style={isLeaderboardPath ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' } : { color: compId ? 'white' : '#888', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: compId ? 1 : 0.5, pointerEvents: compId ? 'auto' : 'none' }}
               disabled={!compId}
-              onClick={() => {
-                if (!compId) return;
-                if (compType && compType.includes('alliance')) navigate(`/leaderboard-alliance/${compId}`);
-                else navigate(`/medal-leaderboard/${compId}`);
+              onClick={async () => {
+                    // Always fetch the authoritative competitions list and navigate
+                    // only when a current OPEN competition is found.
+                    try {
+                      const listRes = await fetch(apiUrl('/api/competitions'));
+                      if (!listRes.ok) return;
+                      const all = await listRes.json();
+                      const today = new Date();
+                      const open = (all || []).filter(c => c && (c.status === 'Open' || (c.date && new Date(c.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))));
+                      if (!open || open.length === 0) return;
+                      open.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+                      const pick = open[0];
+                      const pickId = pick.id || pick._id || pick.joinCode || pick.joincode;
+                      if (!pickId) return;
+                      try {
+                        const compRes = await fetch(apiUrl(`/api/competitions/${pickId}`));
+                        if (compRes.ok) {
+                          const compData = await compRes.json();
+                          try { console.debug('TopMenu: navigating to leaderboard (desktop) pickId:', pickId, 'compData:', compData); } catch (e) {}
+                          navigate(`/leaderboard/${pickId}`, { state: { competition: compData } });
+                          return;
+                        }
+                      } catch (e) {
+                        try { console.debug('TopMenu: navigating to leaderboard (desktop) fallback pickId:', pickId, 'pick:', pick); } catch (e) {}
+                        navigate(`/leaderboard/${pickId}`, { state: { competition: pick } });
+                        return;
+                      }
+                    } catch (e) {
+                      // ignore
+                    }
               }}
             >
               Leaderboard
@@ -265,7 +342,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                 </button>
                 <button onClick={() => {
                 setMenuOpen(false);
-                if (scorecardComp && compId && resolvedName) {
+                if (openComp && compId && resolvedName) {
                   let group = null;
                   let playerObj = null;
                   if (scorecardComp.groups) {
@@ -285,7 +362,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                       };
                     }
                   }
-                  navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: scorecardComp } });
+                    navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: openComp } });
                 } else if (compId) {
                   // Admins/fallback: allow opening scorecard without a player state
                   navigate(`/scorecard/${compId}`);
@@ -300,7 +377,37 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                 My Scorecard
               </button>
               <button
-                onClick={() => { setMenuOpen(false); if (!compId) return; if (compType && compType.includes('alliance')) navigate(`/leaderboard-alliance/${compId}`); else navigate(`/medal-leaderboard/${compId}`); }}
+                onClick={async () => { setMenuOpen(false);
+                    try {
+                      const listRes = await fetch(apiUrl('/api/competitions'));
+                      if (listRes.ok) {
+                        const all = await listRes.json();
+                        const today = new Date();
+                        const open = (all || []).filter(c => c && (c.status === 'Open' || (c.date && new Date(c.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))));
+                        if (open.length > 0) {
+                          open.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+                          const pick = open[0];
+                          const pickId = pick.id || pick._id || pick.joinCode || pick.joincode;
+                          try {
+                            const compRes = await fetch(apiUrl(`/api/competitions/${pickId}`));
+                            if (compRes.ok) {
+                              const compData = await compRes.json();
+                                  try { console.debug('TopMenu: navigating to leaderboard (mobile) pickId:', pickId, 'compData:', compData); } catch (e) {}
+                                  navigate(`/leaderboard/${pickId}`, { state: { competition: compData } });
+                                  return;
+                                }
+                              } catch (e) {
+                                try { console.debug('TopMenu: navigating to leaderboard (mobile) fallback pickId:', pickId, 'pick:', pick); } catch (e) {}
+                                navigate(`/leaderboard/${pickId}`, { state: { competition: pick } });
+                                return;
+                              }
+                        }
+                      }
+                    } catch (e) {}
+          if (!compId) return; try { const res = await fetch(apiUrl(`/api/competitions/${compId}`)); if (res.ok) { const data = await res.json(); try { console.debug('TopMenu: navigating to leaderboard (mobile) fallback compId:', compId, 'data:', data); } catch (e) {} navigate(`/leaderboard/${compId}`, { state: { competition: data } }); return; } } catch (e) {}
+          try { console.debug('TopMenu: navigating to leaderboard (mobile) final fallback compId:', compId, 'leaderboardComp:', leaderboardComp); } catch (e) {}
+          navigate(`/leaderboard/${compId}`, { state: { competition: leaderboardComp } });
+                }}
                 className="text-left py-3 text-lg font-semibold"
                 style={{ color: isLeaderboardPath ? '#FFD700' : 'white' }}
                 aria-current={isLeaderboardPath ? 'page' : undefined}
