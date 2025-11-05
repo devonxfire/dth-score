@@ -11,6 +11,25 @@ app.use(express.json());
 
 const prisma = new PrismaClient();
 
+// Simple event id generator
+function makeEventId() {
+  return Math.random().toString(36).slice(2, 8) + '-' + Date.now().toString(36);
+}
+
+// In-memory signature dedupe with short TTL to avoid rapid duplicate emits
+const _popupSigDedupe = new Map(); // sig -> ts
+function popupSignatureSeen(sig, ttl = 10000) {
+  if (!sig) return false;
+  try {
+    const now = Date.now();
+    const prev = _popupSigDedupe.get(sig);
+    if (prev && (now - prev) < ttl) return true;
+    _popupSigDedupe.set(sig, now);
+    setTimeout(() => { try { _popupSigDedupe.delete(sig); } catch (e) {} }, ttl + 50);
+    return false;
+  } catch (e) { return false; }
+}
+
 // Get all teams for a competition (for leaderboard)
 app.get('/api/teams', async (req, res) => {
   const { competitionId } = req.query;
@@ -652,6 +671,43 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
           holes.forEach((h, idx) => { holeIdToIndex[h.id] = idx; });
           const mappedScores = allScores.map(s => ({ userId: s.user_id, holeIndex: holeIdToIndex[s.hole_id] ?? null, strokes: s.strokes }));
           global.io.to(`competition:${compIdNum}`).emit('scores-updated', { competitionId: compIdNum, teamId: Number(teamId), teamPoints: updatedTeam.team_points, changedUserIds, mappedScores });
+          // Emit popup-events for any eagle/birdie/blowup detected in mappedScores
+          try {
+            for (const s of mappedScores) {
+              const strokes = Number(s.strokes);
+              const holeIndex = s.holeIndex;
+              const hole = holes[holeIndex];
+              if (!hole || hole.par == null) continue;
+              const par = Number(hole.par);
+              let type = null;
+              if (strokes === par - 2) type = 'eagle';
+              else if (strokes === par - 1) type = 'birdie';
+              else if (strokes >= par + 3) type = 'blowup';
+              if (!type) continue;
+              const userId = s.userId;
+              let playerName = userId ? `user:${userId}` : null;
+              try {
+                if (userId) {
+                  const userRow = await prisma.users.findUnique({ where: { id: Number(userId) } });
+                  if (userRow) playerName = userRow.name;
+                }
+              } catch (e) {}
+              const event = {
+                eventId: makeEventId(),
+                competitionId: compIdNum,
+                groupId: updatedTeam.id || null,
+                type,
+                playerName,
+                holeNumber: (holeIndex != null) ? (holeIndex + 1) : null,
+                ts: Date.now()
+              };
+              try { event.signature = `${event.type}:${playerName}:${event.holeNumber}:${compIdNum}`; } catch (e) {}
+              const originSocket = req && req.headers && (req.headers['x-origin-socket'] || req.headers['X-Origin-Socket']) ? (req.headers['x-origin-socket'] || req.headers['X-Origin-Socket']) : null;
+              if (popupSignatureSeen(event.signature)) continue;
+              try { if (originSocket) event.originSocketId = originSocket; } catch (e) {}
+              try { global.io.to(`competition:${compIdNum}`).emit('popup-event', event); } catch (e) {}
+            }
+          } catch (e) { console.error('Error emitting popup-event from scores update', e); }
         }
       } catch (e) {
         console.error('Error emitting scores-updated socket event', e);
@@ -951,6 +1007,37 @@ io.on('connection', (socket) => {
       console.error('Error handling client-medal-saved', e);
     }
   });
+  // Clients may show optimistic popups locally. To ensure other viewers see
+  // those popups even when the HTTP save didn't change server state (no
+  // server-side popup emitted), allow clients to request a server rebroadcast
+  // of a canonical popup-event via 'client-popup'. The server will attach
+  // an eventId and originSocketId and use popupSignatureSeen to prevent dupes.
+  socket.on('client-popup', (payload) => {
+    try {
+      const compId = Number(payload?.competitionId);
+      if (!compId) return;
+      const type = payload.type;
+      const playerName = payload.playerName;
+      const holeNumber = payload.holeNumber || null;
+      const sig = payload.signature || payload.signature === 0 ? payload.signature : (type && playerName ? `${type}:${playerName}:${holeNumber}:${compId}` : null);
+      if (!sig) return;
+      // server-side dedupe to avoid rapid duplicate rebroadcasts
+      if (popupSignatureSeen(sig)) return;
+      const event = {
+        eventId: makeEventId(),
+        competitionId: compId,
+        type,
+        playerName,
+        holeNumber: holeNumber || null,
+        ts: Date.now(),
+        signature: sig,
+        originSocketId: socket.id
+      };
+      global.io.to(`competition:${compId}`).emit('popup-event', event);
+    } catch (e) {
+      console.error('Error handling client-popup', e);
+    }
+  });
   socket.on('disconnect', () => {
     // console.log('Socket disconnected:', socket.id);
   });
@@ -1101,10 +1188,77 @@ app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req
     });
     console.log('Updated groups:', JSON.stringify(comp.groups));
     try {
-      if (global.io) {
+        if (global.io) {
         // Emit the updated group object so clients can merge locally without a full refetch
         const updatedGroup = (updated && Array.isArray(updated.groups)) ? updated.groups[groupIdx] : comp.groups[groupIdx];
         global.io.to(`competition:${Number(id)}`).emit('medal-player-updated', { competitionId: Number(id), groupId: Number(groupId), playerName, group: updatedGroup });
+        // Now detect mini-stat flips and score-based changes and emit popup-events
+        try {
+          const beforeGroup = comp.groups[groupIdx] || {};
+          const afterGroup = updatedGroup || {};
+          // mini stats
+          const props = ['waters', 'dog', 'two_clubs'];
+          for (const prop of props) {
+            const beforeMap = beforeGroup[prop] || {};
+            const afterMap = afterGroup[prop] || {};
+            const beforeVal = beforeMap[playerName];
+            const afterVal = afterMap[playerName];
+            const becameTrue = ((afterVal || false) && !beforeVal);
+            if (becameTrue) {
+              const type = (prop === 'waters') ? 'waters' : (prop === 'dog') ? 'dog' : 'two_clubs';
+              const event = {
+                eventId: makeEventId(),
+                competitionId: Number(id),
+                groupId: Number(groupId),
+                type,
+                playerName,
+                ts: Date.now()
+              };
+              try { event.signature = `${type}:${playerName}:g:${groupId}:c:${Number(id)}`; } catch (e) {}
+              const originSocket = req && req.headers && (req.headers['x-origin-socket'] || req.headers['X-Origin-Socket']) ? (req.headers['x-origin-socket'] || req.headers['X-Origin-Socket']) : null;
+              if (!popupSignatureSeen(event.signature)) {
+                try { if (originSocket) event.originSocketId = originSocket; } catch (e) {}
+                try { global.io.to(`competition:${Number(id)}`).emit('popup-event', event); } catch (e) {}
+              }
+            }
+          }
+          // score diffs
+          try {
+            const beforeScores = (beforeGroup.scores && beforeGroup.scores[playerName]) || [];
+            const afterScores = (afterGroup.scores && afterGroup.scores[playerName]) || [];
+            const holesForComp = await prisma.holes.findMany({ where: { competition_id: Number(id) }, orderBy: { number: 'asc' } });
+            for (let hi = 0; hi < Math.max(beforeScores.length, afterScores.length); hi++) {
+              const beforeVal = beforeScores[hi];
+              const afterVal = afterScores[hi];
+              if (String(beforeVal) === String(afterVal)) continue;
+              const hole = holesForComp[hi];
+              if (!hole || hole.par == null) continue;
+              const par = Number(hole.par);
+              const strokes = afterVal == null || afterVal === '' ? null : Number(afterVal);
+              if (strokes == null || !Number.isFinite(strokes)) continue;
+              let type = null;
+              if (strokes === par - 2) type = 'eagle';
+              else if (strokes === par - 1) type = 'birdie';
+              else if (strokes >= par + 3) type = 'blowup';
+              if (!type) continue;
+              const event = {
+                eventId: makeEventId(),
+                competitionId: Number(id),
+                groupId: Number(groupId),
+                type,
+                playerName,
+                holeNumber: hi + 1,
+                ts: Date.now()
+              };
+              try { event.signature = `${event.type}:${playerName}:${event.holeNumber}:${Number(id)}`; } catch (e) {}
+              const originSocket = req && req.headers && (req.headers['x-origin-socket'] || req.headers['X-Origin-Socket']) ? (req.headers['x-origin-socket'] || req.headers['X-Origin-Socket']) : null;
+              if (!popupSignatureSeen(event.signature)) {
+                try { if (originSocket) event.originSocketId = originSocket; } catch (e) {}
+                try { global.io.to(`competition:${Number(id)}`).emit('popup-event', event); } catch (e) {}
+              }
+            }
+          } catch (e) { console.error('Error emitting popup-event from medal score changes', e); }
+        } catch (e) { console.error('Error emitting popup-event from medal update', e); }
       }
     } catch (e) {
       console.error('Error emitting medal-player-updated', e);

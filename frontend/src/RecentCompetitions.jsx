@@ -37,13 +37,9 @@ function RecentCompetitions({ user = {}, comps = [] }) {
 
   // Debug: log open competitions whenever they change
   useEffect(() => {
-    console.log('Open competitions:', openComps);
   }, [openComps]);
 
-    // Debug: log open competitions whenever they change
-    useEffect(() => {
-      console.log('Open competitions:', openComps);
-    }, [openComps]);
+    // (removed debug logging)
 
   // useEffect for debug logging can be removed
 
@@ -176,7 +172,6 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                   className="flex flex-row items-center gap-2 py-2 px-6 border border-white text-white font-extrabold rounded-2xl transition text-lg bg-[#1B3A6B] hover:bg-white hover:text-[#1B3A6B]"
                   style={{ boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
                   onClick={() => {
-                    console.log('Create New Competition clicked. openComps:', openComps);
                     if (openComps.length > 0) {
                       setShowOpenCompModal('create');
                     } else {

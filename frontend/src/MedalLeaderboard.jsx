@@ -638,7 +638,7 @@ function MedalLeaderboard() {
         const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
   const url = apiUrl(`/api/teams/${teamId}/users/${userId}`);
         const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
-        console.log('Saving fines', { url, body });
+        
         const res = await fetch(url, {
           method: 'PATCH',
           headers: {
@@ -654,7 +654,7 @@ function MedalLeaderboard() {
           return;
         }
         const data = await res.json();
-        console.log('Saved fines response', data);
+        
         setEntries(es => es.map(e => (e.teamId === teamId && e.userId === userId) ? { ...e, fines: data.fines ?? (fines !== '' ? fines : '') } : e));
         return;
       }
@@ -678,7 +678,7 @@ function MedalLeaderboard() {
         return;
       }
       const data = await res.json();
-      console.log('Fallback saved fines', data);
+      
       setEntries(es => es.map(e => (e.name === playerName ? { ...e, fines: data.fines ?? (fines !== '' ? fines : '') } : e)));
     } catch (err) {
       console.error('Failed to save fines', err);

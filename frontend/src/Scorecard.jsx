@@ -5,7 +5,9 @@ import { TrophyIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
-import { checkAndMark } from './popupDedupe';
+import { checkAndMark, markShown } from './popupDedupe';
+import socket from './socket';
+import { toast } from './simpleToast';
 import './popupJiggle.css';
 
 // Modal state for reset confirmation
@@ -75,6 +77,32 @@ const defaultHoles = [
 
 
 export default function Scorecard(props) {
+  // Show a local toast and ask the server to rebroadcast to other clients
+  function showLocalPopup({ type, name, holeNumber, sig }) {
+    try {
+  let emoji = '🎉';
+  let title = 'Nice!';
+  let body = name || '';
+  // 5s default for all toast popups
+  let autoClose = 5000;
+  if (type === 'eagle') { emoji = '🦅'; title = 'Eagle!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([200,100,200]); }
+  else if (type === 'birdie') { emoji = '🕊️'; title = 'Birdie!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([100,50,100]); }
+  else if (type === 'blowup') { emoji = '💥'; title = 'How Embarrassing!'; body = `${name || ''} just blew up on Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([400,100,400]); }
+  else if (type === 'waters') { emoji = '💧'; title = 'Splash!'; body = `${name || ''} has earned a water`; }
+  else if (type === 'dog') { emoji = '🐶'; title = 'Woof!'; body = `${name || ''} got the dog`; }
+
+      const content = (
+        <div className="flex flex-col items-center" style={{ padding: '0.75rem 1rem' }}>
+          <div style={{ fontSize: '3rem', marginBottom: 8 }}>{emoji}</div>
+          <div style={{ fontWeight: 800, color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.4rem' }}>{title}</div>
+          <div style={{ color: 'white', fontFamily: 'Lato, Arial, sans-serif', fontSize: '1.05rem' }}>{body}</div>
+        </div>
+      );
+  try { toast(content, { toastId: sig || `${type}:${name}:${holeNumber}:${competition?.id}`, autoClose, position: 'top-center', closeOnClick: true }); } catch (e) {}
+  try { if (sig) markShown(sig); } catch (e) {}
+  try { socket.emit('client-popup', { competitionId: Number(competition?.id), type, playerName: name, holeNumber: holeNumber || null, signature: sig }); } catch (e) {}
+    } catch (e) {}
+  }
   // Waters popup state
   const [showWatersPopup, setShowWatersPopup] = useState(false);
   const [watersPlayer, setWatersPlayer] = useState(null);
@@ -317,40 +345,13 @@ export default function Scorecard(props) {
         // Eagle: 2 under par
         if (gross === hole.par - 2) {
           const sig = `eagle:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
-          if (checkAndMark(sig)) {
-            setEagleHole(hole.number);
-            setEaglePlayer(groupPlayers[playerIdx]);
-            setShowEagle(true);
-            if (navigator.vibrate) {
-              navigator.vibrate([200, 100, 200, 100, 200]);
-            }
-            if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-            eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
-          }
+          try { showLocalPopup({ type: 'eagle', name: groupPlayers[playerIdx], holeNumber: hole.number, sig }); } catch (e) {}
         } else if (gross === hole.par - 1) {
           const sig = `birdie:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
-          if (checkAndMark(sig)) {
-            setBirdieHole(hole.number);
-            setBirdiePlayer(groupPlayers[playerIdx]);
-            setShowBirdie(true);
-            if (navigator.vibrate) {
-              navigator.vibrate([100, 50, 100]);
-            }
-            if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
-            birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
-          }
+          try { showLocalPopup({ type: 'birdie', name: groupPlayers[playerIdx], holeNumber: hole.number, sig }); } catch (e) {}
         } else if (gross >= hole.par + 3) {
           const sig = `blowup:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
-          if (checkAndMark(sig)) {
-            setBlowupHole(hole.number);
-            setBlowupPlayer(groupPlayers[playerIdx]);
-            setShowBlowup(true);
-            if (navigator.vibrate) {
-              navigator.vibrate([400, 100, 400]);
-            }
-            if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-            blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
-          }
+          try { showLocalPopup({ type: 'blowup', name: groupPlayers[playerIdx], holeNumber: hole.number, sig }); } catch (e) {}
         }
       }
       return updated;
@@ -419,73 +420,7 @@ export default function Scorecard(props) {
         </div>
       )}
 
-  {/* Eagle Celebration Popup */}
-      {showEagle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Eagle">🦅</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Eagle!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>For {eaglePlayer} on Hole {eagleHole}</div>
-            <button
-              className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
-              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-              onClick={() => {
-                setShowEagle(false);
-                if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
-  {/* Blowup Popup */}
-      {/* Dog Popup */}
-      {showDogPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Dog">🐶</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Woof!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{dogPlayer} has just gotten the dog</div>
-            <button
-              className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
-              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-              onClick={() => {
-                setShowDogPopup(false);
-                if (dogTimeoutRef.current) clearTimeout(dogTimeoutRef.current);
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-      {showBlowup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Explosion">💥</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>How embarrassing.</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{blowupPlayer} just blew up on Hole {blowupHole}.</div>
-            <button
-              className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
-              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-              onClick={() => {
-                setShowBlowup(false);
-                if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
+  
 
       <TopMenu
         user={userMenu}
@@ -776,36 +711,12 @@ export default function Scorecard(props) {
                                       if (val && Number(val) > 0) {
                                         const sig = `waters:${name}:g:${groupForPlayer?.id ?? ''}:c:${competition?.id ?? ''}`;
                                         if (checkAndMark(sig)) {
-                                          setWatersPlayer(name);
-                                          setShowWatersPopup(true);
-                                          if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
-                                          watersTimeoutRef.current = setTimeout(() => setShowWatersPopup(false), 30000);
+                                          try { showLocalPopup({ type: 'waters', name, sig }); } catch (e) {}
                                         }
                                       }
                                     }}
                                   />
-      {/* Waters Popup */}
-      {showWatersPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Splash">💧</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Splash!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{watersPlayer} has just earned a water</div>
-            <button
-              className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
-              style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-              onClick={() => {
-                setShowWatersPopup(false);
-                if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
+      
                                 </td>
                                 {/* Dog column */}
                                 <td className="border px-2 py-1 text-center">
@@ -847,10 +758,7 @@ export default function Scorecard(props) {
                                         {
                                           const sig = `dog:${name}:g:${groupForPlayer?.id ?? ''}:c:${competition?.id ?? ''}`;
                                           if (checkAndMark(sig)) {
-                                            setDogPlayer(name);
-                                            setShowDogPopup(true);
-                                            if (dogTimeoutRef.current) clearTimeout(dogTimeoutRef.current);
-                                            dogTimeoutRef.current = setTimeout(() => setShowDogPopup(false), 30000);
+                                            try { showLocalPopup({ type: 'dog', name, holeNumber: null, sig }); } catch (e) {}
                                           }
                                         }
                                       } else {

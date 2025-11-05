@@ -96,19 +96,15 @@ export default function LeaderboardRouter(props) {
   const compType = (competition?.type || '').toString().toLowerCase();
   const is4BBB = compType.includes('4bbb') || compType.includes('fourbbb');
   if (is4BBB) {
-    console.log('LeaderboardRouter: Rendering Leaderboard4BBB for compType:', compType);
     return <Leaderboard4BBB {...props} competition={competition} />;
   }
   const isMedal = compType.includes('medal') || compType.includes('stroke');
   const isAlliance = compType.includes('alliance');
   if (isAlliance) {
-    console.log('LeaderboardRouter: Rendering AllianceLeaderboard for compType:', compType);
     return <AllianceLeaderboard {...props} competition={competition} />;
   }
   if (isMedal) {
-    console.log('LeaderboardRouter: Rendering MedalLeaderboard for compType:', compType);
     return <MedalLeaderboard {...props} competition={competition} />;
   }
-  console.log('LeaderboardRouter: Rendering standard Leaderboard for compType:', compType);
   return <Leaderboard {...props} competition={competition} />;
 }

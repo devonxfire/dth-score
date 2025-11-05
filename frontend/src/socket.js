@@ -6,6 +6,8 @@ import { API_BASE } from './api';
 const backendBase = API_BASE && API_BASE !== '' ? API_BASE : window.location.origin;
 
 // Create a single socket instance used across the app
-const socket = io(backendBase, { transports: ['websocket', 'polling'] });
+// Force polling transport to avoid websocket upgrade issues in some dev setups.
+// This is a safe fallback for local development; browsers will use long-polling.
+const socket = io(backendBase, { transports: ['polling'] });
 
 export default socket;

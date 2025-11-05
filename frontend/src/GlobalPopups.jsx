@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import socket from './socket';
 import { apiUrl } from './api';
 import './popupJiggle.css';
 import { checkAndMark, shouldShowPopup, markShown } from './popupDedupe';
+import { toast } from './simpleToast';
 
 export default function GlobalPopups() {
   const [showBirdie, setShowBirdie] = useState(false);
@@ -30,20 +32,54 @@ export default function GlobalPopups() {
   const dogTimeout = useRef(null);
   const lastMiniRef = useRef(new Map()); // key -> { waters, dog }
   const verifyTimeouts = useRef(new Map()); // key -> timeoutId for delayed verification
+  // track last shown popup per player+hole to avoid showing lower-priority
+  // popups after a higher-priority one (e.g. birdie then immediate eagle)
+  const lastShown = useRef(new Map()); // key -> { type, ts }
+  const POPUP_PRIORITY = { eagle: 3, birdie: 2, blowup: 1 };
 
   // Join all competitions so we receive their realtime events regardless of UI route.
   useEffect(() => {
-    console.log('[global-popups] mounted, socket connected?', !!(socket && socket.connected));
+    // mounted; joining competitions below
     let cancelled = false;
     let joined = [];
     (async () => {
       try {
         const res = await fetch(apiUrl('/api/competitions'));
-        if (!res.ok) { console.log('[global-popups] fetch /api/competitions failed', res.status); return; }
+  if (!res.ok) { return; }
         const data = await res.json();
-        console.log('[global-popups] fetched competitions count', Array.isArray(data) ? data.length : 0);
+  // fetched competitions
         if (cancelled) return;
         const comps = (data || []);
+
+        // Seed lastMiniRef with any existing waters/dog state so we don't fire
+        // mini-stat popups for already-present values on initial load.
+        try {
+          for (const c of comps) {
+            try {
+              const id = Number(c.id || c._id);
+              if (!Number.isFinite(id)) continue;
+              // fetch full competition detail to inspect groups
+              const detailRes = await fetch(apiUrl(`/api/competitions/${id}`));
+              if (!detailRes.ok) continue;
+              const detail = await detailRes.json();
+              const groups = Array.isArray(detail.groups) ? detail.groups : [];
+              for (const g of groups) {
+                const groupId = g.id ?? g.groupId ?? null;
+                const waters = g.waters || {};
+                const dog = g.dog || {};
+                const players = Array.isArray(g.players) ? g.players : [];
+                for (const name of players) {
+                  try {
+                    const key = `${groupId ?? ''}:${name}:c:${id}`;
+                    lastMiniRef.current.set(key, { waters: !!waters[name], dog: !!dog[name] });
+                  } catch (e) { /* ignore per-name errors */ }
+                }
+              }
+            } catch (e) { /* ignore per-competition errors */ }
+          }
+        } catch (e) {
+          /* seeding mini-state failed; ignore */
+        }
 
         const doJoin = () => {
           for (const c of comps) {
@@ -53,14 +89,12 @@ export default function GlobalPopups() {
               joined.push(id);
             } catch (e) { /* ignore */ }
           }
-          console.log('[global-popups] joined competitions', joined);
+          /* joined competitions (best-effort) */
         };
 
         if (socket && socket.connected) {
-          console.log('[global-popups] socket already connected, joining now');
           doJoin();
         } else if (socket) {
-          console.log('[global-popups] socket not connected yet, will join on connect');
           socket.once('connect', doJoin);
         }
       } catch (e) { }
@@ -100,7 +134,7 @@ export default function GlobalPopups() {
         const existing = verifyTimeouts.current.get(key);
         if (existing) clearTimeout(existing);
 
-        console.log('[global-popups] scheduling verify popup', { type, name, holeIdx, holeNumber, strokes, compId, key });
+  // scheduling verify popup (delayed verification)
         const tid = setTimeout(async () => {
           try {
             // If competition id is available, fetch the competition to find the group index
@@ -139,7 +173,7 @@ export default function GlobalPopups() {
               currentMatches = true;
             }
 
-            console.log('[global-popups] verification result', { key, currentMatches });
+            // verification result: currentMatches
             if (currentMatches) {
               // Use the same signature format as local scorecards so dedupe matches
               // (e.g. `eagle:Bob:12:123`). Fall back to 'x' for missing compId.
@@ -151,8 +185,7 @@ export default function GlobalPopups() {
                 if (type === 'blowup') { setBlowupPlayer(name); setBlowupHole(holeNumber); setShowBlowup(true); if (navigator.vibrate) navigator.vibrate([400,100,400]); scheduleHide(blowupTimeout, setShowBlowup, 30000); }
               }
             } else {
-              // debug: didn't match saved score
-              console.log('[global-popups] verification failed for', { key, type, name, holeIdx, strokes, compId, groupIdx });
+              // verification failed for saved score; ignoring
             }
           } catch (e) {}
           try { verifyTimeouts.current.delete(key); } catch (e) {}
@@ -162,122 +195,175 @@ export default function GlobalPopups() {
       } catch (e) {}
     }
 
-    const handler = (msg) => {
-      console.log('[global-popups] handler received', msg && (msg.mappedScores ? 'mappedScores' : msg.group ? 'group' : Object.keys(msg)));
+  const handler = (msg) => {
+    // handler received message
       try {
         if (!msg) return;
         // Support mappedScores arrays (scores-updated) and group updates (medal-player-updated)
         const mapped = msg.mappedScores || [];
+        // mappedScores may be emitted by the server for score updates. Score-based
+        // celebration popups (birdie/eagle/blowup) are now server-driven via
+        // `popup-event`. We keep a debug log here but avoid showing popups from
+        // raw mappedScores to prevent duplication and race conditions.
         if (Array.isArray(mapped) && mapped.length > 0) {
-          for (const s of mapped) {
-            const strokes = parseInt(s.strokes ?? s.value ?? s.strokes_received ?? s.strokesReceived, 10);
-            const holeIdx = s.holeIndex ?? s.hole_index ?? s.hole;
-            const playerName = s.playerName || s.name || s.userName || s.user || s.userId || s.user_id;
-            const hole = (msg.holes && msg.holes[holeIdx]) || null;
-            // best-effort: if hole data present use its par
-            const par = hole?.par ?? null;
-            if (!Number.isFinite(strokes) || par == null) continue;
-            const holeNumber = hole?.number ?? holeIdx + 1;
-            // Instead of showing immediately, schedule a brief verification (like MedalScorecard)
-            // to ensure the saved score persisted before showing a global popup.
-            const compId = msg.competitionId ?? msg.competition ?? null;
-            if (msg._clientBroadcast) {
-              // client-initiated broadcast: show immediately (still deduped)
-              if (strokes === par - 2) {
-                const sig = `eagle:${playerName}:${holeNumber}:${compId ?? 'x'}`;
-                if (checkAndMark(sig)) { setEaglePlayer(playerName); setEagleHole(holeNumber); setShowEagle(true); scheduleHide(eagleTimeout, setShowEagle, 30000); }
-              } else if (strokes === par - 1) {
-                const sig = `birdie:${playerName}:${holeNumber}:${compId ?? 'x'}`;
-                if (checkAndMark(sig)) { setBirdiePlayer(playerName); setBirdieHole(holeNumber); setShowBirdie(true); scheduleHide(birdieTimeout, setShowBirdie, 30000); }
-              } else if (strokes >= par + 3) {
-                const sig = `blowup:${playerName}:${holeNumber}:${compId ?? 'x'}`;
-                if (checkAndMark(sig)) { setBlowupPlayer(playerName); setBlowupHole(holeNumber); setShowBlowup(true); scheduleHide(blowupTimeout, setShowBlowup, 30000); }
-              }
-            } else {
-              if (strokes === par - 2) {
-                scheduleVerifiedPopup({ type: 'eagle', name: playerName, holeIdx: Number(holeIdx), holeNumber, strokes, compId });
-              } else if (strokes === par - 1) {
-                scheduleVerifiedPopup({ type: 'birdie', name: playerName, holeIdx: Number(holeIdx), holeNumber, strokes, compId });
-              } else if (strokes >= par + 3) {
-                scheduleVerifiedPopup({ type: 'blowup', name: playerName, holeIdx: Number(holeIdx), holeNumber, strokes, compId });
-              }
-            }
-          }
+          /* mappedScores received; relying on popup-event for score popups */
         }
 
-        // Mini-stat changes: waters/dog — show only when value actually changes to true
+        // Mini-stat changes (waters/dog) are now server-driven via canonical
+        // `popup-event` messages. To avoid duplicate/incorrect mini-stat popups
+        // we no longer show popups directly from `medal-player-updated` group
+        // updates. Instead, update our seeded state so initial-load values are
+        // remembered and rely on `popup-event` for any UI popups.
         if (msg.group && (msg.group.waters || msg.group.dog)) {
-          console.log('[global-popups] group mini-stats present', { groupId: msg.groupId, comp: msg.competitionId, waters: msg.group.waters, dog: msg.group.dog });
+          /* group mini-stats present: update local seed only */
           const waters = msg.group.waters || {};
           const dog = msg.group.dog || {};
           const groupId = msg.groupId ?? msg.group?.id ?? '';
           const compId = msg.competitionId ?? msg.competition ?? '';
           for (const name of Array.from(new Set([...Object.keys(waters), ...Object.keys(dog)]))) {
-            const newWaters = !!(waters[name]);
-            const newDog = !!(dog[name]);
-            console.log('[global-popups] mini-stat change for', { name, newWaters, newDog, groupId, compId });
-            const key = `${groupId}:${name}:c:${compId}`;
-            const prev = lastMiniRef.current.get(key) || { waters: false, dog: false };
-            // show waters only if it changed from false -> true
-            if (newWaters && !prev.waters) {
-              const sig = `waters:${name}:g:${groupId}:c:${compId}`;
-              if (checkAndMark(sig)) { setWatersPlayer(name); setShowWaters(true); scheduleHide(watersTimeout, setShowWaters, 15000); }
-            }
-            // show dog only if it changed from false -> true
-            if (newDog && !prev.dog) {
-              const sig = `dog:${name}:g:${groupId}:c:${compId}`;
-              if (checkAndMark(sig)) { setDogPlayer(name); setShowDog(true); scheduleHide(dogTimeout, setShowDog, 15000); }
-            }
-            lastMiniRef.current.set(key, { waters: newWaters, dog: newDog });
+            try {
+              const key = `${groupId ?? ''}:${name}:c:${compId}`;
+              lastMiniRef.current.set(key, { waters: !!(waters[name]), dog: !!(dog[name]) });
+            } catch (e) { /* ignore per-name */ }
           }
         }
 
         // If a group object contains scores, schedule per-player popup checks similar to local scorecards
+        // If a group object contains scores, we log it. Score popups are handled
+        // exclusively via server `popup-event` messages to avoid duplication.
         if (msg.group && msg.group.scores) {
-          try {
-            const names = msg.group.players || [];
-            for (const name of names) {
-              const arr = msg.group.scores?.[name];
-              if (!Array.isArray(arr)) continue;
-                for (let i = 0; i < arr.length; i++) {
-                const strokes = arr[i];
-                const hole = msg.holes?.[i] || null;
-                const par = hole?.par ?? null;
-                const holeNumber = hole?.number ?? i + 1;
-                const gross = parseInt(strokes, 10);
-                if (!Number.isFinite(gross) || par == null) continue;
-                if (msg._clientBroadcast) {
-                  const compIdLocal = msg.competitionId ?? msg.competition ?? null;
-                  if (gross === par - 2) {
-                    const sig = `eagle:${name}:${holeNumber}:${compIdLocal ?? 'x'}`;
-                    if (checkAndMark(sig)) { setEaglePlayer(name); setEagleHole(holeNumber); setShowEagle(true); scheduleHide(eagleTimeout, setShowEagle, 30000); }
-                  } else if (gross === par - 1) {
-                    const sig = `birdie:${name}:${holeNumber}:${compIdLocal ?? 'x'}`;
-                    if (checkAndMark(sig)) { setBirdiePlayer(name); setBirdieHole(holeNumber); setShowBirdie(true); scheduleHide(birdieTimeout, setShowBirdie, 30000); }
-                  } else if (gross >= par + 3) {
-                    const sig = `blowup:${name}:${holeNumber}:${compIdLocal ?? 'x'}`;
-                    if (checkAndMark(sig)) { setBlowupPlayer(name); setBlowupHole(holeNumber); setShowBlowup(true); scheduleHide(blowupTimeout, setShowBlowup, 30000); }
-                  }
-                } else {
-                  scheduleVerifiedPopup({ type: 'eagle', name, holeIdx: i, holeNumber, strokes: gross, compId: msg.competitionId ?? msg.competition ?? null, group: msg.group });
-                }
-              }
-            }
-          } catch (e) {}
+          /* group.scores present (handled by popup-event) */
         }
       } catch (e) { }
+    };
+
+    // Server-driven popup-event: canonical events emitted after DB commits
+    const popupEventHandler = (event) => {
+      try {
+        if (!event || !event.eventId) return;
+        // If this event originated from this client's socket, ignore it to avoid echoing
+        try {
+          if (event.originSocketId && socket && socket.id && event.originSocketId === socket.id) {
+            return; // ignore echo from same socket
+          }
+        } catch (e) { /* ignore origin checks */ }
+        // Prefer deduping by server-provided signature (if present) so that
+        // clients which showed an optimistic local popup (using the same
+        // signature) will suppress the server rebroadcast. Fall back to
+        // deduping by eventId when no signature exists.
+  const dedupeKey = event.signature || event.eventId;
+  try { if (typeof window !== 'undefined') window.__lastPopupEvent = event; } catch (e) {}
+  if (!checkAndMark(dedupeKey)) { return; }
+  const { type, playerName, holeNumber } = event;
+        // suppress lower-priority popups for same player+hole when a higher
+        // priority popup has been shown recently. e.g. birdie then eagle.
+        try {
+          if (holeNumber && playerName) {
+            const pkey = `${String(playerName)}:h:${String(holeNumber)}`;
+            const prev = lastShown.current.get(pkey);
+            const now = Date.now();
+              if (prev && (now - prev.ts) < 10000) {
+                const prevPri = POPUP_PRIORITY[prev.type] || 0;
+                const newPri = POPUP_PRIORITY[type] || 0;
+                if (newPri < prevPri) {
+                  // ignore lower-priority event
+                  return;
+                }
+                if (newPri > prevPri) {
+                  // hide previous popup UI and continue to show new
+                  if (prev.type === 'birdie') { setShowBirdie(false); }
+                  if (prev.type === 'eagle') { setShowEagle(false); }
+                  if (prev.type === 'blowup') { setShowBlowup(false); }
+                }
+              }
+          }
+        } catch (e) { /* ignore suppression errors */ }
+
+        // Use toast for all clients. We still track lastShown to avoid
+        // quick lower-priority replacements logic but rendering is via toasts.
+        try {
+          let emoji = '🎉';
+          let title = 'Nice!';
+          let body = playerName || '';
+          // default 5s autoClose for global popups
+          let autoClose = 5000;
+          if (type === 'eagle') { emoji = '🦅'; title = 'Eagle!'; body = `For ${playerName || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([200,100,200]); }
+          else if (type === 'birdie') { emoji = '🕊️'; title = 'Birdie!'; body = `For ${playerName || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([100,50,100]); }
+          else if (type === 'blowup') { emoji = '💥'; title = "How Embarrassing!"; body = `${playerName || ''} just blew up on Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([400,100,400]); }
+          else if (type === 'waters') { emoji = '💧'; title = 'Splash!'; body = `${playerName || ''} has earned a water`; }
+          else if (type === 'dog') { emoji = '🐶'; title = 'Woof!'; body = `${playerName || ''} got the dog`; }
+
+          // prevent lower-priority replacement for same player+hole shortly after
+          try {
+            if (holeNumber && playerName) {
+              const pkey = `${String(playerName)}:h:${String(holeNumber)}`;
+              const prev = lastShown.current.get(pkey);
+              const now = Date.now();
+              if (prev && (now - prev.ts) < 10000) {
+                const prevPri = POPUP_PRIORITY[prev.type] || 0;
+                const newPri = POPUP_PRIORITY[type] || 0;
+                if (newPri < prevPri) {
+                  return;
+                }
+                if (newPri > prevPri) {
+                  // replacing previous popup with higher-priority
+                }
+              }
+              lastShown.current.set(pkey, { type, ts: now });
+              setTimeout(() => { try { const cur = lastShown.current.get(pkey); if (cur && (Date.now() - cur.ts) > 10000) lastShown.current.delete(pkey); } catch (e) {} }, 11000);
+            }
+          } catch (e) {}
+
+          const content = (
+            <div className="flex flex-col items-center popup-jiggle" style={{ padding: '1rem 1.25rem' }}>
+              <div style={{ fontSize: '3rem', marginBottom: 8 }}>{emoji}</div>
+              <div style={{ fontWeight: 800, color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.4rem' }}>{title}</div>
+              <div style={{ color: 'white', fontFamily: 'Lato, Arial, sans-serif', fontSize: '1.05rem' }}>{body}</div>
+            </div>
+          );
+
+          try {
+            toast(content, { toastId: dedupeKey, autoClose, position: 'top-center', closeOnClick: true });
+          } catch (e) { console.error('toast error', e); }
+        } catch (e) { console.error('popup-event render error', e); }
+      } catch (e) { console.error('popupEventHandler error', e); }
+    };
+
+    // initial-mini-stats seeds: server sends this only to joining socket to avoid
+    // rendering popups for pre-existing mini-stats
+    const initialMiniHandler = (payload) => {
+    try {
+      if (!payload || !Array.isArray(payload.groups)) return;
+        for (const g of payload.groups) {
+          const groupId = g.groupId;
+          const waters = g.waters || {};
+          const dog = g.dog || {};
+          const compId = payload.competitionId ?? '';
+          const players = Array.from(new Set([...Object.keys(waters || {}), ...Object.keys(dog || {})]));
+          for (const name of players) {
+            try {
+              const key = `${groupId ?? ''}:${name}:c:${compId}`;
+              lastMiniRef.current.set(key, { waters: !!waters[name], dog: !!dog[name] });
+            } catch (e) {}
+          }
+        }
+      } catch (e) { console.error('initialMiniHandler error', e); }
     };
 
     socket.on('scores-updated', handler);
     socket.on('medal-player-updated', handler);
     socket.on('team-user-updated', handler);
     socket.on('fines-updated', handler);
+  socket.on('popup-event', popupEventHandler);
+  socket.on('initial-mini-stats', initialMiniHandler);
 
     return () => {
       socket.off('scores-updated', handler);
       socket.off('medal-player-updated', handler);
       socket.off('team-user-updated', handler);
       socket.off('fines-updated', handler);
+  socket.off('popup-event', popupEventHandler);
+  socket.off('initial-mini-stats', initialMiniHandler);
       try { if (birdieTimeout.current) clearTimeout(birdieTimeout.current); } catch (e) {}
       try {
         for (const t of verifyTimeouts.current.values()) { clearTimeout(t); }
@@ -286,59 +372,12 @@ export default function GlobalPopups() {
     };
   }, []);
 
-  // Simple popup markup (matches existing app styling)
-  return (
-    <>
-      {showBirdie && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Birdie">🕊️</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Birdie!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{birdiePlayer} — Hole {birdieHole}</div>
-            <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowBirdie(false); if (birdieTimeout.current) clearTimeout(birdieTimeout.current); }}>Dismiss</button>
-          </div>
-        </div>
-      )}
-      {showEagle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Eagle">🦅</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Eagle!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{eaglePlayer} — Hole {eagleHole}</div>
-            <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowEagle(false); if (eagleTimeout.current) clearTimeout(eagleTimeout.current); }}>Dismiss</button>
-          </div>
-        </div>
-      )}
-      {showBlowup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Blowup">💥</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>How embarrassing.</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{blowupPlayer} — Hole {blowupHole}</div>
-            <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowBlowup(false); if (blowupTimeout.current) clearTimeout(blowupTimeout.current); }}>Dismiss</button>
-          </div>
-        </div>
-      )}
-      {showWaters && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Splash">💧</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Splash!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{watersPlayer} has earned a water</div>
-            <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowWaters(false); if (watersTimeout.current) clearTimeout(watersTimeout.current); }}>Dismiss</button>
-          </div>
-        </div>
-      )}
-      {showDog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Dog">🐶</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Woof!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{dogPlayer} got the dog</div>
-            <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowDog(false); if (dogTimeout.current) clearTimeout(dogTimeout.current); }}>Dismiss</button>
-          </div>
-        </div>
-      )}
-    </>
-  );
+    // We no longer render the legacy full-screen modal popups here. Toasts are
+    // used instead for reliability and cross-route visibility. The old modal
+    // JSX is intentionally left commented below in case we want to restore it.
+    /*
+    const popupNodes = ( ...legacy modal JSX... );
+    return createPortal(popupNodes, document.body);
+    */
+    return null;
 }

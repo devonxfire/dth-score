@@ -47,22 +47,17 @@ export default function ScorecardRouter(props) {
   const is4BBB = compTypeLower.includes('4bbb') || compTypeLower.includes('fourbbb');
   const chars = compTypeLower.split('');
   const charCodes = chars.map(c => c.charCodeAt(0));
-  console.log('ScorecardRouter: competition', competition, 'compType', compType, 'compTypeLower', compTypeLower, 'chars', chars, 'charCodes', charCodes, 'is4BBB', is4BBB);
   if (is4BBB) {
-    console.log('Rendering Scorecard4BBB for compType:', compType);
     return <Scorecard4BBB {...props} competition={competition} />;
   }
   const isAlliance = compTypeLower.includes('alliance');
   if (isAlliance) {
-    console.log('Rendering AllianceScorecard for compType:', compType);
     return <AllianceScorecard {...props} competition={competition} />;
   }
   // Medal logic: render MedalScorecard for Medal comps
   const isMedal = compTypeLower.includes('medal');
   if (isMedal) {
-    console.log('Rendering MedalScorecard for compType:', compType);
     return <MedalScorecard {...props} competition={competition} />;
   }
-  console.log('Rendering standard Scorecard for compType:', compType);
   return <Scorecard {...props} competition={competition} />;
 }

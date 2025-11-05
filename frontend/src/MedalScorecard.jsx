@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { apiUrl } from './api';
 import socket from './socket';
 import { shouldShowPopup, markShown, checkAndMark } from './popupDedupe';
+import { toast } from './simpleToast';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -20,6 +21,12 @@ const playerColors = [
 ];
 
 export default function MedalScorecard(props) {
+  // Helper to send PATCH requests with an X-Origin-Socket header when possible
+  async function patchWithOrigin(url, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    try { if (socket && socket.id) headers['X-Origin-Socket'] = socket.id; } catch (e) {}
+    return fetch(url, { method: 'PATCH', headers, body: JSON.stringify(body) });
+  }
   // Helper: compute Playing Handicap (PH) from Course Handicap (CH) using competition allowance
   const computePH = (ch) => {
     const allowance = comp?.handicapallowance ?? comp?.handicapAllowance ?? 100;
@@ -37,6 +44,35 @@ export default function MedalScorecard(props) {
     if (net === par + 1) return 1;
     return 0;
   };
+
+  // Show a local toast and emit client-popup for other clients.
+  function showLocalPopup({ type, name, holeNumber, sig }) {
+    try {
+  let emoji = '🎉';
+  let title = 'Nice!';
+  let body = name || '';
+  // Use 5s autoClose for all toasts unless explicitly disabled
+  let autoClose = 5000;
+  if (type === 'eagle') { emoji = '🦅'; title = 'Eagle!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([200,100,200]); }
+  else if (type === 'birdie') { emoji = '🕊️'; title = 'Birdie!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([100,50,100]); }
+  else if (type === 'blowup') { emoji = '💥'; title = 'How Embarrassing!'; body = `${name || ''} just blew up on Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([400,100,400]); }
+  else if (type === 'waters') { emoji = '💧'; title = 'Splash!'; body = `${name || ''} has earned a water`; }
+  else if (type === 'dog') { emoji = '🐶'; title = 'Woof!'; body = `${name || ''} got the dog`; }
+
+      const content = (
+        <div className="flex flex-col items-center" style={{ padding: '0.75rem 1rem' }}>
+          <div style={{ fontSize: '3rem', marginBottom: 8 }}>{emoji}</div>
+          <div style={{ fontWeight: 800, color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.4rem' }}>{title}</div>
+          <div style={{ color: 'white', fontFamily: 'Lato, Arial, sans-serif', fontSize: '1.05rem' }}>{body}</div>
+        </div>
+      );
+  try { toast(content, { toastId: sig || `${type}:${name}:${holeNumber}:${compId}`, autoClose, position: 'top-center', closeOnClick: true }); } catch (e) {}
+  // mark as shown locally so dedupe prevents the server rebroadcast from hiding the optimistic toast
+  try { if (sig) markShown(sig); } catch (e) {}
+      // Inform server to rebroadcast to other clients (server will dedupe and attach originSocketId)
+      try { socket.emit('client-popup', { competitionId: Number(compId), type, playerName: name, holeNumber: holeNumber || null, signature: sig }); } catch (e) {}
+    } catch (e) {}
+  }
 
   // Compute per-player stableford totals (front/back/total) and per-hole points array
   const computePlayerStablefordTotals = (name) => {
@@ -208,78 +244,7 @@ export default function MedalScorecard(props) {
       try {
         if (!msg || Number(msg.competitionId) !== compNum) return;
 
-        // helper: schedule the same delayed popup checks we use for local edits
-        function schedulePopupCheck(name, idx, strokes) {
-          console.debug && console.debug('[socket-debug] schedulePopupCheck called', { name, idx, strokes });
-          try {
-            const gross = parseInt(strokes, 10);
-            const hole = defaultHoles[idx];
-            if (!gross || !hole) return;
-                  if (gross === hole.par - 2) {
-                if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
-                eagleShowDelayRef.current = setTimeout(() => {
-                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
-                  console.debug && console.debug('[socket-debug] eagle check', { name, idx, gross, latest });
-                  if (latest === gross) {
-                    const sig = `eagle:${name}:${hole.number}:${compId}`;
-                    if (checkAndMark(sig)) {
-                      console.debug && console.debug('[socket-debug] triggering eagle popup', { name, idx, gross });
-                      setEagleHole(hole.number);
-                      setEaglePlayer(name);
-                      setShowEagle(true);
-                      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-                      if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-                      eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
-                    }
-                  }
-                }, 2000);
-              } else {
-                if (eagleShowDelayRef.current) { clearTimeout(eagleShowDelayRef.current); eagleShowDelayRef.current = null; }
-              }
-            if (gross === hole.par - 1) {
-              if (birdieShowDelayRef.current) clearTimeout(birdieShowDelayRef.current);
-              birdieShowDelayRef.current = setTimeout(() => {
-                const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
-                console.debug && console.debug('[socket-debug] birdie check', { name, idx, gross, latest });
-                if (latest === gross) {
-                  const sig = `birdie:${name}:${hole.number}:${compId}`;
-                  if (checkAndMark(sig)) {
-                    console.debug && console.debug('[socket-debug] triggering birdie popup', { name, idx, gross });
-                    setBirdieHole(hole.number);
-                    setBirdiePlayer(name);
-                    setShowBirdie(true);
-                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                    if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
-                    birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
-                  }
-                }
-              }, 2000);
-            } else {
-              if (birdieShowDelayRef.current) { clearTimeout(birdieShowDelayRef.current); birdieShowDelayRef.current = null; }
-            }
-            if (gross >= hole.par + 3) {
-              if (blowupShowDelayRef.current) clearTimeout(blowupShowDelayRef.current);
-              blowupShowDelayRef.current = setTimeout(() => {
-                const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
-                console.debug && console.debug('[socket-debug] blowup check', { name, idx, gross, latest });
-                if (latest === gross) {
-                  const sig = `blowup:${name}:${hole.number}:${compId}`;
-                  if (checkAndMark(sig)) {
-                    console.debug && console.debug('[socket-debug] triggering blowup popup', { name, idx, gross });
-                    setBlowupHole(hole.number);
-                    setBlowupPlayer(name);
-                    setShowBlowup(true);
-                    if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
-                    if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-                    blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
-                  }
-                }
-              }, 2000);
-            } else {
-              if (blowupShowDelayRef.current) { clearTimeout(blowupShowDelayRef.current); blowupShowDelayRef.current = null; }
-            }
-          } catch (e) {}
-        }
+        
 
         // If a full group object is included (medal-player-updated), merge into groups
         if (msg.group && (msg.groupId != null)) {
@@ -367,16 +332,9 @@ export default function MedalScorecard(props) {
                 eagleShowDelayRef.current = setTimeout(() => {
                   const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
                   if (latest === gross) {
-                    const sig = `eagle:${name}:${hole.number}:${compId}`;
-                    if (checkAndMark(sig)) {
-                      setEagleHole(hole.number);
-                      setEaglePlayer(name);
-                      setShowEagle(true);
-                      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-                      if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-                      eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
-                    }
-                  }
+                  const sig = `eagle:${name}:${hole.number}:${compId}`;
+                            showLocalPopup({ type: 'eagle', name, holeNumber: hole.number, sig });
+                }
                 }, 2000);
               } else {
                 if (eagleShowDelayRef.current) { clearTimeout(eagleShowDelayRef.current); eagleShowDelayRef.current = null; }
@@ -385,17 +343,10 @@ export default function MedalScorecard(props) {
                 if (birdieShowDelayRef.current) clearTimeout(birdieShowDelayRef.current);
                 birdieShowDelayRef.current = setTimeout(() => {
                   const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
-                  if (latest === gross) {
-                    const sig = `birdie:${name}:${hole.number}:${compId}`;
-                    if (checkAndMark(sig)) {
-                      setBirdieHole(hole.number);
-                      setBirdiePlayer(name);
-                      setShowBirdie(true);
-                      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                      if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
-                      birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
-                    }
-                  }
+            if (latest === gross) {
+            const sig = `birdie:${name}:${hole.number}:${compId}`;
+              showLocalPopup({ type: 'birdie', name, holeNumber: hole.number, sig });
+          }
                 }, 2000);
               } else {
                 if (birdieShowDelayRef.current) { clearTimeout(birdieShowDelayRef.current); birdieShowDelayRef.current = null; }
@@ -407,12 +358,7 @@ export default function MedalScorecard(props) {
                   if (latest === gross) {
                     const sig = `blowup:${name}:${hole.number}:${compId}`;
                     if (checkAndMark(sig)) {
-                      setBlowupHole(hole.number);
-                      setBlowupPlayer(name);
-                      setShowBlowup(true);
-                      if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
-                      if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-                      blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
+                      try { showLocalPopup({ type: 'blowup', name, holeNumber: hole.number, sig }); } catch (e) {}
                     }
                   }
                 }, 2000);
@@ -553,26 +499,21 @@ export default function MedalScorecard(props) {
     setError('');
     const data = playerData[name];
     const mini = miniTableStats[name] || {};
-    try {
-      console.log('Saving player:', name, { teebox: data.teebox, handicap: data.handicap, scores: data.scores, waters: mini.waters, dog: mini.dog, two_clubs: mini.twoClubs });
-      const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teebox: data.teebox,
-          handicap: data.handicap,
-          scores: data.scores,
-          waters: mini.waters ?? '',
-          dog: mini.dog ?? false,
-          two_clubs: mini.twoClubs ?? ''
-        })
+  try {
+      const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+        teebox: data.teebox,
+        handicap: data.handicap,
+        scores: data.scores,
+        waters: mini.waters ?? '',
+        dog: mini.dog ?? false,
+        two_clubs: mini.twoClubs ?? ''
       });
       if (!res.ok) {
         const errText = await res.text();
         console.error('Save failed:', errText);
         throw new Error('Failed to save: ' + errText);
       }
-      console.log('Save successful for', name);
+      
       try {
         // Immediately notify server to rebroadcast this saved medal update so other
         // clients see popups instantly (optimistic global popups). The server will
@@ -603,11 +544,7 @@ export default function MedalScorecard(props) {
     if (field === 'teebox') patchBody.teebox = value;
     if (field === 'handicap') patchBody.handicap = value;
     if (Object.keys(patchBody).length > 0) {
-      fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patchBody)
-      }).catch(() => {});
+      patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody).catch(() => {});
     }
   }
 
@@ -646,19 +583,14 @@ export default function MedalScorecard(props) {
     const hole = defaultHoles[idx];
     if (gross > 0 && hole) {
       // Eagle (2 under)
-      if (gross === hole.par - 2) {
+            if (gross === hole.par - 2) {
         if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
         eagleShowDelayRef.current = setTimeout(() => {
           const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
           if (latest === gross) {
             const sig = `eagle:${name}:${hole.number}:${compId}`;
             if (checkAndMark(sig)) {
-              setEagleHole(hole.number);
-              setEaglePlayer(name);
-              setShowEagle(true);
-              if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-              if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current);
-              eagleTimeoutRef.current = setTimeout(() => setShowEagle(false), 30000);
+                      showLocalPopup({ type: 'eagle', name, holeNumber: hole.number, sig });
             }
           }
         }, 2000);
@@ -667,19 +599,14 @@ export default function MedalScorecard(props) {
       }
 
       // Birdie (1 under)
-      if (gross === hole.par - 1) {
+            if (gross === hole.par - 1) {
         if (birdieShowDelayRef.current) clearTimeout(birdieShowDelayRef.current);
         birdieShowDelayRef.current = setTimeout(() => {
           const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
           if (latest === gross) {
             const sig = `birdie:${name}:${hole.number}:${compId}`;
             if (checkAndMark(sig)) {
-              setBirdieHole(hole.number);
-              setBirdiePlayer(name);
-              setShowBirdie(true);
-              if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-              if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current);
-              birdieTimeoutRef.current = setTimeout(() => setShowBirdie(false), 30000);
+                    showLocalPopup({ type: 'birdie', name, holeNumber: hole.number, sig });
             }
           }
         }, 2000);
@@ -692,16 +619,9 @@ export default function MedalScorecard(props) {
         if (blowupShowDelayRef.current) clearTimeout(blowupShowDelayRef.current);
         blowupShowDelayRef.current = setTimeout(() => {
           const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
-          if (latest === gross) {
+                  if (latest === gross) {
             const sig = `blowup:${name}:${hole.number}:${compId}`;
-            if (checkAndMark(sig)) {
-              setBlowupHole(hole.number);
-              setBlowupPlayer(name);
-              setShowBlowup(true);
-              if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
-              if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current);
-              blowupTimeoutRef.current = setTimeout(() => setShowBlowup(false), 30000);
-            }
+                      showLocalPopup({ type: 'blowup', name, holeNumber: hole.number, sig });
           }
         }, 2000);
       } else {
@@ -713,12 +633,8 @@ export default function MedalScorecard(props) {
     const group = groups[groupIdx];
     if (!group || !Array.isArray(group.players)) return;
     try {
-      const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scores: playerData[name].scores.map((v, i) => i === idx ? value : v)
-        })
+      const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+        scores: playerData[name].scores.map((v, i) => i === idx ? value : v)
       });
       if (!res.ok) {
         const errText = await res.text();
@@ -750,11 +666,7 @@ export default function MedalScorecard(props) {
       try {
         for (const player of players) {
           const patchBody = { dog: player === name };
-          await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(player)}`), {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(patchBody)
-          });
+          await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(player)}`), patchBody);
         }
       } catch (err) {
         setError('Failed to save dog for group: ' + (err.message || err));
@@ -762,10 +674,8 @@ export default function MedalScorecard(props) {
       {
     const sig = `dog:${name}:g:${groupIdx ?? ''}:c:${compId}`;
         if (checkAndMark(sig)) {
-          setDogPlayer(name);
-          setShowDogPopup(true);
-          if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
-          watersTimeoutRef.current = setTimeout(() => setShowDogPopup(false), 30000);
+          // Show a local toast and ask server to rebroadcast to other clients
+          try { showLocalPopup({ type: 'dog', name, sig }); } catch (e) {}
         }
       }
       return;
@@ -784,11 +694,7 @@ export default function MedalScorecard(props) {
       const patchBody = {};
       if (field === 'waters') patchBody.waters = value;
       if (field === 'twoClubs') patchBody.two_clubs = value;
-      await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patchBody)
-      });
+      await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody);
       // Re-fetch latest mini table data for sync
       const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
       if (res.ok) {
@@ -807,14 +713,11 @@ export default function MedalScorecard(props) {
     }
     // Show popups for Waters
     if (field === 'waters' && value && Number(value) > 0) {
-  const sig = `waters:${name}:g:${groupIdx ?? ''}:c:${compId}`;
-      if (checkAndMark(sig)) {
-        setWatersPlayer(name);
-        setShowWatersPopup(true);
-        if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current);
-        watersTimeoutRef.current = setTimeout(() => setShowWatersPopup(false), 30000);
+    const sig = `waters:${name}:g:${groupIdx ?? ''}:c:${compId}`;
+        if (checkAndMark(sig)) {
+          try { showLocalPopup({ type: 'waters', name, sig }); } catch (e) {}
+        }
       }
-    }
   }
 
   // Cleanup any pending timeouts on unmount
@@ -843,11 +746,7 @@ export default function MedalScorecard(props) {
     // Persist clears to backend (PATCH per player)
     try {
       for (const name of players) {
-        await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scores: Array(18).fill(null) })
-        });
+        await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), { scores: Array(18).fill(null) });
       }
     } catch (err) {
       console.error('Failed to persist cleared scores', err);
@@ -1571,61 +1470,7 @@ export default function MedalScorecard(props) {
           {error && <div className="text-red-300 mt-4 font-semibold">{error}</div>}
         </div>
       </div>
-      {/* Birdie Popup */}
-      {showBirdie && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Birdie">🕊️</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Birdie!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>For {birdiePlayer} on Hole {birdieHole}</div>
-            <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowBirdie(false); if (birdieTimeoutRef.current) clearTimeout(birdieTimeoutRef.current); }}>Dismiss</button>
-          </div>
-        </div>
-      )}
-      {/* Eagle Popup */}
-      {showEagle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Eagle">🦅</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Eagle!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>For {eaglePlayer} on Hole {eagleHole}</div>
-            <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowEagle(false); if (eagleTimeoutRef.current) clearTimeout(eagleTimeoutRef.current); }}>Dismiss</button>
-          </div>
-        </div>
-      )}
-      {/* Blowup Popup */}
-      {showBlowup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Explosion">💥</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>How embarrassing.</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{blowupPlayer} just blew up on Hole {blowupHole}.</div>
-            <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowBlowup(false); if (blowupTimeoutRef.current) clearTimeout(blowupTimeoutRef.current); }}>Dismiss</button>
-          </div>
-        </div>
-      )}
-      {/* Waters Popup */}
-      {showWatersPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Splash">💧</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Splash!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{watersPlayer} has just earned a water</div>
-            <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowWatersPopup(false); if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current); }}>Dismiss</button>
-          </div>
-        </div>
-      )}
-      {/* Dog Popup */}
-      {showDogPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
-            <span className="text-6xl mb-2" role="img" aria-label="Dog">🐶</span>
-            <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Woof!</h2>
-            <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{dogPlayer} has just gotten the dog</div>
-            <button className="mt-2 px-6 py-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'} onClick={() => { setShowDogPopup(false); if (watersTimeoutRef.current) clearTimeout(watersTimeoutRef.current); }}>Dismiss</button>
-          </div>
-        </div>
-      )}
+      
       {/* Reset Scores Confirmation Modal */}
       {showResetModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
