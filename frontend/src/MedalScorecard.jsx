@@ -455,12 +455,14 @@ export default function MedalScorecard(props) {
                     const age = Date.now() - (pending.ts || 0);
                     // If server confirms our pending value, clear pending and skip (local already set)
                     if (String(pending.value) === strokeStr) {
+                      try { debugLog('mappedScores: server confirms pending', { key, strokeStr, age }); } catch (e) {}
                       delete pendingLocalSavesRef.current[key];
                       continue;
                     }
                     // If we have a very recent local save, ignore the server update to avoid
                     // overwriting our newer local edit with a stale/late-arriving value.
                     if (age < 5000) {
+                      try { debugLog('mappedScores: skipping server update due to recent local pending', { key, strokeStr, age, pending: pending.value }); } catch (e) {}
                       continue;
                     }
                   }
@@ -655,6 +657,17 @@ export default function MedalScorecard(props) {
   // Track recent local per-hole saves so we can ignore short-lived server echoes
   // that might arrive out-of-order and overwrite a newer local edit.
   const pendingLocalSavesRef = useRef({});
+  // Debounced save timers per player:hole to batch rapid clicks and avoid request reordering
+  const saveTimeoutsRef = useRef({});
+  // debug helper (enable by setting localStorage.setItem('dth:debug','1') in the browser)
+  const debugLog = (...args) => {
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem && localStorage.getItem('dth:debug') === '1') {
+        // eslint-disable-next-line no-console
+        console.debug('[dth-debug]', ...args);
+      }
+    } catch (e) {}
+  };
 
   async function handleScoreChange(name, idx, value) {
     if (!canEdit(name)) return;
@@ -735,22 +748,40 @@ export default function MedalScorecard(props) {
         if (blowupShowDelayRef.current) { clearTimeout(blowupShowDelayRef.current); blowupShowDelayRef.current = null; }
       }
     }
-    // Save scores for this player immediately
-    if (!compId || !groups.length) return;
-    const group = groups[groupIdx];
-    if (!group || !Array.isArray(group.players)) return;
+    // Debounced save: schedule a small delay to batch rapid clicks and avoid request reordering.
     try {
-      const existingScores = Array.isArray(playerData[name]?.scores) ? playerData[name].scores : Array.from({ length: 18 }, () => '');
-      const newScores = existingScores.map((v, i) => i === idx ? value : v);
-      const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
-        scores: newScores
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        setError('Failed to save for ' + name + ': ' + errText);
-      }
+      if (!compId || !groups.length) return;
+      const key = `${name}:${idx}`;
+      if (saveTimeoutsRef.current[key]) clearTimeout(saveTimeoutsRef.current[key]);
+      debugLog('scheduling debounced save', { key, value, compId, groupIdx });
+      saveTimeoutsRef.current[key] = setTimeout(async () => {
+        try {
+          debugLog('debounced save firing', { key, compId, groupIdx });
+          // Read latest scores from ref (reflects any rapid local changes)
+          const latestScores = playerDataRef.current?.[name]?.scores || Array.from({ length: 18 }, () => '');
+          const newScores = Array.isArray(latestScores) ? latestScores.map(v => (v == null ? '' : v)) : Array(18).fill('');
+          const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), { scores: newScores });
+          debugLog('server save result', { key, status: res && res.status });
+          if (!res.ok) {
+            const errText = await res.text();
+            setError('Failed to save for ' + name + ': ' + errText);
+          } else {
+            // If server persisted the same value we had pending for this hole, clear pending marker
+            try {
+              const strokeStr = String(newScores[idx] ?? '');
+              const pendingKey = `${name}:${idx}`;
+              const pending = pendingLocalSavesRef.current[pendingKey];
+              if (pending && String(pending.value) === strokeStr) delete pendingLocalSavesRef.current[pendingKey];
+            } catch (e) {}
+          }
+        } catch (err) {
+          setError('Failed to save for ' + name + ': ' + (err.message || err));
+        } finally {
+          try { delete saveTimeoutsRef.current[key]; } catch (e) {}
+        }
+  }, 500);
     } catch (err) {
-      setError('Failed to save for ' + name + ': ' + (err.message || err));
+      console.error('Error scheduling debounced save', err);
     }
   }
 
