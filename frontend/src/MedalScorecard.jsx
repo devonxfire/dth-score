@@ -1113,9 +1113,9 @@ export default function MedalScorecard(props) {
 
                     <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
                       <div className="flex items-center justify-center mb-3">
-                        <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => Math.max(1, h - 1))}>◀</button>
+                        <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 1 ? 18 : h - 1))}>◀</button>
                         <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
-                        <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => Math.min(18, h + 1))}>▶</button>
+                        <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 18 ? 1 : h + 1))}>▶</button>
                       </div>
                       <div className="space-y-3">
                         {players.map((pName) => {
@@ -1163,9 +1163,9 @@ export default function MedalScorecard(props) {
                 return (
                   <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
                     <div className="flex items-center justify-center mb-3">
-                      <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => Math.max(1, h - 1))}>◀</button>
+                      <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 1 ? 18 : h - 1))}>◀</button>
                       <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
-                      <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => Math.min(18, h + 1))}>▶</button>
+                      <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 18 ? 1 : h + 1))}>▶</button>
                     </div>
                     <div className="space-y-3">
                       {players.map((pName) => {
