@@ -9,7 +9,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 const COMP_TYPE_DISPLAY = {
-  fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
+  fourBbbStableford: '4BBB Stableford',
   alliance: 'Alliance',
   medalStrokeplay: 'Medal Strokeplay',
   individualStableford: 'Individual Stableford',

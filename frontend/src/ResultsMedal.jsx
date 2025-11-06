@@ -18,8 +18,8 @@ import html2canvas from 'html2canvas';
 export default function ResultsMedal() {
   // Friendly display for comp type
   const COMP_TYPE_DISPLAY = {
-    fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
-    '4bbb stableford': '4BBB Stableford (2 Scores to Count)',
+  fourBbbStableford: '4BBB Stableford',
+  '4bbb stableford': '4BBB Stableford',
     alliance: 'Alliance',
     medalStrokeplay: 'Medal Strokeplay',
     'medal strokeplay': 'Medal Strokeplay',

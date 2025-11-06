@@ -173,6 +173,41 @@ export default function MedalScorecard(props) {
   const [showResetModal, setShowResetModal] = useState(false);
   // Mobile selected player for compact score entry
   const [mobileSelectedPlayer, setMobileSelectedPlayer] = useState('');
+  const [mobileSelectedHole, setMobileSelectedHole] = useState(1);
+
+  // Per-cell styling for gross score inputs: eagle (<= par-2) => pink, birdie (par-1) => green,
+  // blowup (>= par+3) => maroon. Returns an inline style object to merge into the input's style.
+  function scoreCellStyle(name, idx) {
+    try {
+      const raw = playerData?.[name]?.scores?.[idx];
+      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+      const hole = defaultHoles[idx];
+  if (!Number.isFinite(gross) || !hole) return {};
+  // Outline-only styles: transparent background, colored 2px border and matching text color
+  if (gross <= hole.par - 2) return { background: 'transparent', border: '2px solid #FFC0CB', color: '#FFC0CB', boxSizing: 'border-box' }; // pink outline
+  if (gross === hole.par - 1) return { background: 'transparent', border: '2px solid #16a34a', color: '#16a34a', boxSizing: 'border-box' }; // green outline
+  if (gross >= hole.par + 3) return { background: 'transparent', border: '2px solid #ef4444', color: '#ef4444', boxSizing: 'border-box' }; // brighter red outline
+    } catch (e) {
+      return {};
+    }
+    return {};
+  }
+
+  // Return extra class names for score cells (used to make eagle/birdie circular)
+  function scoreCellClass(name, idx) {
+    try {
+      const raw = playerData?.[name]?.scores?.[idx];
+      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+      const hole = defaultHoles[idx];
+      if (!Number.isFinite(gross) || !hole) return '';
+      // circle for eagle or birdie
+      if (gross <= hole.par - 2) return 'rounded-full';
+      if (gross === hole.par - 1) return 'rounded-full';
+    } catch (e) {
+      return '';
+    }
+    return '';
+  }
 
   useEffect(() => {
     if (!players || !players.length) return;
@@ -571,13 +606,17 @@ export default function MedalScorecard(props) {
 
   async function handleScoreChange(name, idx, value) {
     if (!canEdit(name)) return;
-    setPlayerData(prev => ({
-      ...prev,
-      [name]: {
-        ...prev[name],
-        scores: prev[name].scores.map((v, i) => i === idx ? value : v)
-      }
-    }));
+    setPlayerData(prev => {
+      const existing = Array.isArray(prev[name]?.scores) ? prev[name].scores : Array.from({ length: 18 }, () => '');
+      const updatedScores = existing.map((v, i) => i === idx ? value : v);
+      return {
+        ...prev,
+        [name]: {
+          ...prev[name],
+          scores: updatedScores
+        }
+      };
+    });
     // Birdie/Eagle/Blowup detection logic
     const gross = parseInt(value, 10);
     const hole = defaultHoles[idx];
@@ -633,8 +672,10 @@ export default function MedalScorecard(props) {
     const group = groups[groupIdx];
     if (!group || !Array.isArray(group.players)) return;
     try {
+      const existingScores = Array.isArray(playerData[name]?.scores) ? playerData[name].scores : Array.from({ length: 18 }, () => '');
+      const newScores = existingScores.map((v, i) => i === idx ? value : v);
       const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
-        scores: playerData[name].scores.map((v, i) => i === idx ? value : v)
+        scores: newScores
       });
       if (!res.ok) {
         const errText = await res.text();
@@ -671,13 +712,11 @@ export default function MedalScorecard(props) {
       } catch (err) {
         setError('Failed to save dog for group: ' + (err.message || err));
       }
-      {
     const sig = `dog:${name}:g:${groupIdx ?? ''}:c:${compId}`;
-        if (checkAndMark(sig)) {
-          // Show a local toast and ask server to rebroadcast to other clients
-          try { showLocalPopup({ type: 'dog', name, sig }); } catch (e) {}
-        }
-      }
+    if (checkAndMark(sig)) {
+      // Show a local toast and ask server to rebroadcast to other clients
+      try { showLocalPopup({ type: 'dog', name, sig }); } catch (e) {}
+    }
       return;
     }
     // Normal update for other fields
@@ -957,168 +996,169 @@ export default function MedalScorecard(props) {
             </div>
           </div>
           {/* Scorecard Table UI: Front 9 and Back 9, PAR/STROKE/HOLE headings, gross/net rows, Medal logic */}
-          {/* Mobile-only per-hole entry (select a player, then show their holes) */}
+          {/* Mobile-only per-hole entry (compact cards for mobile) */}
           <div className="sm:hidden w-full mt-4">
-            <div className="mb-3">
-              <label className="sr-only">Select player</label>
-              <select
-                aria-label="Select player"
-                className={`w-full p-2 rounded ${players.indexOf(mobileSelectedPlayer) >= 0 ? playerColors[players.indexOf(mobileSelectedPlayer) % playerColors.length] : 'bg-white/10 text-white'}`}
-                value={mobileSelectedPlayer}
-                onChange={e => setMobileSelectedPlayer(e.target.value)}
-              >
-                {players.map((name, idx) => (
-                  <option key={name} value={name}>{`PLAYER ${String.fromCharCode(65 + idx)}: ${name}`}</option>
-                ))}
-              </select>
-              <div className="text-xs text-white/70 mt-1">(Click to select different player)</div>
-            </div>
-            {mobileSelectedPlayer && (() => {
-              const name = mobileSelectedPlayer;
-              const pIdx = players.indexOf(name);
-              return (
-                <div key={`mobile-${name}`} className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className={`font-bold ${playerColors[pIdx % playerColors.length]} truncate`} style={{ minWidth: 0 }}></div>
-                    <div className="text-xs font-semibold" style={{ color: '#FFD700' }}>PH {computePH(playerData[name]?.handicap)}</div>
-                  </div>
-                  <div className="divide-y divide-white/10">
-                    {defaultHoles.map((hole, hIdx) => (
-                      <div key={hole.number} className="flex items-center justify-between py-2">
-                        <div className="w-20">
-                          <div className="text-sm font-bold">Hole {hole.number}</div>
-                          <div className="text-xs text-white/80">Par {hole.par} • S{hole.index}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            aria-label={`decrement-hole-${hole.number}-${name}`}
-                            className="px-2 py-1 rounded bg-white/10"
-                            onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = Math.max(0, cur - 1); handleScoreChange(name, hIdx, String(next)); }}
-                            disabled={!canEdit(name)}
-                          >−</button>
-                          <input
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none"
-                            value={playerData[name]?.scores?.[hIdx] ?? ''}
-                            onChange={e => { if (!canEdit(name)) return; const v = (e.target.value || '').replace(/[^0-9]/g, ''); handleScoreChange(name, hIdx, v); }}
-                            disabled={!canEdit(name)}
-                            onFocus={e => e.currentTarget.scrollIntoView({ block: 'center' })}
-                          />
-                          <button
-                            aria-label={`increment-hole-${hole.number}-${name}`}
-                            className="px-2 py-1 rounded bg-white/10"
-                            onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = cur + 1; handleScoreChange(name, hIdx, String(next)); }}
-                            disabled={!canEdit(name)}
-                          >+</button>
-                        </div>
+            {/* Decide mobile rendering mode */}
+            {(() => {
+              const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+              const isMedalMobile = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('medal')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('medal'));
+              if (isAlliance) {
+                const group = groups[groupIdx] || { players: [] };
+                const best = computeGroupBestTwoTotals(group);
+                const hole = defaultHoles[mobileSelectedHole - 1];
+                return (
+                  <div>
+                    <div className="w-full p-3 rounded border-2 text-center mb-3" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
+                      <div className="font-extrabold text-2xl text-white">Alliance Score: <span style={{ color: '#FFD700' }}>{best.total}</span></div>
+                    </div>
+
+                    <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
+                      <div className="flex items-center justify-center mb-3">
+                        <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => Math.max(1, h - 1))}>◀</button>
+                        <div className="text-lg font-bold text-white">Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
+                        <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => Math.min(18, h + 1))}>▶</button>
                       </div>
-                    ))}
+                      <div className="space-y-3">
+                        {players.map((pName) => {
+                          const stable = computePlayerStablefordTotals(pName);
+                          const grossArr = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
+                          const curVal = grossArr[mobileSelectedHole - 1] || '';
+                          const grossTotal = grossArr.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                          // par label
+                          let parSumPlayer = 0; let anyScorePlayer = false;
+                          for (let i = 0; i < grossArr.length; i++) { const v = parseInt(grossArr[i], 10); if (Number.isFinite(v)) { parSumPlayer += (defaultHoles[i]?.par || 0); anyScorePlayer = true; } }
+                          const diffPlayer = grossTotal - parSumPlayer;
+                          const parLabelPlayer = anyScorePlayer ? (diffPlayer === 0 ? ' (E)' : ` (${diffPlayer > 0 ? '+' : ''}${diffPlayer})`) : '';
+                          const initialLabel = (() => { try { const parts = (pName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return pName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return pName; } })();
+
+                          return (
+                            <div key={`mob-${pName}`} className="p-2 rounded border border-white/10 relative">
+                              <div className="flex items-center justify-between">
+                                <div className="font-semibold">{initialLabel}</div>
+                              </div>
+                              <div className="text-xs font-semibold mt-1" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
+
+                              <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                                <div>Out: <span className="font-bold">{stable.front}</span></div>
+                                <div className="text-right">In: <span className="font-bold">{stable.back}</span></div>
+                                <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
+                                <div className="text-right">Points: <span className="font-bold">{stable.total}</span></div>
+                              </div>
+
+                              <div className="absolute left-1/2 transform -translate-x-1/2 bottom-3 flex items-center gap-4">
+                                <button aria-label={`big-dec-${pName}`} className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
+                                <div className="mx-2 text-2xl font-extrabold">{curVal || '-'}</div>
+                                <button aria-label={`big-inc-${pName}`} className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                  {(function() {
-                    // Sum only holes where a gross score has been entered (non-empty)
-                    const outTotal = defaultHoles.slice(0,9).reduce((s, hole, i) => {
-                      const raw = playerData[name]?.scores?.[i];
-                      const val = raw === '' || raw == null ? NaN : parseInt(raw, 10);
-                      return s + (Number.isFinite(val) ? val : 0);
-                    }, 0);
-                    const inTotal = defaultHoles.slice(9,18).reduce((s, hole, i) => {
-                      const raw = playerData[name]?.scores?.[i + 9];
-                      const val = raw === '' || raw == null ? NaN : parseInt(raw, 10);
-                      return s + (Number.isFinite(val) ? val : 0);
-                    }, 0);
-                    const grossTotal = outTotal + inTotal;
+                );
+              }
 
-                    // Net/Result: only include holes with entered gross values
-                    const playingHandicap = computePH(playerData[name]?.handicap) || 0;
-                    let netTotal = 0;
-                    let holesWithScore = 0;
-                    defaultHoles.forEach((hole, idx) => {
-                      const raw = playerData[name]?.scores?.[idx];
-                      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
-                      if (!Number.isFinite(gross)) return;
-                      holesWithScore++;
-                      let strokesReceived = 0;
-                      if (playingHandicap > 0) {
-                        if (playingHandicap >= 18) {
-                          strokesReceived = 1;
-                          if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
-                          else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
-                        } else if (hole.index <= playingHandicap) {
-                          strokesReceived = 1;
-                        }
-                      }
-                      const net = gross - strokesReceived;
-                      if (typeof net === 'number') netTotal += net;
-                    });
+              if (isMedalMobile) {
+                const hole = defaultHoles[mobileSelectedHole - 1];
+                return (
+                  <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
+                    <div className="flex items-center justify-center mb-3">
+                      <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => Math.max(1, h - 1))}>◀</button>
+                      <div className="text-lg font-bold text-white">Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
+                      <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => Math.min(18, h + 1))}>▶</button>
+                    </div>
+                    <div className="space-y-3">
+                      {players.map((pName) => {
+                        const grossArr = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
+                        const curVal = grossArr[mobileSelectedHole - 1] || '';
+                        const grossTotal = grossArr.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                        const playingHandicap = computePH(playerData[pName]?.handicap) || 0;
+                        let netFront = 0; let netBack = 0;
+                        defaultHoles.forEach((h, idx) => {
+                          const raw = grossArr[idx];
+                          const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+                          let strokesReceived = 0;
+                          if (playingHandicap > 0) {
+                            if (playingHandicap >= 18) {
+                              strokesReceived = 1;
+                              if (playingHandicap - 18 >= h.index) strokesReceived = 2;
+                              else if (h.index <= (playingHandicap % 18)) strokesReceived = 2;
+                            } else if (h.index <= playingHandicap) strokesReceived = 1;
+                          }
+                          const net = Number.isFinite(gross) ? (gross - strokesReceived) : 0;
+                          if (idx < 9) netFront += net; else netBack += net;
+                        });
+                        const totalNet = netFront + netBack;
+                        // par label for totals
+                        let parSumPlayer = 0; let anyScorePlayer = false;
+                        for (let i = 0; i < grossArr.length; i++) { const v = parseInt(grossArr[i], 10); if (Number.isFinite(v)) { parSumPlayer += (defaultHoles[i]?.par || 0); anyScorePlayer = true; } }
+                        const diffPlayer = grossTotal - parSumPlayer;
+                        const parLabelPlayer = anyScorePlayer ? (diffPlayer === 0 ? ' (E)' : ` (${diffPlayer > 0 ? '+' : ''}${diffPlayer})`) : '';
+                        const initialLabel = (() => { try { const parts = (pName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return pName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return pName; } })();
 
-                    // Score to par: sum of (gross - par) for played holes only
-                    let scoreToPar = 0;
-                    let anyScore = false;
-                    defaultHoles.forEach((hole, idx) => {
-                      const raw = playerData[name]?.scores?.[idx];
-                      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
-                      if (!Number.isFinite(gross)) return;
-                      anyScore = true;
-                      scoreToPar += (gross - hole.par);
-                    });
-                    let scoreToParLabel = '';
-                    if (!anyScore || scoreToPar === 0) {
-                      scoreToParLabel = 'E';
-                    } else {
-                      scoreToParLabel = `${scoreToPar >= 0 ? '+' + scoreToPar : String(scoreToPar)}`;
-                    }
+                        return (
+                          <div key={`mob-medal-${pName}`} className="p-2 rounded border border-white/10 relative">
+                            <div className="flex items-center justify-between">
+                              <div className="font-semibold">{initialLabel}</div>
+                            </div>
+                            <div className="text-xs font-semibold mt-1" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
 
-                    // compute team best-two totals for alliance comps (per-hole aggregation)
-                    const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                    const resultLabel = isAlliance ? 'Result' : 'Net';
-                    // For Alliance comps the mobile Result should show the player's stableford total, not net
-                    let allianceResultTotal = null;
-                    if (isAlliance) {
-                      try {
-                        const stableTotals = computePlayerStablefordTotals(name);
-                        allianceResultTotal = holesWithScore ? stableTotals.total : '';
-                      } catch (e) {
-                        allianceResultTotal = '';
-                      }
-                    }
-                    let teamScoreTotal = null;
-                    if (isAlliance && Array.isArray(groups) && groups[groupIdx]) {
-                      try {
-                        const best = computeGroupBestTwoTotals(groups[groupIdx]);
-                        teamScoreTotal = best.total;
-                      } catch (e) {
-                        teamScoreTotal = null;
-                      }
-                    }
+                            <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                              <div>Out: <span className="font-bold">{netFront}</span></div>
+                              <div className="text-right">In: <span className="font-bold">{netBack}</span></div>
+                              <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
+                              <div className="text-right">Net: <span className="font-bold">{totalNet}</span></div>
+                            </div>
 
+                            <div className="absolute left-1/2 transform -translate-x-1/2 bottom-3 flex items-center gap-4">
+                              <button aria-label={`big-dec-medal-${pName}`} className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
+                              <div className="mx-2 text-2xl font-extrabold">{curVal || '-'}</div>
+                              <button aria-label={`big-inc-medal-${pName}`} className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Default: per-player cards
+              return (
+                <>
+                  {players.map((name) => {
+                    const pIdx = players.indexOf(name);
                     return (
-                      <div className="mt-3 text-sm font-bold">
-                        <div className="flex justify-between">
-                          <div>Out: {outTotal}</div>
-                          <div>In: {inTotal}</div>
+                      <div key={`mobile-${name}`} className="mb-4 p-3 rounded border text-white relative pb-16" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className={`font-bold ${playerColors[pIdx % playerColors.length]} truncate`} style={{ minWidth: 0 }}></div>
+                          <div className="text-xs font-semibold" style={{ color: '#FFD700' }}>PH {computePH(playerData[name]?.handicap)}</div>
                         </div>
-                        <div className="flex justify-between mt-1">
-                          <div>Total: {grossTotal}</div>
-                          <div>{resultLabel}: {isAlliance ? (allianceResultTotal != null ? allianceResultTotal : '') : (holesWithScore ? netTotal : '')}</div>
+                        <div className="divide-y divide-white/10">
+                          {defaultHoles.map((hole, hIdx) => (
+                            <div key={hole.number} className="flex items-center justify-between py-2">
+                              <div className="w-20">
+                                <div className="text-sm font-bold">Hole {hole.number}</div>
+                                <div className="text-xs text-white/80">Par {hole.par} • S{hole.index}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button aria-label={`decrement-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = Math.max(0, cur - 1); handleScoreChange(name, hIdx, String(next)); }} disabled={!canEdit(name)}>−</button>
+                                <input inputMode="numeric" pattern="[0-9]*" className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none" value={playerData[name]?.scores?.[hIdx] ?? ''} onChange={e => { if (!canEdit(name)) return; const v = (e.target.value || '').replace(/[^0-9]/g, ''); handleScoreChange(name, hIdx, v); }} disabled={!canEdit(name)} onFocus={e => e.currentTarget.scrollIntoView({ block: 'center' })} />
+                                <button aria-label={`increment-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = cur + 1; handleScoreChange(name, hIdx, String(next)); }} disabled={!canEdit(name)}>+</button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-
-                        {isAlliance && teamScoreTotal != null && (
-                          <div className="flex justify-between mt-2 text-yellow-300 font-extrabold">
-                            <div>Team Score:</div>
-                            <div>{teamScoreTotal}</div>
-                          </div>
-                        )}
-
-                        <div className="flex justify-center mt-4">
-                          <div className="text-center px-6 py-3 rounded-2xl border-4 font-extrabold text-2xl" style={{ borderColor: '#FFD700', background: '#1B3A6B', color: 'white' }}>
-                            Score: <span className="ml-2">{scoreToParLabel}</span>
-                          </div>
+                        {/* per-player summary simplified */}
+                        <div className="mt-3 text-sm font-bold">
+                          <div className="flex justify-between"><div>Out: </div><div>In: </div></div>
+                          <div className="absolute left-1/2 transform -translate-x-1/2 bottom-4"><div className="text-center px-6 py-3 rounded-2xl border-4 font-extrabold text-2xl" style={{ borderColor: '#FFD700', background: '#1B3A6B', color: 'white' }}>Score</div></div>
                         </div>
                       </div>
                     );
-                  })()}
-                </div>
+                  })}
+                </>
               );
             })()}
           </div>
@@ -1155,7 +1195,7 @@ export default function MedalScorecard(props) {
               <tbody>
                   {players.map((name, pIdx) => {
                   const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                  const resultLabel = isAlliance ? 'Result' : 'Net';
+                  const resultLabel = isAlliance ? 'Points' : 'Net';
                   const stable = isAlliance ? computePlayerStablefordTotals(name) : null;
                   return (
                   <React.Fragment key={name + '-rows-front'}>
@@ -1175,9 +1215,9 @@ export default function MedalScorecard(props) {
                               value={playerData[name]?.scores?.[hIdx] || ''}
                               onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx, e.target.value); }}
                               disabled={!canEdit(name)}
-                              className="w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 text-white"
+                              className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(name, hIdx)}`}
                               inputMode="numeric"
-                              style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
+                              style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(name, hIdx) }}
                             />
                           </div>
                         </td>
@@ -1312,7 +1352,7 @@ export default function MedalScorecard(props) {
               <tbody>
                 {players.map((name, pIdx) => {
                   const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                  const resultLabel = isAlliance ? 'Result' : 'Net';
+                          const resultLabel = isAlliance ? 'Points' : 'Net';
                   const stable = isAlliance ? computePlayerStablefordTotals(name) : null;
                   return (
                   <React.Fragment key={name + '-rows-back'}>
@@ -1332,9 +1372,9 @@ export default function MedalScorecard(props) {
                               value={playerData[name]?.scores?.[hIdx+9] || ''}
                               onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx+9, e.target.value); }}
                               disabled={!canEdit(name)}
-                              className="w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 text-white"
+                              className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(name, hIdx+9)}`}
                               inputMode="numeric"
-                              style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
+                              style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(name, hIdx+9) }}
                             />
                           </div>
                         </td>

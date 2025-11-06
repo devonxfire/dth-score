@@ -28,7 +28,7 @@ import PageBackground from './PageBackground';
 import { apiUrl } from './api';
 
 const COMP_TYPE_DISPLAY = {
-  fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
+  fourBbbStableford: '4BBB Stableford',
   alliance: 'Alliance',
   medalStrokeplay: 'Medal Strokeplay',
   individualStableford: 'Individual Stableford',
@@ -90,7 +90,7 @@ function Leaderboard() {
   const isMedal = comp.toLowerCase().includes('medal');
   const isStableford = comp.toLowerCase().includes('stableford');
   const isAlliance = comp.toLowerCase().includes('alliance');
-  // Alliance (2 scores to count) team logic
+  // Alliance team logic
   const [groups, setGroups] = useState([]);
   const [compId, setCompId] = useState(null);
 

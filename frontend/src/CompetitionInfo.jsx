@@ -16,8 +16,8 @@ import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
 
 const COMP_TYPE_DISPLAY = {
-  fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
-  '4bbb stableford': '4BBB Stableford (2 Scores to Count)',
+  fourBbbStableford: '4BBB Stableford',
+  '4bbb stableford': '4BBB Stableford',
   alliance: 'Alliance',
   medalStrokeplay: 'Medal Strokeplay',
   'medal strokeplay': 'Medal Strokeplay',

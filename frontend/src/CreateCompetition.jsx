@@ -16,8 +16,8 @@ import AllianceAssignment from './AllianceAssignment';
 
 // Display mapping for all comp types
 const COMP_TYPE_DISPLAY = {
-  fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
-  '4bbb stableford': '4BBB Stableford (2 Scores to Count)',
+  fourBbbStableford: '4BBB Stableford',
+  '4bbb stableford': '4BBB Stableford',
   alliance: 'Alliance',
   medalStrokeplay: 'Medal Strokeplay',
   'medal strokeplay': 'Medal Strokeplay',
@@ -387,7 +387,7 @@ function CreateCompetition({ user, onSignOut }) {
                   className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
                   style={{ fontFamily: 'Lato, Arial, sans-serif' }}
                 >
-                  <option value="fourBbbStableford">4BBB Stableford (2 Scores to Count)</option>
+                  <option value="fourBbbStableford">4BBB Stableford</option>
                   <option value="alliance">Alliance</option>
                   <option value="medalStrokeplay">Medal Strokeplay</option>
                   <option value="individualStableford">Individual Stableford</option>

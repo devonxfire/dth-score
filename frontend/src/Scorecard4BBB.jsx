@@ -46,7 +46,7 @@ const playerColors = [
 ];
 
 const COMP_TYPE_DISPLAY = {
-  fourBbbStableford: '4BBB Stableford (2 Scores to Count)',
+  fourBbbStableford: '4BBB Stableford',
   alliance: 'Alliance',
   medalStrokeplay: 'Medal Strokeplay',
   individualStableford: 'Individual Stableford',
@@ -251,7 +251,6 @@ export default function Scorecard4BBB(props) {
 
   // Real-time: join competition room and listen for updates
   useEffect(() => {
-    if (!competition || !competition.id) return;
     const compId = competition.id;
     try {
       socket.emit('join', { competitionId: compId });
@@ -1177,11 +1176,11 @@ export default function Scorecard4BBB(props) {
                                   const isDoubleBogey = gross > 0 && gross === hole.par + 2;
                                   const isTripleOrWorse = gross > 0 && gross >= hole.par + 3;
                                   let inputClass = 'w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0';
-                                  if (isEagleOrBetter) inputClass += ' text-blue-400 border-blue-400 rounded-full border-2';
-                                  else if (isBirdie) inputClass += ' text-green-500 border-green-500 rounded-full border';
-                                  else if (isTripleOrWorse) inputClass += ' text-purple-400 border-purple-400 border';
-                                  else if (isDoubleBogey) inputClass += ' text-red-400 border-red-400 border-2 double-border';
-                                  else if (isBogey) inputClass += ' text-yellow-400 border-yellow-400 border';
+                                  if (isEagleOrBetter) inputClass += ' bg-transparent border-2 border-pink-300 text-pink-300 rounded-full';
+                                  else if (isBirdie) inputClass += ' bg-transparent border-2 border-green-500 text-green-500 rounded-full';
+                                  else if (isTripleOrWorse) inputClass += ' bg-transparent border-2 border-[#800000] text-[#800000]';
+                                  else if (isDoubleBogey) inputClass += ' bg-transparent border-2 border-red-400 text-red-400';
+                                  else if (isBogey) inputClass += ' bg-transparent border-2 border-yellow-400 text-yellow-400';
                                   else inputClass += ' text-white';
                                   return (
                                     <input
@@ -1624,11 +1623,11 @@ export default function Scorecard4BBB(props) {
                                   const isDoubleBogey = gross > 0 && gross === hole.par + 2;
                                   const isTripleOrWorse = gross > 0 && gross >= hole.par + 3;
                                   let inputClass = 'w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0';
-                                  if (isEagleOrBetter) inputClass += ' text-blue-400 border-blue-400 rounded-full border-2';
-                                  else if (isBirdie) inputClass += ' text-green-500 border-green-500 rounded-full border';
-                                  else if (isTripleOrWorse) inputClass += ' text-purple-400 border-purple-400 border';
-                                  else if (isDoubleBogey) inputClass += ' text-red-400 border-red-400 border-2 double-border';
-                                  else if (isBogey) inputClass += ' text-yellow-400 border-yellow-400 border';
+                                  if (isEagleOrBetter) inputClass += ' bg-pink-300 text-black rounded-full';
+                                  else if (isBirdie) inputClass += ' bg-green-500 text-white rounded-full';
+                                  else if (isTripleOrWorse) inputClass += ' bg-[#800000] text-white';
+                                  else if (isDoubleBogey) inputClass += ' bg-red-400 text-white';
+                                  else if (isBogey) inputClass += ' bg-yellow-400 text-white';
                                   else inputClass += ' text-white';
                                   return (
                                     <input
