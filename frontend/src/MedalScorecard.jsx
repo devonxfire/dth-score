@@ -173,7 +173,38 @@ export default function MedalScorecard(props) {
   const [showResetModal, setShowResetModal] = useState(false);
   // Mobile selected player for compact score entry
   const [mobileSelectedPlayer, setMobileSelectedPlayer] = useState('');
-  const [mobileSelectedHole, setMobileSelectedHole] = useState(1);
+  // Persist mobile-selected hole per-competition so refresh/navigation restores last-edited hole.
+  const storageKey = compId ? `dth:mobileSelectedHole:${compId}` : 'dth:mobileSelectedHole:unknown';
+  const [mobileSelectedHole, setMobileSelectedHole] = useState(() => {
+    try {
+      const raw = compId ? localStorage.getItem(`dth:mobileSelectedHole:${compId}`) : null;
+      const n = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(n) && n >= 1 && n <= 18) return n;
+    } catch (e) {}
+    return 1;
+  });
+
+  // Keep localStorage in sync when compId changes (switching competitions) — load saved hole for new comp.
+  useEffect(() => {
+    try {
+      if (!compId) return;
+      const raw = localStorage.getItem(`dth:mobileSelectedHole:${compId}`);
+      const n = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(n) && n >= 1 && n <= 18) {
+        setMobileSelectedHole(n);
+      } else {
+        setMobileSelectedHole(1);
+      }
+    } catch (e) {}
+  }, [compId]);
+
+  // Persist whenever mobileSelectedHole changes
+  useEffect(() => {
+    try {
+      if (!compId) return;
+      localStorage.setItem(`dth:mobileSelectedHole:${compId}`, String(mobileSelectedHole));
+    } catch (e) {}
+  }, [compId, mobileSelectedHole]);
 
   // Per-cell styling for gross score inputs: eagle (<= par-2) => pink, birdie (par-1) => green,
   // blowup (>= par+3) => maroon. Returns an inline style object to merge into the input's style.
@@ -416,6 +447,24 @@ export default function MedalScorecard(props) {
                 if (!name) continue;
                 const pd = copy[name] || { scores: Array(18).fill(''), teebox: '', handicap: '' };
                 const arr = Array.isArray(pd.scores) ? [...pd.scores] : Array(18).fill('');
+                try {
+                  const key = `${name}:${holeIdx}`;
+                  const pending = pendingLocalSavesRef.current[key];
+                  const strokeStr = strokes == null ? '' : String(strokes);
+                  if (pending) {
+                    const age = Date.now() - (pending.ts || 0);
+                    // If server confirms our pending value, clear pending and skip (local already set)
+                    if (String(pending.value) === strokeStr) {
+                      delete pendingLocalSavesRef.current[key];
+                      continue;
+                    }
+                    // If we have a very recent local save, ignore the server update to avoid
+                    // overwriting our newer local edit with a stale/late-arriving value.
+                    if (age < 5000) {
+                      continue;
+                    }
+                  }
+                } catch (e) {}
                 arr[holeIdx] = strokes == null ? '' : String(strokes);
                 copy[name] = { ...pd, scores: arr };
               }
@@ -603,9 +652,28 @@ export default function MedalScorecard(props) {
   // Keep a ref copy of playerData so delayed callbacks can read latest values
   const playerDataRef = useRef(playerData);
   useEffect(() => { playerDataRef.current = playerData; }, [playerData]);
+  // Track recent local per-hole saves so we can ignore short-lived server echoes
+  // that might arrive out-of-order and overwrite a newer local edit.
+  const pendingLocalSavesRef = useRef({});
 
   async function handleScoreChange(name, idx, value) {
     if (!canEdit(name)) return;
+    // remember last-edited hole for this competition (so refresh/navigation returns here)
+    try { setMobileSelectedHole(idx + 1); localStorage.setItem(`dth:mobileSelectedHole:${compId}`, String(idx + 1)); } catch (e) {}
+    // mark this hole as a recent local save so we can ignore immediate server echoes
+    try {
+      const key = `${name}:${idx}`;
+      const ts = Date.now();
+      pendingLocalSavesRef.current[key] = { value: String(value), ts };
+      // expire after 5s
+      setTimeout(() => {
+        try {
+          if (pendingLocalSavesRef.current[key] && pendingLocalSavesRef.current[key].ts === ts) {
+            delete pendingLocalSavesRef.current[key];
+          }
+        } catch (e) {}
+      }, 5000);
+    } catch (e) {}
     setPlayerData(prev => {
       const existing = Array.isArray(prev[name]?.scores) ? prev[name].scores : Array.from({ length: 18 }, () => '');
       const updatedScores = existing.map((v, i) => i === idx ? value : v);
@@ -1045,10 +1113,10 @@ export default function MedalScorecard(props) {
                                 <div className="text-right">Points: <span className="font-bold">{stable.total}</span></div>
                               </div>
 
-                              <div className="absolute left-1/2 transform -translate-x-1/2 bottom-3 flex items-center gap-4">
-                                <button aria-label={`big-dec-${pName}`} className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
-                                <div className="mx-2 text-2xl font-extrabold">{curVal || '-'}</div>
-                                <button aria-label={`big-inc-${pName}`} className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
+                              <div className="absolute right-3 top-3 flex items-center gap-3">
+                                <button aria-label={`big-dec-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
+                                <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center' }}>{curVal || '-'}</div>
+                                <button aria-label={`big-inc-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
                               </div>
                             </div>
                           );
@@ -1111,10 +1179,10 @@ export default function MedalScorecard(props) {
                               <div className="text-right">Net: <span className="font-bold">{totalNet}</span></div>
                             </div>
 
-                            <div className="absolute left-1/2 transform -translate-x-1/2 bottom-3 flex items-center gap-4">
-                              <button aria-label={`big-dec-medal-${pName}`} className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
-                              <div className="mx-2 text-2xl font-extrabold">{curVal || '-'}</div>
-                              <button aria-label={`big-inc-medal-${pName}`} className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
+                            <div className="absolute right-3 top-3 flex items-center gap-3">
+                              <button aria-label={`big-dec-medal-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
+                              <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center' }}>{curVal || '-'}</div>
+                              <button aria-label={`big-inc-medal-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
                             </div>
                           </div>
                         );
