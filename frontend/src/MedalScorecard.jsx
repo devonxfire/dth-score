@@ -390,6 +390,15 @@ export default function MedalScorecard(props) {
           // helper: schedule the same delayed popup checks we use for local edits
           function schedulePopupCheck(name, idx, strokes) {
             try {
+              // If we recently edited this hole locally, suppress server-triggered popups
+              try {
+                const pendingKey = `${name}:${idx}`;
+                const pend = pendingLocalSavesRef.current[pendingKey];
+                if (pend && (Date.now() - (pend.ts || 0) < 5000)) {
+                  try { debugLog && debugLog('suppressing popup due to recent local edit', { pendingKey, pend }); } catch (e) {}
+                  return;
+                }
+              } catch (e) {}
               const gross = parseInt(strokes, 10);
               const hole = defaultHoles[idx];
               if (!gross || !hole) return;
