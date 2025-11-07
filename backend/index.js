@@ -395,7 +395,7 @@ app.post('/api/competitions', async (req, res) => {
 app.get('/api/competitions/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const comp = await prisma.competitions.findUnique({ where: { id: Number(id) } });
+  const comp = await prisma.competitions.findUnique({ where: { id: Number(id) }, include: { holes: { orderBy: { number: 'asc' } } } });
     if (!comp) {
       return res.status(404).json({ error: 'Competition not found' });
     }

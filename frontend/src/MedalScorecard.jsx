@@ -39,6 +39,8 @@ function getPlayerColorsFor(props) {
 export default function MedalScorecard(props) {
   // Compute player colors based on competition type or overrideTitle
   const playerColors = getPlayerColorsFor(props);
+
+  // holesArr will be set after comp state is initialized (see further below)
   // Helper to send PATCH requests with an X-Origin-Socket header when possible
   async function patchWithOrigin(url, body) {
     const headers = { 'Content-Type': 'application/json' };
@@ -99,7 +101,7 @@ export default function MedalScorecard(props) {
     let back = 0;
     let total = 0;
     const playingHandicap = computePH(playerData[name]?.handicap) || 0;
-    defaultHoles.forEach((hole, idx) => {
+    holesArr.forEach((hole, idx) => {
       const raw = playerData[name]?.scores?.[idx];
       const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
       if (!Number.isFinite(gross)) {
@@ -109,11 +111,12 @@ export default function MedalScorecard(props) {
       // compute strokes received using same logic as medal net
       let strokesReceived = 0;
       if (playingHandicap > 0) {
+        const idxVal = hole.index || hole.index === 0 ? Number(hole.index) : undefined;
         if (playingHandicap >= 18) {
           strokesReceived = 1;
-          if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
-          else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
-        } else if (hole.index <= playingHandicap) {
+          if (playingHandicap - 18 >= idxVal) strokesReceived = 2;
+          else if (idxVal <= (playingHandicap % 18)) strokesReceived = 2;
+        } else if (idxVal <= playingHandicap) {
           strokesReceived = 1;
         }
       }
@@ -224,13 +227,21 @@ export default function MedalScorecard(props) {
     } catch (e) {}
   }, [compId, mobileSelectedHole]);
 
+  // Use holes from the competition payload when available (map stroke_index -> index),
+  // otherwise fall back to the defaultHoles constant.
+  const holesArr = (comp && Array.isArray(comp.holes) && comp.holes.length === 18)
+    ? comp.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)) }))
+    : (props && props.competition && Array.isArray(props.competition.holes) && props.competition.holes.length === 18)
+      ? props.competition.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)) }))
+      : defaultHoles;
+
   // Per-cell styling for gross score inputs: eagle (<= par-2) => pink, birdie (par-1) => green,
   // blowup (>= par+3) => maroon. Returns an inline style object to merge into the input's style.
   function scoreCellStyle(name, idx) {
     try {
       const raw = playerData?.[name]?.scores?.[idx];
       const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
-      const hole = defaultHoles[idx];
+  const hole = holesArr[idx];
   if (!Number.isFinite(gross) || !hole) return {};
   // Outline-only styles: transparent background, colored 2px border and matching text color
   if (gross <= hole.par - 2) return { background: 'transparent', border: '2px solid #FFC0CB', color: '#FFC0CB', boxSizing: 'border-box' }; // pink outline
@@ -247,7 +258,7 @@ export default function MedalScorecard(props) {
     try {
       const raw = playerData?.[name]?.scores?.[idx];
       const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
-      const hole = defaultHoles[idx];
+  const hole = holesArr[idx];
       if (!Number.isFinite(gross) || !hole) return '';
       // circle for eagle or birdie
       if (gross <= hole.par - 2) return 'rounded-full';
