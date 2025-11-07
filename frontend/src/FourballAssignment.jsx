@@ -145,7 +145,9 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
         <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, width: '100%', background: 'white', opacity: 0.7, borderRadius: 2}}></div>
       </div>
       <div className="flex flex-col items-center bg-transparent">
-  <form onSubmit={handleSubmit} className="w-full max-w-4xl rounded-2xl text-white mx-auto p-6" style={{ background: 'rgba(0,47,95,0.95)' }}>
+        {/* Outer yellow square wrapper to ensure a visible thin border behind the rounded panel */}
+        <div style={{ background: '#FFD700', padding: '1px', borderRadius: 0 }} className="w-full max-w-4xl mx-auto">
+          <form onSubmit={handleSubmit} className="w-full rounded-2xl text-white mx-auto p-6" style={{ background: 'rgba(0,47,95,0.95)' }}>
           {groups.map((group, idx) => (
             <div key={idx} className="mb-6 border-b border-white/30 pb-4">
               <div className="mb-2 font-extrabold" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.2rem' }}>4 Ball {idx + 1}</div>
@@ -222,6 +224,7 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
             </button>
           </div>
         </form>
+      </div>
       </div>
     </>
   );

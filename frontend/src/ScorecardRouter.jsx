@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import Scorecard from './Scorecard';
-import Scorecard4BBB from './Scorecard4BBB';
 import MedalScorecard from './MedalScorecard';
 import AllianceScorecard from './AllianceScorecard';
 import { apiUrl } from './api';
@@ -48,7 +47,10 @@ export default function ScorecardRouter(props) {
   const chars = compTypeLower.split('');
   const charCodes = chars.map(c => c.charCodeAt(0));
   if (is4BBB) {
-    return <Scorecard4BBB {...props} competition={competition} />;
+    // Render the Alliance scorecard UI for 4BBB competitions for visual parity.
+    // Pass an explicit title override so the heading says "4BBB Stableford" while
+    // keeping the Alliance component and MedalScorecard behavior untouched.
+    return <AllianceScorecard {...props} competition={competition} overrideTitle="4BBB Stableford" />;
   }
   const isAlliance = compTypeLower.includes('alliance');
   if (isAlliance) {

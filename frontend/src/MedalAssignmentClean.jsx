@@ -1,0 +1,101 @@
+import React, { useEffect, useState } from 'react';
+import { apiUrl } from './api';
+import PageBackground from './PageBackground';
+import { useNavigate, useParams } from 'react-router-dom';
+
+export default function MedalAssignment(props) {
+  const params = useParams();
+  const navigate = useNavigate();
+  const compId = props.compId || params.id || props.competition?.id;
+  const [groups, setGroups] = useState(() => {
+    if (props.initialGroups && props.initialGroups.length > 0) return props.initialGroups;
+    return [{ players: [], teeTime: '', displayNames: ['', '', '', ''] }];
+  });
+  const [availablePlayers, setAvailablePlayers] = useState([]);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!compId) return;
+    fetch(apiUrl(`/api/competitions/${compId}`))
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) setGroups(Array.isArray(data.groups) && data.groups.length > 0 ? data.groups : [{ players: [], teeTime: '', displayNames: ['', '', '', ''] }]);
+      });
+  }, [compId]);
+
+  useEffect(() => {
+    fetch(apiUrl('/api/users')).then(r => r.ok ? r.json() : []).then(data => {
+      if (Array.isArray(data)) setAvailablePlayers(data.map(u => u.name));
+    });
+  }, []);
+
+  function addGroup() { setGroups(prev => [...prev, { players: [], teeTime: '', displayNames: ['', '', '', ''] }]); }
+  function assignPlayer(groupIdx, playerIdx, playerName) {
+    setGroups(prev => prev.map((g, i) => i === groupIdx ? { ...g, players: Object.assign([], g.players, { [playerIdx]: playerName }) } : g));
+  }
+  function setTeeTime(groupIdx, teeTime) { setGroups(prev => prev.map((g, i) => i === groupIdx ? { ...g, teeTime } : g)); }
+  function removeGroup(idx) { setGroups(prev => prev.filter((_, i) => i !== idx)); }
+
+  async function handleSave() {
+    setError('');
+    setSaving(true);
+    for (const g of groups) {
+      if (!Array.isArray(g.players) || g.players.length !== 4 || g.players.some(p => !p)) { setError('Each group must have 4 players assigned.'); setSaving(false); return; }
+      if (!g.teeTime) { setError('Each group must have a tee time.'); setSaving(false); return; }
+    }
+    const compIdInt = Number(compId);
+    if (!compIdInt || isNaN(compIdInt)) { setError('Competition ID is missing or invalid.'); setSaving(false); return; }
+    try {
+      const res = await fetch(apiUrl(`/api/competitions/${compIdInt}/groups`), {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groups })
+      });
+      if (!res.ok) { const errText = await res.text(); setError('Failed to save groups: ' + errText); setSaving(false); return; }
+      navigate(`/scorecard-medal/${compIdInt}`);
+    } catch (e) { setError('Failed to save groups: ' + (e.message || 'Unknown error')); } finally { setSaving(false); }
+  }
+
+  function getUnassignedPlayers() { const assigned = groups.flatMap(g => g.players); return availablePlayers.filter(p => !assigned.includes(p)); }
+
+  return (
+    <PageBackground hideFooter>
+      <div className="max-w-4xl w-full h-screen flex flex-col justify-start p-0 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', boxSizing: 'border-box' }}>
+        <div className="w-full h-full flex flex-col justify-start p-0 text-white" style={{ boxSizing: 'border-box', display: 'flex', justifyContent: 'center' }}>
+          {/* Yellow rounded wrapper (1px padding) with inner rounded blue panel to avoid corner artifacts */}
+          <div style={{ background: '#FFD700', borderRadius: 9, padding: 1, boxSizing: 'border-box', width: '100%' }}>
+            <div className="w-full h-full flex flex-col justify-start p-8 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', borderRadius: 8, overflow: 'hidden', boxSizing: 'border-box' }}>
+          <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Medal Competition: 4 Ball Assignment</h1>
+          <div className="mx-auto mt-2 mb-4" style={{ height: '2px', maxWidth: 340, width: '100%', background: 'white', opacity: 0.7, borderRadius: 2 }}></div>
+
+          {error && <div className="text-red-300 mb-2 font-semibold">{error}</div>}
+          {groups.map((group, idx) => (
+            <div key={idx} className="mb-6 border-b border-white/30 pb-4">
+              <div className="mb-2 font-extrabold" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.2rem' }}>4 Ball {idx + 1}</div>
+              <div className="mb-2">
+                <label className="block mb-1 font-bold" htmlFor={`teeTime-${idx}`} style={{ color: '#FFD700', fontFamily: 'Lato, Arial, sans-serif' }}>Tee Time</label>
+                <div className="relative flex items-center">
+                  <input id={`teeTime-${idx}`} type="time" value={group.teeTime} onChange={e => setTeeTime(idx, e.target.value)} className="border border-white bg-transparent rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }} required />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 mt-2">
+                {Array.from({ length: 4 }).map((_, pIdx) => (
+                  <select key={pIdx} className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700 }} value={group.players[pIdx] || ''} onChange={e => assignPlayer(idx, pIdx, e.target.value)} required>
+                    <option value="" style={{ color: '#1B3A6B', fontWeight: 700 }}>Select player</option>
+                    {getUnassignedPlayers().concat(group.players[pIdx] ? [group.players[pIdx]] : []).filter((v, i, arr) => arr.indexOf(v) === i).map(p => (
+                      <option key={p} value={p} style={{ color: '#1B3A6B', fontWeight: 700 }}>{p}</option>
+                    ))}
+                  </select>
+                ))}
+              </div>
+              <button className="mt-2 px-4 py-2 rounded bg-red-700 text-white font-bold" onClick={() => removeGroup(idx)} disabled={groups.length <= 1}>Remove Group</button>
+            </div>
+          ))}
+          <button className="w-full py-3 px-4 mt-2 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onClick={addGroup}>{groups.length === 0 ? 'Add A Tee Time' : 'Add Another Tee Time'}</button>
+          <button className="w-full py-3 px-4 mt-4 rounded-2xl font-bold shadow border border-white transition text-lg" style={{ backgroundColor: '#1B3A6B', color: 'white', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }} onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save & Continue'}</button>
+          </div>
+            </div>
+        </div>
+      </div>
+    </PageBackground>
+  );
+}

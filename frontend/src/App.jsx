@@ -69,7 +69,7 @@ function AppRoutes({ user, setUser }) {
           <Route path="/scorecard-alliance/:id" element={<AllianceScorecard user={user} onSignOut={handleSignOut} />} />
           <Route path="/leaderboard-alliance/:id" element={<AllianceLeaderboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/alliance-leaderboard/:id" element={<AllianceLeaderboard user={user} onSignOut={handleSignOut} />} />
-          <Route path="/assign-fourball" element={<FourballAssignment user={user} onSignOut={handleSignOut} />} />
+          <Route path="/assign-fourball" element={<AssignFourballsPage user={user} />} />
           <Route path="/assign-4balls/:id" element={<AssignFourballsPage user={user} />} />
           <Route path="/scorecard-fourball/:id" element={<FourballScorecard user={user} onSignOut={handleSignOut} />} />
           <Route path="/leaderboard-fourball/:id" element={<FourballLeaderboard user={user} onSignOut={handleSignOut} />} />

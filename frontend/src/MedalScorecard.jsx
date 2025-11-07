@@ -13,14 +13,31 @@ const defaultHoles = [
   { number: 11, par: 4, index: 4 }, { number: 12, par: 4, index: 12 }, { number: 13, par: 5, index: 2 }, { number: 14, par: 4, index: 14 }, { number: 15, par: 3, index: 18 },
   { number: 16, par: 5, index: 6 }, { number: 17, par: 3, index: 16 }, { number: 18, par: 4, index: 8 }
 ];
-const playerColors = [
-  'bg-blue-100 text-blue-900',
-  'bg-green-100 text-green-900',
-  'bg-yellow-100 text-yellow-900',
-  'bg-pink-100 text-pink-900'
-];
+// Default player color classes. For 4BBB we want A+B to share A's color and C+D to share C's color.
+function getPlayerColorsFor(props) {
+  const defaultColors = [
+    'bg-blue-100 text-blue-900',
+    'bg-green-100 text-green-900',
+    'bg-yellow-100 text-yellow-900',
+    'bg-pink-100 text-pink-900'
+  ];
+  try {
+    const is4bbb = (props?.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb'))
+      || (props?.competition && props.competition.type && props.competition.type.toLowerCase().includes('4bbb'))
+      || (props?.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
+    if (is4bbb) {
+      // A and B use color A, C and D use color C
+      return [defaultColors[0], defaultColors[0], defaultColors[2], defaultColors[2]];
+    }
+  } catch (e) {
+    // fallback to defaults on error
+  }
+  return defaultColors;
+}
 
 export default function MedalScorecard(props) {
+  // Compute player colors based on competition type or overrideTitle
+  const playerColors = getPlayerColorsFor(props);
   // Helper to send PATCH requests with an X-Origin-Socket header when possible
   async function patchWithOrigin(url, body) {
     const headers = { 'Content-Type': 'application/json' };
