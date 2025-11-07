@@ -26,8 +26,9 @@ function getPlayerColorsFor(props) {
       || (props?.competition && props.competition.type && props.competition.type.toLowerCase().includes('4bbb'))
       || (props?.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
     if (is4bbb) {
-      // A and B use color A, C and D use color C
-      return [defaultColors[0], defaultColors[0], defaultColors[2], defaultColors[2]];
+      // A and B use color A, C and D use a green pair (light/dark green) for better contrast
+      const greenPair = ['bg-emerald-100 text-emerald-900', 'bg-emerald-100 text-emerald-900'];
+      return [defaultColors[0], defaultColors[0], greenPair[0], greenPair[1]];
     }
   } catch (e) {
     // fallback to defaults on error
@@ -1071,6 +1072,7 @@ export default function MedalScorecard(props) {
                       <th className="border px-2 py-1 text-center" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}>Dog</th>
                       <th className="border px-2 py-1 text-center" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}>2 Clubs</th>
                     </tr>
+                    {/* Removed erroneous insertion here; pair Score rows are rendered inside the main front/back tables after the appropriate player rows. */}
                   </thead>
                   <tbody>
                     {players.map((name, idx) => (
@@ -1126,16 +1128,54 @@ export default function MedalScorecard(props) {
             {/* Decide mobile rendering mode */}
             {(() => {
               const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+              const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
               const isMedalMobile = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('medal')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('medal'));
-              if (isAlliance) {
+              if (isAlliance || is4bbb) {
                 const group = groups[groupIdx] || { players: [] };
                 const best = computeGroupBestTwoTotals(group);
                 const hole = defaultHoles[mobileSelectedHole - 1];
                 return (
                   <div>
-                    <div className="w-full p-3 rounded border-2 text-center mb-3" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
-                      <div className="font-extrabold text-2xl text-white">Alliance Score: <span style={{ color: '#FFD700' }}>{best.total}</span></div>
-                    </div>
+                    {/* For 4BBB show pair BB Scores (AB and CD) in mobile header; otherwise show Alliance total */}
+                    {is4bbb ? (
+                      <div className="grid grid-cols-1 gap-2 mb-3">
+                        {(() => {
+                          const pairTotals = (start) => {
+                            const nameA = (players && players[start]) || '';
+                            const nameB = (players && players[start + 1]) || '';
+                            const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
+                            const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
+                            const perHole = defaultHoles.map((_, i) => {
+                              const a = stabA.perHole?.[i];
+                              const b = stabB.perHole?.[i];
+                              if (a == null && b == null) return null;
+                              return Math.max(Number(a || 0), Number(b || 0));
+                            });
+                            const front = perHole.slice(0, 9).reduce((s, v) => s + (v != null ? v : 0), 0);
+                            const back = perHole.slice(9, 18).reduce((s, v) => s + (v != null ? v : 0), 0);
+                            const total = front + back;
+                            const hasAny = perHole.some(v => v != null);
+                            return { perHole, front, back, total: hasAny ? total : null };
+                          };
+                          const ab = pairTotals(0);
+                          const cd = pairTotals(2);
+                          return (
+                            <>
+                              <div className="w-full p-3 rounded border-2 text-center" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
+                                <div className="font-extrabold text-2xl text-white">Team AB | BB Score: <span style={{ color: '#FFD700' }}>{ab.total != null ? ab.total : ''}</span></div>
+                              </div>
+                              <div className="w-full p-3 rounded border-2 text-center" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
+                                <div className="font-extrabold text-2xl text-white">Team CD | BB Score: <span style={{ color: '#FFD700' }}>{cd.total != null ? cd.total : ''}</span></div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="w-full p-3 rounded border-2 text-center mb-3" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
+                        <div className="font-extrabold text-2xl text-white">Alliance Score: <span style={{ color: '#FFD700' }}>{best.total}</span></div>
+                      </div>
+                    )}
 
                     <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
                       <div className="flex items-center justify-center mb-3">
@@ -1320,9 +1360,12 @@ export default function MedalScorecard(props) {
               <tbody>
                   {players.map((name, pIdx) => {
                   const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                  const resultLabel = isAlliance ? 'Points' : 'Net';
-                  const stable = isAlliance ? computePlayerStablefordTotals(name) : null;
-                  return (
+                  const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
+                  const resultLabel = (isAlliance || is4bbb) ? 'Points' : 'Net';
+                  // For Alliance and 4BBB we want per-hole stableford points for the player
+                  const stable = (isAlliance || is4bbb) ? computePlayerStablefordTotals(name) : null;
+                  // Return an array: the player's rows, and optionally the pair 'Score' row immediately after player B (pIdx===1) and player D (pIdx===3)
+                  return [
                   <React.Fragment key={name + '-rows-front'}>
                     {/* Gross row */}
                     <tr key={name + '-gross-front'}>
@@ -1371,11 +1414,12 @@ export default function MedalScorecard(props) {
                           return <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}></td>;
                         }
                         const net = gross - strokesReceived;
-                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) {
-                          const pts = stablefordPoints(net, hole.par);
+                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance')) || is4bbb) {
+                          // For Alliance and 4BBB show stableford points per hole (computed using PH inside computePlayerStablefordTotals)
+                          const pts = stable ? (stable.perHole ? stable.perHole[hIdx] : stablefordPoints(net, hole.par)) : stablefordPoints(net, hole.par);
                           return (
                             <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
-                              {pts}
+                              {pts != null ? pts : ''}
                             </td>
                           );
                         }
@@ -1415,18 +1459,52 @@ export default function MedalScorecard(props) {
                         })()}
                       </td>
                     </tr>
-                  </React.Fragment>
-                  );
+                  </React.Fragment>,
+                  (is4bbb && (pIdx === 1 || pIdx === 3)) ? (() => {
+                    const pairStart = pIdx === 1 ? 0 : 2;
+                    const nameA = players[pairStart];
+                    const nameB = players[pairStart + 1];
+                    const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0) };
+                    const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0) };
+                    const perHoleFront = defaultHoles.slice(0, 9).map((_, idx) => {
+                      const holeIdx = idx;
+                      const a = stabA.perHole?.[holeIdx];
+                      const b = stabB.perHole?.[holeIdx];
+                      if (a == null && b == null) return null;
+                      return Math.max(Number(a || 0), Number(b || 0));
+                    });
+                    const frontSum = perHoleFront.reduce((s, v) => s + (v != null ? v : 0), 0);
+                    return (
+                      <tr key={`pair-score-front-${pairStart}`}>
+                        <td className="border px-2 py-1 bg-white/5" />
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>BB Score</td>
+                        {perHoleFront.map((val, hIdx) => (
+                          <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                            {val != null ? val : ''}
+                          </td>
+                        ))}
+                        {(() => {
+                          const frontCount = perHoleFront.filter(v => v != null).length;
+                          return (
+                            <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{frontCount ? frontSum : ''}</td>
+                          );
+                        })()}
+                      </tr>
+                    );
+                  })() : null
+                  ];
                 })}
-                {/* Alliance team 'Score' row: sum of best two stableford totals */}
-                {((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) && (
+                {/* For 4BBB, render pair 'Score' rows after player B and player D (pairs A+B and C+D). */}
+                
+                {/* Alliance team 'Score' row: sum of best two stableford totals (only for alliance comps, not 4BBB) */}
+                {((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) && !((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb'))) && (
                   (() => {
                     const group = groups[groupIdx] || { players: [] };
                     const best = computeGroupBestTwoTotals(group);
                     return (
                       <tr key={`group-score-front-${groupIdx}`}>
                         <td className="border px-2 py-1 bg-white/5" />
-                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Score</td>
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>BB Score</td>
                         {defaultHoles.slice(0,9).map((_, hIdx) => {
                           const val = best.perHole ? best.perHole[hIdx] : 0;
                           return (
@@ -1477,9 +1555,12 @@ export default function MedalScorecard(props) {
               <tbody>
                 {players.map((name, pIdx) => {
                   const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                          const resultLabel = isAlliance ? 'Points' : 'Net';
+                  const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
+                  const resultLabel = (isAlliance || is4bbb) ? 'Points' : 'Net';
                   const stable = isAlliance ? computePlayerStablefordTotals(name) : null;
-                  return (
+
+                  // Return an array: the player's rows, and optionally the pair 'Score' row immediately after player B (pIdx===1) and player D (pIdx===3)
+                  return [
                   <React.Fragment key={name + '-rows-back'}>
                     {/* Gross row */}
                     <tr key={name + '-gross-back'}>
@@ -1532,11 +1613,13 @@ export default function MedalScorecard(props) {
                           return <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}></td>;
                         }
                         const net = gross - strokesReceived;
-                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) {
-                          const pts = stablefordPoints(net, hole.par);
+                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance')) || is4bbb) {
+                          // For Alliance and 4BBB show stableford points per hole
+                          const holeIdx = 9 + hIdx;
+                          const pts = stable ? (stable.perHole ? stable.perHole[holeIdx] : stablefordPoints(net, hole.par)) : stablefordPoints(net, hole.par);
                           return (
                             <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
-                              {pts}
+                              {pts != null ? pts : ''}
                             </td>
                           );
                         }
@@ -1602,8 +1685,51 @@ export default function MedalScorecard(props) {
                         })()}
                       </td>
                     </tr>
-                  </React.Fragment>
-                  );
+                  </React.Fragment>,
+                  (is4bbb && (pIdx === 1 || pIdx === 3)) ? (() => {
+                    const pairStart = pIdx === 1 ? 0 : 2;
+                    const nameA = players[pairStart];
+                    const nameB = players[pairStart + 1];
+                    const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0) };
+                    const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0) };
+                        const perHoleBack = defaultHoles.slice(9, 18).map((_, idx) => {
+                          const holeIdx = 9 + idx;
+                          const a = stabA.perHole?.[holeIdx];
+                          const b = stabB.perHole?.[holeIdx];
+                          if (a == null && b == null) return null;
+                          return Math.max(Number(a || 0), Number(b || 0));
+                        });
+                        const backSum = perHoleBack.reduce((s, v) => s + (v != null ? v : 0), 0);
+                        const totalPerHole = defaultHoles.map((_, i) => {
+                          const a = stabA.perHole?.[i];
+                          const b = stabB.perHole?.[i];
+                          if (a == null && b == null) return null;
+                          return Math.max(Number(a || 0), Number(b || 0));
+                        });
+                        const totalSum = totalPerHole.reduce((s, v) => s + (v != null ? v : 0), 0);
+                    return (
+                      <tr key={`pair-score-back-${pairStart}`}>
+                        <td className="border px-2 py-1 bg-white/5" />
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>BB Score</td>
+                        {perHoleBack.map((val, hIdx) => (
+                          <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                            {val != null ? val : ''}
+                          </td>
+                        ))}
+                        {(() => {
+                          const backCount = perHoleBack.filter(v => v != null).length;
+                          const totalCount = totalPerHole.filter(v => v != null).length;
+                          return (
+                            <>
+                              <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{backCount ? backSum : ''}</td>
+                              <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{totalCount ? totalSum : ''}</td>
+                            </>
+                          );
+                        })()}
+                      </tr>
+                    );
+                  })() : null
+                  ];
                 })}
                 {/* Alliance team 'Score' row for Back 9: show best-two back and total */}
                 {((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) && (
@@ -1619,7 +1745,7 @@ export default function MedalScorecard(props) {
                           const val = best.perHole ? best.perHole[idx] : 0;
                           return (
                             <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
-                              {val != null ? val : 0}
+                              {val != null ? val : ''}
                             </td>
                           );
                         })}
