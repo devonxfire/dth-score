@@ -30,6 +30,8 @@ const defaultHoles = [
   { number: 18, par: 4, index: 8 }
 ];
 
+// Helper: when competition provides holes, use those (map stroke_index -> index). Otherwise fall back to defaultHoles.
+
 function getPlayingHandicap(entry, comp) {
   const ch = parseFloat(entry.handicap || 0);
   const allowanceRaw = comp?.handicapallowance ?? comp?.handicapAllowance ?? 100;
@@ -65,7 +67,7 @@ function getPlayingHandicap(entry, comp) {
         setLoading(true);
         fetch(apiUrl(`/api/competitions/${id}`))
           .then(res => res.ok ? res.json() : null)
-          .then(data => {
+          .then(async data => {
             if (!data) return setLoading(false);
             setComp(data);
             setGroups(Array.isArray(data.groups) ? data.groups : []);
@@ -94,25 +96,56 @@ function getPlayingHandicap(entry, comp) {
             }
             setEntries(built);
 
-            const teamIds = Array.from(new Set((data.groups || []).map(g => g && (g.teamId || g.id || g.team_id || g.group_id)).filter(Boolean)));
+            // Gather all underlying team ids. For 4BBB groups the API may return group.teamIds (array of two team ids) so
+            // include those as well.
+            const teamIds = Array.from(new Set([].concat(...(data.groups || []).map(g => {
+              if (!g) return [];
+              if (Array.isArray(g.teamIds) && g.teamIds.length > 0) return g.teamIds.filter(Boolean);
+              const t = (g.teamId || g.id || g.team_id || g.group_id);
+              return t ? [t] : [];
+            }))));
             if (teamIds.length > 0) {
-              Promise.all(teamIds.map(async tid => {
-                try {
-                  const res = await fetch(apiUrl(`/api/teams/${tid}`));
-                  if (!res.ok) return [tid, null];
-                  const t = await res.json();
-                  return [tid, t.team_points ?? (t.team_points === 0 ? t.team_points : (t.team_points || t.teamPoints || null))];
-                } catch (e) { return [tid, null]; }
-              })).then(results => {
-                const map = {};
-                results.forEach(([tid, pts]) => { if (tid) map[tid] = pts; });
-                setBackendTeamPointsMap(map);
-              }).catch(() => {});
+              // Try fetching all teams for this competition in one request (server exposes /api/teams?competitionId=...)
+              fetch(apiUrl(`/api/teams?competitionId=${data.id}`))
+                .then(res => res.ok ? res.json() : null)
+                .then(allTeams => {
+                  if (allTeams && Array.isArray(allTeams)) {
+                    const map = {};
+                    (allTeams || []).forEach(t => {
+                      if (t && t.id != null) map[t.id] = t.team_points ?? t.teamPoints ?? null;
+                    });
+                    setBackendTeamPointsMap(map);
+                    return;
+                  }
+                  // Fallback: fetch individual team rows (older servers may not support the query)
+                  return Promise.all(teamIds.map(tid => fetch(apiUrl(`/api/teams/${tid}`)).then(r => r.ok ? r.json() : null).then(t => [tid, t ? (t.team_points ?? (t.team_points === 0 ? t.team_points : (t.team_points || t.teamPoints || null))) : null]).catch(() => [tid, null])));
+                })
+                .then(results => {
+                  if (!results) return;
+                  const map = {};
+                  results.forEach(([tid, pts]) => { if (tid) map[tid] = pts; });
+                  setBackendTeamPointsMap(map);
+                })
+                .catch(() => {
+                  // Network error: attempt individual fetches as a last resort
+                  Promise.all(teamIds.map(tid => fetch(apiUrl(`/api/teams/${tid}`)).then(r => r.ok ? r.json() : null).then(t => [tid, t ? (t.team_points ?? (t.team_points === 0 ? t.team_points : (t.team_points || t.teamPoints || null))) : null]).catch(() => [tid, null])))
+                    .then(results => {
+                      const map = {};
+                      results.forEach(([tid, pts]) => { if (tid) map[tid] = pts; });
+                      setBackendTeamPointsMap(map);
+                    })
+                    .catch(() => {});
+                });
             }
             setLoading(false);
           })
           .catch(() => setLoading(false));
       }, []);
+
+      // Use holes from competition payload when available, otherwise defaultHoles
+      const holesArr = (comp && Array.isArray(comp.holes) && comp.holes.length === 18)
+        ? comp.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)) }))
+        : defaultHoles;
 
           // when comp is loaded, seed notesDraft
           useEffect(() => {
@@ -169,17 +202,19 @@ function getPlayingHandicap(entry, comp) {
           const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
           if (!Number.isFinite(gross)) { perHole[i] = null; continue; }
           let strokesReceived = 0;
+          const hole = holesArr[i];
+          const idxVal = hole && (hole.index != null) ? Number(hole.index) : undefined;
           if (ph > 0) {
             if (ph >= 18) {
               strokesReceived = 1;
-              if ((ph - 18) >= defaultHoles[i].index) strokesReceived = 2;
-              else if (defaultHoles[i].index <= (ph % 18)) strokesReceived = 2;
-            } else if (defaultHoles[i].index <= ph) {
+              if ((ph - 18) >= idxVal) strokesReceived = 2;
+              else if (idxVal <= (ph % 18)) strokesReceived = 2;
+            } else if (idxVal <= ph) {
               strokesReceived = 1;
             }
           }
           const net = gross - strokesReceived;
-          const pts = stablefordPoints(net, defaultHoles[i].par);
+          const pts = stablefordPoints(net, hole ? hole.par : defaultHoles[i].par);
           perHole[i] = pts;
           total += pts;
         }
@@ -250,7 +285,15 @@ function getPlayingHandicap(entry, comp) {
       }
 
       function buildTeams() {
-        const teams = (groups || []).map((group, idx) => {
+        const compTypeStr = (comp && String(comp.type || '').toLowerCase()) || '';
+        const compNameStr = (comp && String(comp.name || comp.title || '').toLowerCase()) || '';
+        const isFourBbbComp = comp && (
+          compTypeStr.includes('4bbb') || compTypeStr.includes('fourbbb') || compTypeStr.includes('fourball') || compTypeStr.includes('4bb') || compTypeStr.includes('4-ball') || !!comp.fourballs ||
+          compNameStr.includes('4bbb') || compNameStr.includes('fourbbb') || compNameStr.includes('fourball') || compNameStr.includes('4bb') || compNameStr.includes('4-ball') || compNameStr.includes('four-ball')
+        );
+
+        const teams = [];
+        (groups || []).forEach((group, idx) => {
           const groupPlayers = (group.players || []).map((name, i) => {
             let ent = entries.find(e => (e.name || '').trim().toLowerCase() === (name || '').trim().toLowerCase());
             if (!ent && Array.isArray(group.displayNames) && group.displayNames[i]) {
@@ -286,21 +329,45 @@ function getPlayingHandicap(entry, comp) {
               perHole: stable.perHole
             };
           });
-          const perHoleBestTwo = Array(18).fill(0).map((_, idx) => {
-            const vals = groupPlayers.map(p => (p.perHole && Number.isFinite(p.perHole[idx]) ? p.perHole[idx] : 0));
-            vals.sort((a,b) => b - a);
-            return (vals[0] || 0) + (vals[1] || 0);
-          });
-          const front = perHoleBestTwo.slice(0,9).reduce((s, v) => s + (v || 0), 0);
-          const back = perHoleBestTwo.slice(9,18).reduce((s, v) => s + (v || 0), 0);
-          const teamPoints = front + back;
-          const backendPoints = (group && (group.teamId || group.id || group.team_id || group.group_id)) ? backendTeamPointsMap[(group.teamId || group.id || group.team_id || group.group_id)] : null;
-          return {
-            groupIdx: idx,
-            players: groupPlayers,
-            teamPoints: (typeof backendPoints === 'number' ? backendPoints : teamPoints),
-            teeTime: group.teeTime || ''
-          };
+          // If this is a 4BBB competition (or a 4-player group with explicit teamIds) split into two 2-player teams (A+B and C+D)
+          if ((isFourBbbComp || (Array.isArray(group.teamIds) && group.teamIds.length >= 2)) && Array.isArray(groupPlayers) && groupPlayers.length === 4) {
+            const pairA = [groupPlayers[0], groupPlayers[1]];
+            const pairB = [groupPlayers[2], groupPlayers[3]];
+
+            const computeTeamPointsForPlayers = (playersArr) => {
+              const perHoleBestTwo = Array(18).fill(0).map((_, hIdx) => {
+                const vals = playersArr.map(p => (p.perHole && Number.isFinite(p.perHole[hIdx]) ? p.perHole[hIdx] : 0));
+                vals.sort((a,b) => b - a);
+                return (vals[0] || 0) + (vals[1] || 0);
+              });
+              const front = perHoleBestTwo.slice(0,9).reduce((s, v) => s + (v || 0), 0);
+              const back = perHoleBestTwo.slice(9,18).reduce((s, v) => s + (v || 0), 0);
+              return front + back;
+            };
+
+            // backend team ids may be provided as group.teamIds (array)
+            const teamIdA = Array.isArray(group.teamIds) && group.teamIds.length > 0 ? group.teamIds[0] : (group.teamId || group.id || group.team_id || null);
+            const teamIdB = Array.isArray(group.teamIds) && group.teamIds.length > 1 ? group.teamIds[1] : null;
+
+            const backendA = teamIdA ? backendTeamPointsMap[teamIdA] : null;
+            const backendB = teamIdB ? backendTeamPointsMap[teamIdB] : null;
+            const computedA = computeTeamPointsForPlayers(pairA);
+            const computedB = computeTeamPointsForPlayers(pairB);
+
+            teams.push({ groupIdx: idx, players: pairA, teamPoints: (typeof backendA === 'number' ? backendA : computedA), computedTeamPoints: computedA, teeTime: group.teeTime || '', teamId: teamIdA });
+            teams.push({ groupIdx: idx, players: pairB, teamPoints: (typeof backendB === 'number' ? backendB : computedB), computedTeamPoints: computedB, teeTime: group.teeTime || '', teamId: teamIdB });
+          } else {
+            const perHoleBestTwo = Array(18).fill(0).map((_, hIdx) => {
+              const vals = groupPlayers.map(p => (p.perHole && Number.isFinite(p.perHole[hIdx]) ? p.perHole[hIdx] : 0));
+              vals.sort((a,b) => b - a);
+              return (vals[0] || 0) + (vals[1] || 0);
+            });
+            const front = perHoleBestTwo.slice(0,9).reduce((s, v) => s + (v || 0), 0);
+            const back = perHoleBestTwo.slice(9,18).reduce((s, v) => s + (v || 0), 0);
+            const teamPoints = front + back;
+            const backendPoints = (group && (group.teamId || group.id || group.team_id || group.group_id)) ? backendTeamPointsMap[(group.teamId || group.id || group.team_id || group.group_id)] : null;
+            teams.push({ groupIdx: idx, players: groupPlayers, teamPoints: (typeof backendPoints === 'number' ? backendPoints : teamPoints), computedTeamPoints: teamPoints, teeTime: group.teeTime || '', teamId: (group.teamId || group.id || group.team_id || group.group_id) });
+          }
         });
         teams.sort((a,b) => b.teamPoints - a.teamPoints);
         let lastPoints = null;
@@ -316,6 +383,16 @@ function getPlayingHandicap(entry, comp) {
       if (loading) return <PageBackground><TopMenu userComp={comp} competitionList={comp ? [comp] : []} /><div className="p-8 text-white">Loading leaderboard...</div></PageBackground>;
 
       const teams = buildTeams();
+      // DEBUG: expose the teams array the UI is rendering and backend team points map so we can inspect them in the browser console.
+      // Remove this after verification.
+      try {
+        if (typeof window !== 'undefined') {
+          window.__dth_ui_teams = teams;
+          window.__dth_backendTeamPointsMap = backendTeamPointsMap || {};
+          // eslint-disable-next-line no-console
+          console.log('AllianceLeaderboard: UI teams', teams, 'backendTeamPointsMap', window.__dth_backendTeamPointsMap);
+        }
+      } catch (e) { /* ignore */ }
 
       async function exportToPDF() {
         try {
@@ -366,8 +443,8 @@ function getPlayingHandicap(entry, comp) {
         pdf.text(`Course: ${courseText}`, margin, y); pdf.text(`Handicap Allowance: ${allowanceText}`, margin + 80, y); y += lineHeight * 1.2;
         pdf.text(`Notes: ${comp?.notes || '-'}`, margin, y); y += lineHeight * 1.2;
 
-        const rows = [];
-        teams.forEach(team => { team.players.forEach(p => { const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0; const thru = holesPlayed === 18 ? 'F' : holesPlayed; rows.push({ pos: team.pos, teamPoints: team.teamPoints, teeTime: team.teeTime, name: p.name, displayName: p.displayName || '', userId: p.userId || null, teamId: p.teamId || null, dog: p.dog || false, waters: p.waters || '', twoClubs: p.twoClubs || '', fines: p.fines || '', gross: p.gross, net: p.net, dthNet: p.dthNet, points: p.points, thru }); }); });
+  const rows = [];
+  teams.forEach(team => { team.players.forEach(p => { const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0; const thru = holesPlayed === 18 ? 'F' : holesPlayed; rows.push({ pos: team.pos, teamPoints: team.teamPoints, teeTime: team.teeTime, name: p.name, displayName: p.displayName || '', userId: p.userId || null, teamId: team.teamId || null, dog: p.dog || false, waters: p.waters || '', twoClubs: p.twoClubs || '', fines: p.fines || '', gross: p.gross, net: p.net, dthNet: p.dthNet, points: p.points, thru }); }); });
 
         const goodScores = rows.filter(r => typeof r.dthNet === 'number' && r.dthNet < 70 && r.thru === 'F');
         pdf.setFont(undefined, 'bold'); pdf.text('Good Scores', margin, y); y += lineHeight; pdf.setFont(undefined, 'normal');
@@ -395,10 +472,13 @@ function getPlayingHandicap(entry, comp) {
         }
       }
 
-      const rowsForUI = [];
-      teams.forEach(team => { team.players.forEach(p => { const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0; const thru = holesPlayed === 18 ? 'F' : holesPlayed; rowsForUI.push({ pos: team.pos, teamPoints: team.teamPoints, teeTime: team.teeTime, name: p.name, displayName: p.displayName || '', userId: p.userId || null, teamId: p.teamId || null, dog: p.dog || false, waters: p.waters || '', twoClubs: p.twoClubs || '', fines: p.fines || '', gross: p.gross, net: p.net, dthNet: p.dthNet, points: p.points, thru }); }); });
+  const rowsForUI = [];
+  teams.forEach(team => { team.players.forEach(p => { const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0; const thru = holesPlayed === 18 ? 'F' : holesPlayed; rowsForUI.push({ pos: team.pos, teamPoints: team.teamPoints, computedTeamPoints: team.computedTeamPoints ?? null, teeTime: team.teeTime, name: p.name, displayName: p.displayName || '', userId: p.userId || null, teamId: team.teamId || null, dog: p.dog || false, waters: p.waters || '', twoClubs: p.twoClubs || '', fines: p.fines || '', gross: p.gross, net: p.net, dthNet: p.dthNet, points: p.points, thru }); }); });
 
-      rowsForUI.sort((a,b)=>{ if (a.pos !== b.pos) return a.pos - b.pos; return (b.points || 0) - (a.points || 0); });
+  // rowsForUI is built by iterating `teams` (already sorted by teamPoints and assigned positions).
+  // Avoid re-sorting by individual player points here because that can separate teammates
+  // who should appear together under the same team position. Keep the teams' order so
+  // paired players remain adjacent and share the same Pos and Score (teamPoints).
 
       const goodScores = rowsForUI.filter(r => typeof r.dthNet === 'number' && r.dthNet < 70 && r.thru === 'F');
 
@@ -489,7 +569,7 @@ function getPlayingHandicap(entry, comp) {
                             <div className="max-w-[8ch] sm:max-w-none truncate">{(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}</div>
                           </td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
-                          <td className="border px-0.5 sm:px-2 py-0.5">{entry.teamPoints}</td>
+                          <td className="border px-0.5 sm:px-2 py-0.5">{entry.teamPoints}{(entry.computedTeamPoints != null && entry.computedTeamPoints !== entry.teamPoints) ? ` (calc ${entry.computedTeamPoints})` : ''}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.gross}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.dthNet}</td>

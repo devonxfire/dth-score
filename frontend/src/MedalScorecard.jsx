@@ -1515,7 +1515,7 @@ export default function MedalScorecard(props) {
                     return (
                       <tr key={`group-score-front-${groupIdx}`}>
                         <td className="border px-2 py-1 bg-white/5" />
-                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>BB Score</td>
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Score</td>
                         {defaultHoles.slice(0,9).map((_, hIdx) => {
                           const val = best.perHole ? best.perHole[hIdx] : 0;
                           return (

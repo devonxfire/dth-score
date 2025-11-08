@@ -12,22 +12,38 @@ async function main() {
   }
 
   // Check if holes already exist for this competition
-  const existing = await prisma.hole.findMany({
+  const existing = await prisma.holes.findMany({
     where: { competition_id: Number(competitionId) },
   });
   if (existing.length > 0) {
     console.log(`Holes already exist for competition ${competitionId}.`);
     process.exit(0);
   }
+  // Westlake hole definitions
+  const westlake = [
+    { number: 1, par: 4, stroke_index: 5 },
+    { number: 2, par: 4, stroke_index: 7 },
+    { number: 3, par: 3, stroke_index: 17 },
+    { number: 4, par: 5, stroke_index: 1 },
+    { number: 5, par: 4, stroke_index: 11 },
+    { number: 6, par: 3, stroke_index: 15 },
+    { number: 7, par: 5, stroke_index: 3 },
+    { number: 8, par: 4, stroke_index: 13 },
+    { number: 9, par: 4, stroke_index: 9 },
+    { number: 10, par: 4, stroke_index: 10 },
+    { number: 11, par: 4, stroke_index: 4 },
+    { number: 12, par: 4, stroke_index: 12 },
+    { number: 13, par: 5, stroke_index: 2 },
+    { number: 14, par: 4, stroke_index: 14 },
+    { number: 15, par: 3, stroke_index: 18 },
+    { number: 16, par: 5, stroke_index: 6 },
+    { number: 17, par: 3, stroke_index: 16 },
+    { number: 18, par: 4, stroke_index: 8 }
+  ];
 
-  const holes = Array.from({ length: 18 }, (_, i) => ({
-    competition_id: Number(competitionId),
-    number: i + 1,
-    par: 4, // Default par, adjust as needed
-    yardage: 400, // Default yardage, adjust as needed
-  }));
+  const holes = westlake.map(h => ({ competition_id: Number(competitionId), number: h.number, par: h.par, stroke_index: h.stroke_index }));
 
-  await prisma.hole.createMany({ data: holes });
+  await prisma.holes.createMany({ data: holes });
   console.log(`Seeded 18 holes for competition ${competitionId}.`);
 }
 
