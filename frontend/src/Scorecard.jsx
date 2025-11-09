@@ -111,6 +111,9 @@ export default function Scorecard(props) {
   const [showDogPopup, setShowDogPopup] = useState(false);
   const [dogPlayer, setDogPlayer] = useState(null);
   const dogTimeoutRef = React.useRef(null);
+  // Save button status for inline feedback
+  const [saveStatus, setSaveStatus] = useState('idle');
+  const saveStatusTimeoutRef = React.useRef(null);
   // Mini table stats: Waters, Dog, 2 Clubs (persisted in backend)
   const [miniTableStats, setMiniTableStats] = useState({});
   // Birdie popup state
@@ -392,6 +395,47 @@ export default function Scorecard(props) {
       setScoresLoading(true);
       await fetchAllScores();
       setScoresLoading(false);
+    }
+  }
+
+  // Flush and save all players' scores immediately (mobile Save Scores button)
+  async function flushAndSaveAllScores() {
+    if (!competition || !competition.id || !groupTeamId) return;
+    try {
+      setSaveStatus('saving');
+      if (saveStatusTimeoutRef.current) { try { clearTimeout(saveStatusTimeoutRef.current); } catch (e) {} }
+      const saves = [];
+      for (let idx = 0; idx < groupPlayers.length; idx++) {
+        const name = groupPlayers[idx];
+        let userId = null;
+        if (competition.users) {
+          const user = competition.users.find(u => u.name === name);
+          if (user) userId = user.id || user.user_id || user.userId;
+        }
+        if (!userId) continue;
+        const playerScores = (scores[idx] || Array(18).fill('')).map(v => v === '' ? null : Number(v));
+        const patchUrl = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores`);
+        const patchBody = { competitionId: competition.id, scores: playerScores };
+        saves.push(fetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody) }));
+      }
+  await Promise.allSettled(saves);
+  // Ask server to rebroadcast this saved update so other clients (leaderboard tabs) refresh
+  try {
+    const payload = { competitionId: Number(competition?.id), teamId: groupTeamId, groupPlayers };
+    try { socket && socket.emit && socket.emit('client-medal-saved', payload); } catch (e) {}
+  } catch (e) {}
+  // inline feedback: show saved briefly
+  try { setSaveStatus('saved'); } catch (e) {}
+  try { if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current); } catch (e) {}
+  try { saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000); } catch (e) {}
+      // Re-fetch to sync
+      if (typeof fetchAllScores === 'function') {
+        setScoresLoading(true);
+        await fetchAllScores();
+        setScoresLoading(false);
+      }
+    } catch (err) {
+      console.error('Failed to flush saves', err);
     }
   }
 
@@ -816,6 +860,17 @@ export default function Scorecard(props) {
                           })}
                         </tbody>
                       </table>
+                      {/* Mobile Save Scores button */}
+                      <div className="sm:hidden text-center mt-2">
+                        <button
+                          className="px-4 py-2 rounded-2xl font-semibold"
+                          style={{ background: '#FFD700', color: '#002F5F' }}
+                          onClick={() => { flushAndSaveAllScores(); }}
+                          disabled={saveStatus === 'saving'}
+                        >
+                          {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save Scores')}
+                        </button>
+                      </div>
                       </div>
                     </div>
                   )}

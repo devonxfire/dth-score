@@ -93,6 +93,11 @@ function Leaderboard() {
   // Alliance team logic
   const [groups, setGroups] = useState([]);
   const [compId, setCompId] = useState(null);
+  const [competition, setCompetition] = useState(null);
+  // Build holes array from competition if available
+  const holes = (competition && Array.isArray(competition.holes) && competition.holes.length > 0)
+    ? competition.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index ?? h.index ?? h.strokeIndex ?? h.index) }))
+    : defaultHoles;
 
   // Fetch teams and their BB Score from backend
   const backendTeams = useBackendTeams(compId);
@@ -111,7 +116,10 @@ function Leaderboard() {
           setCompId(comp.id);
           fetch(apiUrl(`/api/competitions/${comp.id}`))
             .then(res => res.json())
-            .then(cdata => setGroups(cdata.groups || []));
+            .then(cdata => {
+              setCompetition(cdata || null);
+              setGroups((cdata && Array.isArray(cdata.groups)) ? cdata.groups : []);
+            });
         }
       });
   }, [entries]);
@@ -133,7 +141,7 @@ function Leaderboard() {
         }
       }).filter(Boolean);
       // For each hole, get best 2 stableford points
-      const holes = 18;
+  const holes = 18;
       let teamPoints = 0;
       let thru = 0;
       for (let h = 0; h < holes; h++) {
@@ -143,11 +151,11 @@ function Leaderboard() {
           const ph = getPlayingHandicap(e);
           const gross = parseInt(e.scores?.[h], 10);
           if (!gross || isNaN(gross) || gross <= 0) return 0;
-          const hole = defaultHoles[h];
+          const hole = holes[h] || defaultHoles[h];
           let strokesReceived = 0;
           if (ph > 0) {
             strokesReceived = Math.floor(ph / 18);
-            if (hole.index <= (ph % 18)) strokesReceived += 1;
+            if ((hole.index || 0) <= (ph % 18)) strokesReceived += 1;
           }
           const net = gross - strokesReceived;
           const par = hole.par;
@@ -207,7 +215,8 @@ function Leaderboard() {
   // Helper: calculate net and points
   function getPlayingHandicap(entry) {
     const full = parseFloat(entry.player?.handicap || 0);
-    return Math.round(full * 0.95);
+    const allowance = competition?.handicapallowance ? parseFloat(competition.handicapallowance) : 100;
+    return Math.round(full * (allowance / 100));
   }
   function getNet(entry) {
     return entry.total - getPlayingHandicap(entry);
@@ -219,13 +228,13 @@ function Leaderboard() {
     for (let i = 0; i < (entry.scores?.length || 0); i++) {
       const gross = parseInt(entry.scores[i] || 0);
       if (!gross) continue;
-      const hole = defaultHoles[i];
+      const hole = holes[i] || defaultHoles[i];
       // Calculate shots for this hole
       let shots = 0;
       if (ph > 0) {
         shots = Math.floor(ph / 18);
         // Extra shots for lowest indexes
-        if (hole.index <= (ph % 18)) shots += 1;
+        if ((hole.index || 0) <= (ph % 18)) shots += 1;
       }
       const net = gross - shots;
       const par = hole.par;

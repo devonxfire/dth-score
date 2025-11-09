@@ -41,6 +41,9 @@ export default function MedalScorecard(props) {
   const playerColors = getPlayerColorsFor(props);
   // Render numeric inputs as native picker selects on touch/narrow viewports
   const [useMobilePicker, setUseMobilePicker] = useState(false);
+  // Save button status: 'idle' | 'saving' | 'saved'
+  const [saveStatus, setSaveStatus] = useState('idle');
+  const saveStatusTimeoutRef = useRef(null);
   useEffect(() => {
     function update() {
       try {
@@ -837,6 +840,75 @@ export default function MedalScorecard(props) {
     }
   }
 
+  // Flush any pending debounced saves and immediately persist all players' scores.
+  async function flushAndSaveAll() {
+    if (!compId || !groups.length) return;
+    try {
+      // set saving state for button
+      setSaveStatus('saving');
+      if (saveStatusTimeoutRef.current) { try { clearTimeout(saveStatusTimeoutRef.current); } catch (e) {} }
+    } catch (e) {}
+    // Clear any scheduled debounced saves
+    try {
+      for (const k of Object.keys(saveTimeoutsRef.current)) {
+        try { clearTimeout(saveTimeoutsRef.current[k]); } catch (e) {}
+        try { delete saveTimeoutsRef.current[k]; } catch (e) {}
+      }
+    } catch (e) {}
+
+    const saves = [];
+    const now = Date.now();
+    try {
+      for (const name of players) {
+        const latestScores = (playerDataRef.current && playerDataRef.current[name] && Array.isArray(playerDataRef.current[name].scores)) ? playerDataRef.current[name].scores : Array.from({ length: 18 }, () => '');
+        const newScores = Array.isArray(latestScores) ? latestScores.map(v => (v == null ? '' : v)) : Array(18).fill('');
+        // mark as pending to avoid reacting to immediate server echoes
+        for (let i = 0; i < newScores.length; i++) {
+          try { pendingLocalSavesRef.current[`${name}:${i}`] = { value: String(newScores[i] ?? ''), ts: now }; } catch (e) {}
+          // expire after 5s
+          setTimeout(((key, ts) => () => {
+            try { if (pendingLocalSavesRef.current[key] && pendingLocalSavesRef.current[key].ts === ts) delete pendingLocalSavesRef.current[key]; } catch (e) {}
+          })(`${name}:${i}`, now), 5000);
+        }
+        const p = patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), { scores: newScores });
+        saves.push(p);
+      }
+  const results = await Promise.allSettled(saves);
+  // Ask server to rebroadcast this saved medal update so other clients see it
+  try {
+    const payload = { competitionId: Number(compId), groupId: Number(groupIdx), group: groups[groupIdx], _clientBroadcast: true };
+    try { socket.emit && socket.emit('client-medal-saved', payload); } catch (e) {}
+  } catch (e) {}
+  // update inline status: show saved briefly
+  try { setSaveStatus('saved'); } catch (e) {}
+  try { if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current); } catch (e) {}
+  try { saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000); } catch (e) {}
+      // After saving, re-fetch the competition to sync any server-side aggregates
+      try {
+        const res = await fetch(apiUrl(`/api/competitions/${compId}`));
+        if (res.ok) {
+          const data = await res.json();
+          setComp(data);
+          setGroups(Array.isArray(data.groups) ? data.groups : []);
+          // update playerData from the returned group scores
+          if (Array.isArray(data.groups) && data.groups[groupIdx] && data.groups[groupIdx].scores) {
+            setPlayerData(prev => {
+              const copy = { ...(prev || {}) };
+              const names = data.groups[groupIdx].players || [];
+              for (const nm of names) {
+                const s = data.groups[groupIdx].scores?.[nm];
+                if (Array.isArray(s)) copy[nm] = { ...(copy[nm] || {}), scores: s.map(v => v == null ? '' : String(v)) };
+              }
+              return copy;
+            });
+          }
+        }
+      } catch (e) {}
+    } catch (err) {
+      setError('Failed to flush saves: ' + (err.message || err));
+    }
+  }
+
   // ...existing code...
 
   async function handleMiniTableChange(name, field, value) {
@@ -1171,49 +1243,50 @@ export default function MedalScorecard(props) {
               if (isAlliance || is4bbb) {
                 const group = groups[groupIdx] || { players: [] };
                 const best = computeGroupBestTwoTotals(group);
-                          const hole = holesArr[mobileSelectedHole - 1];
+                const hole = holesArr[mobileSelectedHole - 1];
+
+                const PairHeader = () => {
+                  if (!is4bbb) return (
+                    <div className="w-full p-3 rounded border-2 text-center mb-3" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
+                      <div className="font-extrabold text-2xl text-white">Alliance Score: <span style={{ color: '#FFD700' }}>{best.total}</span></div>
+                    </div>
+                  );
+
+                  const pairTotals = (start) => {
+                    const nameA = (players && players[start]) || '';
+                    const nameB = (players && players[start + 1]) || '';
+                    const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
+                    const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
+                    const perHole = holesArr.map((_, i) => {
+                      const a = stabA.perHole?.[i];
+                      const b = stabB.perHole?.[i];
+                      if (a == null && b == null) return null;
+                      return Math.max(Number(a || 0), Number(b || 0));
+                    });
+                    const front = perHole.slice(0, 9).reduce((s, v) => s + (v != null ? v : 0), 0);
+                    const back = perHole.slice(9, 18).reduce((s, v) => s + (v != null ? v : 0), 0);
+                    const total = front + back;
+                    const hasAny = perHole.some(v => v != null);
+                    return { perHole, front, back, total: hasAny ? total : null };
+                  };
+
+                  const ab = pairTotals(0);
+                  const cd = pairTotals(2);
+                  return (
+                    <div className="grid grid-cols-1 gap-2 mb-3">
+                      <div className="w-full p-3 rounded border-2 text-center" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
+                        <div className="font-extrabold text-2xl text-white">Team AB | BB Score: <span style={{ color: '#FFD700' }}>{ab.total != null ? ab.total : ''}</span></div>
+                      </div>
+                      <div className="w-full p-3 rounded border-2 text-center" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
+                        <div className="font-extrabold text-2xl text-white">Team CD | BB Score: <span style={{ color: '#FFD700' }}>{cd.total != null ? cd.total : ''}</span></div>
+                      </div>
+                    </div>
+                  );
+                };
+
                 return (
                   <div>
-                    {/* For 4BBB show pair BB Scores (AB and CD) in mobile header; otherwise show Alliance total */}
-                    {is4bbb ? (
-                      <div className="grid grid-cols-1 gap-2 mb-3">
-                        {(() => {
-                          const pairTotals = (start) => {
-                            const nameA = (players && players[start]) || '';
-                            const nameB = (players && players[start + 1]) || '';
-                            const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
-                            const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
-                            const perHole = holesArr.map((_, i) => {
-                              const a = stabA.perHole?.[i];
-                              const b = stabB.perHole?.[i];
-                              if (a == null && b == null) return null;
-                              return Math.max(Number(a || 0), Number(b || 0));
-                            });
-                            const front = perHole.slice(0, 9).reduce((s, v) => s + (v != null ? v : 0), 0);
-                            const back = perHole.slice(9, 18).reduce((s, v) => s + (v != null ? v : 0), 0);
-                            const total = front + back;
-                            const hasAny = perHole.some(v => v != null);
-                            return { perHole, front, back, total: hasAny ? total : null };
-                          };
-                          const ab = pairTotals(0);
-                          const cd = pairTotals(2);
-                          return (
-                            <>
-                              <div className="w-full p-3 rounded border-2 text-center" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
-                                <div className="font-extrabold text-2xl text-white">Team AB | BB Score: <span style={{ color: '#FFD700' }}>{ab.total != null ? ab.total : ''}</span></div>
-                              </div>
-                              <div className="w-full p-3 rounded border-2 text-center" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
-                                <div className="font-extrabold text-2xl text-white">Team CD | BB Score: <span style={{ color: '#FFD700' }}>{cd.total != null ? cd.total : ''}</span></div>
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    ) : (
-                      <div className="w-full p-3 rounded border-2 text-center mb-3" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
-                        <div className="font-extrabold text-2xl text-white">Alliance Score: <span style={{ color: '#FFD700' }}>{best.total}</span></div>
-                      </div>
-                    )}
+                    <PairHeader />
 
                     <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
                       <div className="flex items-center justify-center mb-3">
@@ -1221,8 +1294,9 @@ export default function MedalScorecard(props) {
                         <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
                         <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 18 ? 1 : h + 1))}>▶</button>
                       </div>
+
                       <div className="space-y-3">
-                        {players.map((pName) => {
+                        {players.map((pName, idx) => {
                           const stable = computePlayerStablefordTotals(pName);
                           const grossArr = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
                           const curVal = grossArr[mobileSelectedHole - 1] || '';
@@ -1235,37 +1309,65 @@ export default function MedalScorecard(props) {
                           const initialLabel = (() => { try { const parts = (pName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return pName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return pName; } })();
 
                           return (
-                            <div key={`mob-${pName}`} className="p-2 rounded border border-white/10 relative">
-                              <div className="flex items-center justify-between">
-                                <div className="font-semibold">{initialLabel}</div>
-                              </div>
-                              <div className="text-xs font-semibold mt-1" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
+                            <div key={`mob-wrap-${pName}`}>
+                              <div key={`mob-${pName}`} className="p-2 rounded border border-white/10 relative">
+                                <div className="flex items-center justify-between">
+                                  <div className="font-semibold">{initialLabel}</div>
+                                </div>
+                                <div className="text-xs font-semibold mt-1" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
 
-                                  <div className="grid grid-cols-2 gap-2 text-sm mt-3">
-                                    {(() => {
-                                      // compute gross front/back totals (first 9 / last 9) for mobile Out/In display
-                                      const grossArrLocal = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
-                                      const grossFront = grossArrLocal.slice(0,9).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
-                                      const grossBack = grossArrLocal.slice(9,18).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
-                                      return (
-                                        <>
-                                          <div>Out: <span className="font-bold">{grossFront}</span></div>
-                                          <div className="text-right">In: <span className="font-bold">{grossBack}</span></div>
-                                          <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
-                                          <div className="text-right">Points: <span className="font-bold">{stable.total}</span></div>
-                                        </>
-                                      );
-                                    })()}
-                                  </div>
+                                <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                                  {(() => {
+                                    const grossArrLocal = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
+                                    const grossFront = grossArrLocal.slice(0,9).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                                    const grossBack = grossArrLocal.slice(9,18).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                                    return (
+                                      <>
+                                        <div>Out: <span className="font-bold">{grossFront}</span></div>
+                                        <div className="text-right">In: <span className="font-bold">{grossBack}</span></div>
+                                        <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
+                                        <div className="text-right">Points: <span className="font-bold">{stable.total}</span></div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
 
-                              <div className="absolute right-3 top-3 flex items-center gap-3">
-                                <button aria-label={`big-dec-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
-                                <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center' }}>{curVal || '-'}</div>
-                                <button aria-label={`big-inc-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
+                                <div className="absolute right-3 top-3 flex items-center gap-3">
+                                  <button aria-label={`big-dec-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
+                                  <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center' }}>{curVal || '-'}</div>
+                                  <button aria-label={`big-inc-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
+                                </div>
                               </div>
+
+                              {is4bbb && idx === 3 && (
+                                <div className="mt-3 text-center">
+                                  <button
+                                    className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
+                                    style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                                    onClick={() => { flushAndSaveAll(); }}
+                                    disabled={saveStatus === 'saving'}
+                                  >
+                                    {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save Scores')}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
+
+                        {/* also keep a general mobile Save button (visible for any mobile picker) */}
+                        {useMobilePicker && (
+                          <div className="mt-3 text-center">
+                            <button
+                              className="px-4 py-2 rounded-2xl font-semibold"
+                              style={{ background: '#FFD700', color: '#002F5F' }}
+                              onClick={() => { flushAndSaveAll(); }}
+                              disabled={saveStatus === 'saving'}
+                            >
+                              {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save Scores')}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1342,6 +1444,18 @@ export default function MedalScorecard(props) {
                           </div>
                         );
                       })}
+                        {/* Save Scores button for mobile: helpful to flush debounced saves and force immediate persistence */}
+                        {useMobilePicker && (
+                          <div className="mt-3 text-center">
+                            <button
+                              className="px-4 py-2 rounded-2xl font-semibold"
+                              style={{ background: '#FFD700', color: '#002F5F' }}
+                              onClick={() => { flushAndSaveAll(); }}
+                            >
+                              Save Scores
+                            </button>
+                          </div>
+                        )}
                     </div>
                   </div>
                 );

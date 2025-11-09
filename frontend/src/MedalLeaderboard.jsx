@@ -1,292 +1,550 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { apiUrl } from './api';
 import socket from './socket';
-import { useBackendTeams } from './hooks/useBackendTeams';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { shouldShowPopup, markShown, checkAndMark } from './popupDedupe';
+import { toast } from './simpleToast';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { useParams, useNavigate } from 'react-router-dom';
 
-const COMP_TYPE_DISPLAY = {
-  fourBbbStableford: '4BBB Stableford',
-  alliance: 'Alliance',
-  medalStrokeplay: 'Medal Strokeplay',
-  individualStableford: 'Individual Stableford',
-};
-// Westlake Golf Club holes: par and stroke index
 const defaultHoles = [
-  { number: 1, par: 4, index: 5 },
-  { number: 2, par: 4, index: 7 },
-  { number: 3, par: 3, index: 17 },
-  { number: 4, par: 5, index: 1 },
-  { number: 5, par: 4, index: 11 },
-  { number: 6, par: 3, index: 15 },
-  { number: 7, par: 5, index: 3 },
-  { number: 8, par: 4, index: 13 },
-  { number: 9, par: 4, index: 9 },
-  { number: 10, par: 4, index: 10 },
-  { number: 11, par: 4, index: 4 },
-  { number: 12, par: 4, index: 12 },
-  { number: 13, par: 5, index: 2 },
-  { number: 14, par: 4, index: 14 },
-  { number: 15, par: 3, index: 18 },
-  { number: 16, par: 5, index: 6 },
-  { number: 17, par: 3, index: 16 },
-  { number: 18, par: 4, index: 8 },
+  { number: 1, par: 4, index: 5 }, { number: 2, par: 4, index: 7 }, { number: 3, par: 3, index: 17 }, { number: 4, par: 5, index: 1 }, { number: 5, par: 4, index: 11 },
+  { number: 6, par: 3, index: 15 }, { number: 7, par: 5, index: 3 }, { number: 8, par: 4, index: 13 }, { number: 9, par: 4, index: 9 }, { number: 10, par: 4, index: 10 },
+  { number: 11, par: 4, index: 4 }, { number: 12, par: 4, index: 12 }, { number: 13, par: 5, index: 2 }, { number: 14, par: 4, index: 14 }, { number: 15, par: 3, index: 18 },
+  { number: 16, par: 5, index: 6 }, { number: 17, par: 3, index: 16 }, { number: 18, par: 4, index: 8 }
 ];
-
-// Helper: get par for holes played
-function getParDiff(entry) {
-  const holesPlayed = entry.scores?.filter(s => s && s !== '').length || 0;
-  if (!holesPlayed) return '';
-  let gross = 0;
-  let par = 0;
-  for (let i = 0; i < holesPlayed; i++) {
-    gross += parseInt(entry.scores[i] || 0);
-    par += defaultHoles[i]?.par || 0;
+// Default player color classes. For 4BBB we want A+B to share A's color and C+D to share C's color.
+function getPlayerColorsFor(props) {
+  const defaultColors = [
+    'bg-blue-100 text-blue-900',
+    'bg-green-100 text-green-900',
+    'bg-yellow-100 text-yellow-900',
+    'bg-pink-100 text-pink-900'
+  ];
+  try {
+    const is4bbb = (props?.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb'))
+      || (props?.competition && props.competition.type && props.competition.type.toLowerCase().includes('4bbb'))
+      || (props?.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
+    if (is4bbb) {
+      // A and B use color A, C and D use a green pair (light/dark green) for better contrast
+      const greenPair = ['bg-emerald-100 text-emerald-900', 'bg-emerald-100 text-emerald-900'];
+      return [defaultColors[0], defaultColors[0], greenPair[0], greenPair[1]];
+    }
+  } catch (e) {
+    // fallback to defaults on error
   }
-  const diff = gross - par;
-  if (holesPlayed === 0) return '';
-  if (diff === 0) return 'E';
-  if (diff > 0) return `+${diff}`;
-  return `${diff}`;
+  return defaultColors;
 }
 
-// Format date as DD/MM/YYYY
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const [year, month, day] = dateStr.split('-');
-  return `${day}/${month}/${year}`;
-}
-
-function MedalLeaderboard() {
-  const [entries, setEntries] = useState([]);
-  const [comp, setComp] = useState(null);
-  const [groups, setGroups] = useState([]);
-  const [compId, setCompId] = useState(null);
-  const exportRef = useRef(null);
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [editingNotes, setEditingNotes] = useState(false);
-  const [notesDraft, setNotesDraft] = useState('');
-  // Get comp id from URL if using react-router
-  const id = location.pathname.split('/').pop();
-
+export default function MedalScorecard(props) {
+  // Compute player colors based on competition type or overrideTitle
+  const playerColors = getPlayerColorsFor(props);
+  // Render numeric inputs as native picker selects on touch/narrow viewports
+  const [useMobilePicker, setUseMobilePicker] = useState(false);
   useEffect(() => {
-    // Load current user from localStorage if present
+    function update() {
+      try {
+        const isTouch = typeof window !== 'undefined' && (('ontouchstart' in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0));
+        const isNarrow = typeof window !== 'undefined' && window.innerWidth <= 768;
+        setUseMobilePicker(Boolean(isTouch && isNarrow));
+      } catch (e) { setUseMobilePicker(false); }
+    }
+    update();
+    try { window.addEventListener('resize', update); } catch (e) {}
+    return () => { try { window.removeEventListener('resize', update); } catch (e) {} };
+  }, []);
+
+  // holesArr will be set after comp state is initialized (see further below)
+  // Helper to send PATCH requests with an X-Origin-Socket header when possible
+  async function patchWithOrigin(url, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    try { if (socket && socket.id) headers['X-Origin-Socket'] = socket.id; } catch (e) {}
+    return fetch(url, { method: 'PATCH', headers, body: JSON.stringify(body) });
+  }
+  // Helper: compute Playing Handicap (PH) from Course Handicap (CH) using competition allowance
+  const computePH = (ch) => {
+    const allowance = comp?.handicapallowance ?? comp?.handicapAllowance ?? 100;
+    const parsedCh = parseFloat(ch) || 0;
+    return Math.round(parsedCh * (parseFloat(allowance) / 100));
+  };
+  // Stableford mapping: given net (strokes relative to par) and par, return points
+  const stablefordPoints = (net, par) => {
+    if (net == null || Number.isNaN(net)) return 0;
+    if (net <= par - 4) return 6;
+    if (net === par - 3) return 5;
+    if (net === par - 2) return 4;
+    if (net === par - 1) return 3;
+    if (net === par) return 2;
+    if (net === par + 1) return 1;
+    return 0;
+  };
+
+  // Show a local toast and emit client-popup for other clients.
+  function showLocalPopup({ type, name, holeNumber, sig }) {
     try {
-      const raw = localStorage.getItem('user');
-      if (raw) setCurrentUser(JSON.parse(raw));
+  let emoji = '🎉';
+  let title = 'Nice!';
+  let body = name || '';
+  // Use 5s autoClose for all toasts unless explicitly disabled
+  let autoClose = 5000;
+  if (type === 'eagle') { emoji = '🦅'; title = 'Eagle!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([200,100,200]); }
+  else if (type === 'birdie') { emoji = '🕊️'; title = 'Birdie!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([100,50,100]); }
+  else if (type === 'blowup') { emoji = '💥'; title = 'How Embarrassing!'; body = `${name || ''} just blew up on Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([400,100,400]); }
+  else if (type === 'waters') { emoji = '💧'; title = 'Splash!'; body = `${name || ''} has earned a water`; }
+  else if (type === 'dog') { emoji = '🐶'; title = 'Woof!'; body = `${name || ''} got the dog`; }
+
+      const content = (
+        <div className="flex flex-col items-center" style={{ padding: '0.75rem 1rem' }}>
+          <div style={{ fontSize: '3rem', marginBottom: 8 }}>{emoji}</div>
+          <div style={{ fontWeight: 800, color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.4rem' }}>{title}</div>
+          <div style={{ color: 'white', fontFamily: 'Lato, Arial, sans-serif', fontSize: '1.05rem' }}>{body}</div>
+        </div>
+      );
+  try { toast(content, { toastId: sig || `${type}:${name}:${holeNumber}:${compId}`, autoClose, position: 'top-center', closeOnClick: true }); } catch (e) {}
+  // mark as shown locally so dedupe prevents the server rebroadcast from hiding the optimistic toast
+  try { if (sig) markShown(sig); } catch (e) {}
+      // Inform server to rebroadcast to other clients (server will dedupe and attach originSocketId)
+      try { socket.emit('client-popup', { competitionId: Number(compId), type, playerName: name, holeNumber: holeNumber || null, signature: sig }); } catch (e) {}
     } catch (e) {}
-    // Fetch competition and scores for this comp
-  fetch(apiUrl(`/api/competitions/${id}`))
-      .then(res => res.json())
-      .then(data => {
-        setComp(data);
-        setGroups(Array.isArray(data.groups) ? data.groups : []);
-        // Flatten all players in all groups into leaderboard entries
-        const entries = [];
-  const usersList = Array.isArray(data.users) ? data.users : [];
-            if (Array.isArray(data.groups)) {
-          data.groups.forEach((group, groupIdx) => {
-            if (Array.isArray(group.players)) {
-              group.players.forEach(name => {
-                const scores = group.scores?.[name] || Array(18).fill('');
-                const handicap = group.handicaps?.[name] ?? '';
-                const teebox = group.teeboxes?.[name] ?? '';
-                const waters = group.waters?.[name] ?? '';
-                const dog = group.dog?.[name] ?? false;
-                const twoClubs = group.two_clubs?.[name] ?? '';
-                const fines = group.fines?.[name] ?? '';
-                const gross = scores.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
-    // find matching user id if available
-    const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
-    const userId = matchedUser?.id || null;
-    const displayNameFromUser = matchedUser?.displayName || matchedUser?.display_name || matchedUser?.displayname || '';
-    const nickFromUser = matchedUser?.nick || matchedUser?.nickname || '';
-    const teamId = group.teamId || group.id || group.team_id || group.group_id || null;
-                entries.push({
-                  name,
-                  scores,
-                  total: gross || '',
-                  waters,
-                  dog,
-                  twoClubs,
-                  fines,
-                  handicap,
-                  teebox,
-      teamId,
-      userId,
-      displayName: displayNameFromUser,
-      nick: nickFromUser,
-                  groupIdx
-                });
-              });
-            }
-          });
-        }
-  console.debug('Built leaderboard entries (name -> teamId,userId):', entries.map(e => ({ name: e.name, teamId: e.teamId, userId: e.userId })));
-  setEntries(entries);
-        // If we have teamId/userId for entries, fetch their persisted fines from the teams API
-        (async () => {
-          try {
-            const updated = await Promise.all(entries.map(async ent => {
-              if (!ent.teamId || !ent.userId) return ent;
-              try {
-                const res = await fetch(apiUrl(`/api/teams/${ent.teamId}/users/${ent.userId}`));
-                if (!res.ok) return ent;
-                const data = await res.json();
-                return { ...ent, fines: data.fines ?? ent.fines };
-              } catch (e) {
-                return ent;
-              }
-            }));
-            setEntries(updated);
-          } catch (e) {
-            console.error('Failed to fetch persisted fines for entries', e);
-          }
-        })();
-      });
-  }, [id]);
-
-  // when comp is loaded, seed notesDraft
-  useEffect(() => {
-    setNotesDraft(comp?.notes || '');
-  }, [comp]);
-
-  function isCaptain(user, competition) {
-    if (!user || !competition) return false;
-    const capNames = [competition.captain, competition.captainName, competition.captain_name].filter(Boolean).map(s => String(s).trim().toLowerCase());
-    if (capNames.length === 0) return false;
-    const username = (user.username || user.name || '').toString().trim().toLowerCase();
-    if (!username) return false;
-    return capNames.includes(username);
   }
 
-  function canEditNotes(user, competition) {
-    return isAdmin(user) || isCaptain(user, competition);
-  }
-
-  async function saveNotes() {
-    if (!comp || !comp.id) return;
-    const url = apiUrl(`/api/competitions/${comp.id}`);
-    try {
-      const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
-      const res = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(adminSecret ? { 'X-Admin-Secret': adminSecret } : {})
-        },
-        body: JSON.stringify({ notes: notesDraft })
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        alert('Failed to save notes: ' + res.status + ' ' + txt);
+  // Compute per-player stableford totals (front/back/total) and per-hole points array
+  const computePlayerStablefordTotals = (name) => {
+    const perHole = Array(18).fill(null);
+    let front = 0;
+    let back = 0;
+    let total = 0;
+    const playingHandicap = computePH(playerData[name]?.handicap) || 0;
+    holesArr.forEach((hole, idx) => {
+      const raw = playerData[name]?.scores?.[idx];
+      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+      if (!Number.isFinite(gross)) {
+        perHole[idx] = null;
         return;
       }
-      const updated = await res.json();
-      setComp(prev => ({ ...prev, notes: updated.notes ?? notesDraft }));
-      setEditingNotes(false);
-    } catch (err) {
-      console.error('saveNotes error', err);
-      alert('Failed to save notes: ' + (err.message || err));
-    }
+      // compute strokes received using same logic as medal net
+      let strokesReceived = 0;
+      if (playingHandicap > 0) {
+        const idxVal = hole.index || hole.index === 0 ? Number(hole.index) : undefined;
+        if (playingHandicap >= 18) {
+          strokesReceived = 1;
+          if (playingHandicap - 18 >= idxVal) strokesReceived = 2;
+          else if (idxVal <= (playingHandicap % 18)) strokesReceived = 2;
+        } else if (idxVal <= playingHandicap) {
+          strokesReceived = 1;
+        }
+      }
+      const net = gross - strokesReceived;
+      const pts = stablefordPoints(net, hole.par);
+      perHole[idx] = pts;
+      if (idx < 9) front += pts;
+      else back += pts;
+      total += pts;
+    });
+    return { perHole, front, back, total };
+  };
+  // Compute group/team best-two stableford totals (sum of the best two players)
+  const computeGroupBestTwoTotals = (group) => {
+    // Return per-hole best-two sums as well as front/back/total sums.
+    if (!group || !Array.isArray(group.players)) return { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
+    const playerTotals = group.players.map(name => computePlayerStablefordTotals(name) || { perHole: Array(18).fill(null), front: 0, back: 0, total: 0 });
+    // Build per-hole best-two sums
+    const perHole = Array(18).fill(0).map((_, idx) => {
+      const vals = playerTotals.map(t => (t.perHole && Number.isFinite(t.perHole[idx]) ? t.perHole[idx] : 0));
+      vals.sort((a,b) => b - a);
+      // sum top two
+      return (vals[0] || 0) + (vals[1] || 0);
+    });
+    const front = perHole.slice(0,9).reduce((s,v) => s + (v || 0), 0);
+    const back = perHole.slice(9,18).reduce((s,v) => s + (v || 0), 0);
+    const total = front + back;
+    return { perHole, front, back, total };
+  };
+  // ...existing code...
+  // ...existing code...
+  // Tee Box/Handicap modal bypass: always show scorecard, modal logic enforced
+  // Modal logic removed: always render scorecard UI
+  const params = useParams();
+  const navigate = useNavigate();
+  const compId = params.id;
+  // Resolve current user (try props.user then localStorage) and admin flag
+  let resolvedUser = props.user;
+  if (!resolvedUser) {
+    try { resolvedUser = JSON.parse(localStorage.getItem('user')); } catch (e) { resolvedUser = null; }
   }
+  const resolvedName = (resolvedUser && (resolvedUser.name || resolvedUser.displayName || (resolvedUser.firstName ? `${resolvedUser.firstName} ${resolvedUser.lastName || ''}` : null))) || null;
+  const isAdmin = !!(resolvedUser && (resolvedUser.role === 'admin' || resolvedUser.isAdmin || resolvedUser.isadmin));
+  const isCaptain = !!(resolvedUser && (resolvedUser.role === 'captain' || resolvedUser.isCaptain || resolvedUser.iscaptain));
+  // Allow edits when:
+  // - viewer is admin
+  // - OR viewer is a member of the current 4-ball (they can edit any player's data)
+  const canEdit = (playerName) => {
+    if (isAdmin) return true;
+    if (!resolvedName) return false;
+    try {
+      const normViewer = resolvedName.trim().toLowerCase();
+      // if viewer is in the current players list, allow edits for anyone in that group
+      if (Array.isArray(players) && players.some(p => (p || '').trim().toLowerCase() === normViewer)) return true;
+      // otherwise only allow editing own row (fallback)
+      return (playerName || '').trim().toLowerCase() === normViewer;
+    } catch (e) {
+      return false;
+    }
+  };
+  const [comp, setComp] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [groupIdx, setGroupIdx] = useState(0);
+  const [players, setPlayers] = useState([]);
+  const [playerData, setPlayerData] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState({});
+  const [miniTableStats, setMiniTableStats] = useState({});
+  const watersTimeoutRef = useRef(null);
+  const [showWatersPopup, setShowWatersPopup] = useState(false);
+  const [watersPlayer, setWatersPlayer] = useState(null);
+  const [showDogPopup, setShowDogPopup] = useState(false);
+  const [dogPlayer, setDogPlayer] = useState(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  // Mobile selected player for compact score entry
+  const [mobileSelectedPlayer, setMobileSelectedPlayer] = useState('');
+  // Persist mobile-selected hole per-competition so refresh/navigation restores last-edited hole.
+  const storageKey = compId ? `dth:mobileSelectedHole:${compId}` : 'dth:mobileSelectedHole:unknown';
+  const [mobileSelectedHole, setMobileSelectedHole] = useState(() => {
+    try {
+      const raw = compId ? localStorage.getItem(`dth:mobileSelectedHole:${compId}`) : null;
+      const n = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(n) && n >= 1 && n <= 18) return n;
+    } catch (e) {}
+    return 1;
+  });
+
+  // Keep localStorage in sync when compId changes (switching competitions) — load saved hole for new comp.
+  useEffect(() => {
+    try {
+      if (!compId) return;
+      const raw = localStorage.getItem(`dth:mobileSelectedHole:${compId}`);
+      const n = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(n) && n >= 1 && n <= 18) {
+        setMobileSelectedHole(n);
+      } else {
+        setMobileSelectedHole(1);
+      }
+    } catch (e) {}
+  }, [compId]);
+
+  // Persist whenever mobileSelectedHole changes
+  useEffect(() => {
+    try {
+      if (!compId) return;
+      localStorage.setItem(`dth:mobileSelectedHole:${compId}`, String(mobileSelectedHole));
+    } catch (e) {}
+  }, [compId, mobileSelectedHole]);
+
+  // Use holes from the competition payload when available (map stroke_index -> index),
+  // otherwise fall back to the defaultHoles constant.
+  const holesArr = (comp && Array.isArray(comp.holes) && comp.holes.length === 18)
+    ? comp.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)) }))
+    : (props && props.competition && Array.isArray(props.competition.holes) && props.competition.holes.length === 18)
+      ? props.competition.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)) }))
+      : defaultHoles;
+
+  // Per-cell styling for gross score inputs: eagle (<= par-2) => pink, birdie (par-1) => green,
+  // blowup (>= par+3) => maroon. Returns an inline style object to merge into the input's style.
+  function scoreCellStyle(name, idx) {
+    try {
+      const raw = playerData?.[name]?.scores?.[idx];
+      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+  const hole = holesArr[idx];
+  if (!Number.isFinite(gross) || !hole) return {};
+  // Outline-only styles: transparent background, colored 2px border and matching text color
+  if (gross <= hole.par - 2) return { background: 'transparent', border: '2px solid #FFC0CB', color: '#FFC0CB', boxSizing: 'border-box' }; // pink outline
+  if (gross === hole.par - 1) return { background: 'transparent', border: '2px solid #16a34a', color: '#16a34a', boxSizing: 'border-box' }; // green outline
+  if (gross >= hole.par + 3) return { background: 'transparent', border: '2px solid #ef4444', color: '#ef4444', boxSizing: 'border-box' }; // brighter red outline
+    } catch (e) {
+      return {};
+    }
+    return {};
+  }
+
+  // Return extra class names for score cells (used to make eagle/birdie circular)
+  function scoreCellClass(name, idx) {
+    try {
+      const raw = playerData?.[name]?.scores?.[idx];
+      const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+  const hole = holesArr[idx];
+      if (!Number.isFinite(gross) || !hole) return '';
+      // circle for eagle or birdie
+      if (gross <= hole.par - 2) return 'rounded-full';
+      if (gross === hole.par - 1) return 'rounded-full';
+    } catch (e) {
+      return '';
+    }
+    return '';
+  }
+
+  useEffect(() => {
+    if (!players || !players.length) return;
+    if (mobileSelectedPlayer) return;
+    // If viewer is admin or captain, keep default as Player A (players[0])
+    if (isAdmin || isCaptain) {
+      setMobileSelectedPlayer(players[0]);
+      return;
+    }
+    // Prefer selecting the logged-in player when present in the group
+    if (resolvedName) {
+      const normalize = s => (s || '').toString().toLowerCase().replace(/["'()]/g, '').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+      const viewerNorm = normalize(resolvedName);
+      let match = null;
+      for (const p of players) {
+        const pNorm = normalize(p);
+        // exact match
+        if (pNorm === viewerNorm) { match = p; break; }
+        // viewer name contained in player name (handles nicknames removed)
+        if (pNorm.includes(viewerNorm) || viewerNorm.includes(pNorm)) { match = p; break; }
+        // match by last name token
+        const pParts = pNorm.split(' ').filter(Boolean);
+        const vParts = viewerNorm.split(' ').filter(Boolean);
+        if (pParts.length && vParts.length && pParts[pParts.length - 1] === vParts[vParts.length - 1]) { match = p; break; }
+      }
+      setMobileSelectedPlayer(match || players[0]);
+    } else {
+      setMobileSelectedPlayer(players[0]);
+    }
+  }, [players, mobileSelectedPlayer, resolvedName, isAdmin, isCaptain]);
+
+  // Fetch comp info and groups
+  useEffect(() => {
+    if (!compId) return;
+    setLoading(true);
+    fetch(apiUrl(`/api/competitions/${compId}`))
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) {
+          setComp(data);
+          setGroups(Array.isArray(data.groups) ? data.groups : []);
+          if (Array.isArray(data.groups) && data.groups.length > 0) {
+            setPlayers(data.groups[groupIdx]?.players || []);
+          }
+        }
+        setLoading(false);
+      });
+  }, [compId, groupIdx]);
+
+  // Default non-admin viewers to the group they are playing in (admins keep current selection)
+  useEffect(() => {
+    if (!groups || !groups.length) return;
+    if (isAdmin) return; // admins can pick any group
+    if (!resolvedName) return;
+    const normalize = (s) => (s || '').toString().trim().toLowerCase();
+    const foundIdx = groups.findIndex(g => Array.isArray(g.players) && g.players.some(p => normalize(p) === normalize(resolvedName)));
+    if (foundIdx >= 0 && foundIdx !== groupIdx) {
+      setGroupIdx(foundIdx);
+    }
+  }, [groups, resolvedName, isAdmin]);
 
   // Real-time: join competition room and listen for updates
   useEffect(() => {
-    if (!comp || !comp.id) return;
-    const compId = comp.id;
-    try { socket.emit('join', { competitionId: compId }); } catch (e) {}
+    if (!compId) return;
+    const compNum = Number(compId);
+    try { socket.emit('join', { competitionId: compNum }); } catch (e) {}
 
     const handler = (msg) => {
       try {
-        if (!msg || Number(msg.competitionId) !== Number(compId)) return;
+        if (!msg || Number(msg.competitionId) !== compNum) return;
 
-        // If server provided a full group update, merge into comp/groups
+        
+
+        // If a full group object is included (medal-player-updated), merge into groups
         if (msg.group && (msg.groupId != null)) {
-          setComp(prev => {
-            try {
-              const copy = prev ? { ...prev } : prev;
-              if (!copy || !Array.isArray(copy.groups)) return prev;
-              const gidx = Number(msg.groupId);
-              const groupsCopy = [...copy.groups];
-              groupsCopy[gidx] = msg.group;
-              copy.groups = groupsCopy;
-              return copy;
-            } catch (e) { return prev; }
-          });
+          console.debug && console.debug('[socket-debug] medal-player-updated received', { groupId: msg.groupId, group: msg.group });
+          // Log current local playerData snapshot for debugging
+          try { console.debug && console.debug('[socket-debug] local playerData snapshot before merge', playerDataRef.current); } catch (e) {}
+          const gidx = Number(msg.groupId);
+          // Capture prior local scores snapshot from playerDataRef so we can detect changes
+          const prevScores = {};
+          try {
+            const pd = playerDataRef.current || {};
+            for (const nm of msg.group.players || []) {
+              prevScores[nm] = Array.isArray(pd[nm]?.scores) ? pd[nm].scores.slice() : Array(18).fill('');
+            }
+          } catch (e) { /* ignore */ }
+
           setGroups(prev => {
             try {
               const copy = Array.isArray(prev) ? [...prev] : [];
-              copy[Number(msg.groupId)] = msg.group;
+              copy[gidx] = msg.group;
               return copy;
             } catch (e) { return prev; }
           });
-          // Rebuild entries minimally if possible
-          if (msg.group && Array.isArray(msg.group.players)) {
-            setEntries(prev => {
+          // Update playerData and miniTableStats if scores/waters present in payload
+          if (msg.group.scores) {
+            setPlayerData(prev => {
               try {
-                const updated = prev.map(e => ({ ...e }));
-                const usersList = Array.isArray(comp?.users) ? comp.users : [];
-                msg.group.players.forEach(name => {
-                  const mappedScores = msg.group.scores?.[name];
-                  const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
-                  const userId = matchedUser?.id || null;
-                  for (let i = 0; i < updated.length; i++) {
-                    if ((updated[i].name || '').trim().toLowerCase() === (name || '').trim().toLowerCase()) {
-                      if (Array.isArray(mappedScores)) {
-                        updated[i] = { ...updated[i], scores: mappedScores.map(v => v == null ? '' : v), total: mappedScores.reduce((s, v) => s + (parseInt(v, 10) || 0), 0) };
-                      }
-                    }
+                const copy = { ...(prev || {}) };
+                const names = msg.group.players || [];
+                for (const name of names) {
+                  const s = msg.group.scores?.[name];
+                  if (Array.isArray(s)) {
+                    copy[name] = { ...(copy[name] || {}), scores: s.map(v => v == null ? '' : String(v)) };
                   }
-                });
-                return updated;
+                }
+                return copy;
+              } catch (e) { return prev; }
+            });
+            // schedule popup checks for any changed scores compared to prior local snapshot
+            try {
+              const names = msg.group.players || [];
+              for (const name of names) {
+                const newArr = msg.group.scores?.[name];
+                const oldArr = Array.isArray(prevScores[name]) ? prevScores[name] : Array(18).fill('');
+                if (!Array.isArray(newArr)) continue;
+                for (let i = 0; i < newArr.length; i++) {
+                  const oldVal = oldArr[i] == null ? '' : String(oldArr[i]);
+                  const newVal = newArr[i] == null ? '' : String(newArr[i]);
+                  if (oldVal !== newVal) {
+                    schedulePopupCheck(name, i, newArr[i]);
+                  }
+                }
+              }
+            } catch (e) {}
+          }
+          if (msg.group.waters || msg.group.dog) {
+            setMiniTableStats(prev => {
+              try {
+                const copy = { ...(prev || {}) };
+                const names = msg.group.players || [];
+                for (const name of names) {
+                  copy[name] = {
+                    waters: msg.group.waters?.[name] ?? copy[name]?.waters ?? '',
+                    dog: msg.group.dog?.[name] ?? copy[name]?.dog ?? false,
+                    twoClubs: msg.group.two_clubs?.[name] ?? copy[name]?.twoClubs ?? ''
+                  };
+                }
+                return copy;
               } catch (e) { return prev; }
             });
           }
           return;
         }
 
-        // If delta mappedScores were provided, apply them to entries
-        if (Array.isArray(msg.mappedScores) && msg.mappedScores.length > 0) {
-          setEntries(prev => {
+        // If server sent mappedScores delta, apply to playerData
+        if (Array.isArray(msg.mappedScores) && msg.mappedScores.length > 0 && comp) {
+          // helper: schedule the same delayed popup checks we use for local edits
+          function schedulePopupCheck(name, idx, strokes) {
             try {
-              const copy = prev.map(e => ({ ...e }));
+              // If we recently edited this hole locally, suppress server-triggered popups
+              try {
+                const pendingKey = `${name}:${idx}`;
+                const pend = pendingLocalSavesRef.current[pendingKey];
+                if (pend && (Date.now() - (pend.ts || 0) < 5000)) {
+                  try { debugLog && debugLog('suppressing popup due to recent local edit', { pendingKey, pend }); } catch (e) {}
+                  return;
+                }
+              } catch (e) {}
+              const gross = parseInt(strokes, 10);
+              const hole = holesArr[idx];
+              if (!gross || !hole) return;
+              if (gross === hole.par - 2) {
+                if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
+                eagleShowDelayRef.current = setTimeout(() => {
+                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+                  if (latest === gross) {
+                  const sig = `eagle:${name}:${hole.number}:${compId}`;
+                            showLocalPopup({ type: 'eagle', name, holeNumber: hole.number, sig });
+                }
+                }, 2000);
+              } else {
+                if (eagleShowDelayRef.current) { clearTimeout(eagleShowDelayRef.current); eagleShowDelayRef.current = null; }
+              }
+              if (gross === hole.par - 1) {
+                if (birdieShowDelayRef.current) clearTimeout(birdieShowDelayRef.current);
+                birdieShowDelayRef.current = setTimeout(() => {
+                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+            if (latest === gross) {
+            const sig = `birdie:${name}:${hole.number}:${compId}`;
+              showLocalPopup({ type: 'birdie', name, holeNumber: hole.number, sig });
+          }
+                }, 2000);
+              } else {
+                if (birdieShowDelayRef.current) { clearTimeout(birdieShowDelayRef.current); birdieShowDelayRef.current = null; }
+              }
+              if (gross >= hole.par + 3) {
+                if (blowupShowDelayRef.current) clearTimeout(blowupShowDelayRef.current);
+                blowupShowDelayRef.current = setTimeout(() => {
+                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+                  if (latest === gross) {
+                    const sig = `blowup:${name}:${hole.number}:${compId}`;
+                    if (checkAndMark(sig)) {
+                      try { showLocalPopup({ type: 'blowup', name, holeNumber: hole.number, sig }); } catch (e) {}
+                    }
+                  }
+                }, 2000);
+              } else {
+                if (blowupShowDelayRef.current) { clearTimeout(blowupShowDelayRef.current); blowupShowDelayRef.current = null; }
+              }
+            } catch (e) {}
+          }
+
+          setPlayerData(prev => {
+            try {
+              const copy = { ...(prev || {}) };
               for (const ms of msg.mappedScores) {
                 const userId = ms.userId ?? ms.user_id ?? ms.user;
                 const holeIdx = ms.holeIndex ?? ms.hole_index ?? ms.hole;
                 const strokes = ms.strokes ?? ms.value ?? '';
                 if (userId == null || holeIdx == null) continue;
-                // find entry by userId first, else by name mapping from comp.users
-                let idx = copy.findIndex(en => Number(en.userId) === Number(userId));
-                if (idx === -1 && comp && Array.isArray(comp.users)) {
-                  const u = comp.users.find(u => Number(u.id) === Number(userId));
-                  if (u && u.name) {
-                    idx = copy.findIndex(en => (en.name || '').trim().toLowerCase() === (u.name || '').trim().toLowerCase());
+                const u = comp.users?.find(u => Number(u.id) === Number(userId));
+                const name = u?.name;
+                if (!name) continue;
+                const pd = copy[name] || { scores: Array(18).fill(''), teebox: '', handicap: '' };
+                const arr = Array.isArray(pd.scores) ? [...pd.scores] : Array(18).fill('');
+                try {
+                  const key = `${name}:${holeIdx}`;
+                  const pending = pendingLocalSavesRef.current[key];
+                  const strokeStr = strokes == null ? '' : String(strokes);
+                  if (pending) {
+                    const age = Date.now() - (pending.ts || 0);
+                    // If server confirms our pending value, clear pending and skip (local already set)
+                    if (String(pending.value) === strokeStr) {
+                      try { debugLog('mappedScores: server confirms pending', { key, strokeStr, age }); } catch (e) {}
+                      delete pendingLocalSavesRef.current[key];
+                      continue;
+                    }
+                    // If we have a very recent local save, ignore the server update to avoid
+                    // overwriting our newer local edit with a stale/late-arriving value.
+                    if (age < 5000) {
+                      try { debugLog('mappedScores: skipping server update due to recent local pending', { key, strokeStr, age, pending: pending.value }); } catch (e) {}
+                      continue;
+                    }
                   }
-                }
-                if (idx >= 0) {
-                  const arr = Array.isArray(copy[idx].scores) ? [...copy[idx].scores] : Array(18).fill('');
-                  arr[holeIdx] = strokes == null ? '' : String(strokes);
-                  copy[idx].scores = arr;
-                  copy[idx].total = arr.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
-                } else {
-                  // cannot map -> fallback to full fetch
-                  return prev;
-                }
+                } catch (e) {}
+                arr[holeIdx] = strokes == null ? '' : String(strokes);
+                copy[name] = { ...pd, scores: arr };
               }
               return copy;
-            } catch (e) { console.error('Error applying mappedScores to entries', e); return prev; }
+            } catch (e) { console.error('Error applying mappedScores to playerData', e); return prev; }
           });
+
+          // schedule popup checks after playerData is updated (use the provided mappedScores)
+          try {
+            for (const ms of msg.mappedScores) {
+              const userId = ms.userId ?? ms.user_id ?? ms.user;
+              const holeIdx = ms.holeIndex ?? ms.hole_index ?? ms.hole;
+              const strokes = ms.strokes ?? ms.value ?? '';
+              if (userId == null || holeIdx == null) continue;
+              const u = comp.users?.find(u => Number(u.id) === Number(userId));
+              const name = u?.name;
+              if (!name) continue;
+              schedulePopupCheck(name, Number(holeIdx), strokes);
+            }
+          } catch (e) {}
+
           return;
         }
 
-        // fallback: refetch full competition
-        fetch(apiUrl(`/api/competitions/${compId}`))
+        // Fallback: refetch full competition data
+        fetch(apiUrl(`/api/competitions/${compNum}`))
           .then(r => r.ok ? r.json() : null)
           .then(data => { if (data) { setComp(data); setGroups(Array.isArray(data.groups) ? data.groups : []); } })
           .catch(() => {});
@@ -299,557 +557,1322 @@ function MedalLeaderboard() {
     socket.on('fines-updated', handler);
 
     return () => {
-      try { socket.emit('leave', { competitionId: compId }); } catch (e) {}
+      try { socket.emit('leave', { competitionId: compNum }); } catch (e) {}
       socket.off('scores-updated', handler);
       socket.off('medal-player-updated', handler);
       socket.off('team-user-updated', handler);
       socket.off('fines-updated', handler);
     };
-  }, [comp && comp.id]);
+  }, [compId]);
 
-  // Get comp type and date from comp object
-  let compRaw = comp?.type || comp?.competitionType || '';
-  let compKey = compRaw
-    .replace(/\s+/g, '')
-    .replace(/\(.*\)/, '')
-    .replace(/[^a-zA-Z]/g, '')
-    .replace(/^[0-9]+/, '')
-    .replace(/^[A-Z]/, m => m.toLowerCase())
-    .replace(/(\w)([A-Z])/g, (m, p1, p2) => p1 + p2.toLowerCase());
-  if (compKey === '4bbbstableford') compKey = 'fourBbbStableford';
-  if (compKey === 'medalstrokeplay') compKey = 'medalStrokeplay';
-  if (compKey === 'individualstableford') compKey = 'individualStableford';
-  if (compKey === 'alliance') compKey = 'alliance';
-  const date = comp?.date || '';
-  // Determine comp type
-  const isMedal = compRaw.toLowerCase().includes('medal');
-  const isStableford = compRaw.toLowerCase().includes('stableford');
-  const isAlliance = compRaw.toLowerCase().includes('alliance');
-
-  function getAllianceTeams() {
-    // Use latest groups from backend
-    return groups.map((group, idx) => {
-      // Find player entries for this group (case-insensitive, trimmed match, support guest display names)
-      const groupEntries = (group.players || []).map((name, i) => {
-        if (["Guest 1","Guest 2","Guest 3"].includes(name) && Array.isArray(group.displayNames) && group.displayNames[i]) {
-          // Try to match guest by display name
-          const guestName = group.displayNames[i].trim().toLowerCase();
-          return entries.find(e => e.name?.trim().toLowerCase() === guestName);
-        } else if (typeof name === 'string') {
-          const norm = name.trim().toLowerCase();
-          return entries.find(e => e.name?.trim().toLowerCase() === norm);
+  // Fetch player data for current group (always trust backend)
+  useEffect(() => {
+    if (!compId || !groups.length) return;
+    let cancelled = false;
+    async function fetchAllScores() {
+      const group = groups[groupIdx];
+      if (!group || !Array.isArray(group.players)) return;
+      const newData = {};
+      const newMiniStats = {};
+      for (const name of group.players) {
+        const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
+        if (res.ok) {
+          const data = await res.json();
+          newData[name] = {
+            teebox: data.teebox ?? '',
+            handicap: data.handicap ?? '',
+            scores: Array.isArray(data.scores) ? data.scores.map(v => v == null ? '' : v) : Array(18).fill('')
+          };
+          newMiniStats[name] = {
+            waters: data.waters ?? '',
+            dog: !!data.dog,
+            twoClubs: data.two_clubs ?? ''
+          };
         } else {
-          return undefined;
+          newData[name] = { teebox: '', handicap: '', scores: Array(18).fill('') };
+          newMiniStats[name] = { waters: '', dog: false, twoClubs: '' };
         }
-      }).filter(Boolean);
-      // For each hole, get best 2 stableford points
-      const holes = 18;
-      let teamPoints = 0;
-      let thru = 0;
-      for (let h = 0; h < holes; h++) {
-        // Get points for each player for this hole
-        const pts = groupEntries.map(e => {
-          // Calculate points for this hole only
-          const ph = getPlayingHandicap(e);
-          const gross = parseInt(e.scores?.[h], 10);
-          if (!gross || isNaN(gross) || gross <= 0) return 0;
-          const hole = defaultHoles[h];
-          let strokesReceived = 0;
-          if (ph > 0) {
-            strokesReceived = Math.floor(ph / 18);
-            if (hole.index <= (ph % 18)) strokesReceived += 1;
-          }
-          const net = gross - strokesReceived;
-          const par = hole.par;
-          if (net === par - 4) return 6; // triple eagle
-          if (net === par - 3) return 5; // double eagle
-          if (net === par - 2) return 4; // eagle
-          if (net === par - 1) return 3; // birdie
-          if (net === par) return 2; // par
-          if (net === par + 1) return 1; // bogey
-          return 0;
-        });
-        // Best single score to count (BB Score)
-        const best = Math.max(...pts);
-        if (best > 0) thru = h + 1;
-        teamPoints += best;
       }
-      // Propagate guest display names for UI
-      let displayPlayers = (group.players || []).map((name, i) => {
-        const guestIdx = ['Guest 1','Guest 2','Guest 3'].indexOf(name);
-        if (guestIdx !== -1 && Array.isArray(group.displayNames) && group.displayNames[guestIdx]) {
-          return `GUEST - ${group.displayNames[guestIdx]}`;
-        } else if (guestIdx !== -1) {
-          return name;
-        } else if (typeof name === 'string') {
-          const parts = name.trim().split(' ');
-          if (parts.length > 1) {
-            return parts[0][0] + '. ' + parts[parts.length - 1];
+      if (!cancelled) {
+        setPlayers(group.players);
+        setPlayerData(newData);
+        setMiniTableStats(newMiniStats);
+      }
+    }
+    fetchAllScores();
+    return () => { cancelled = true; };
+  }, [compId, groups, groupIdx]);
+
+  // Fetch mini table stats for all players
+  useEffect(() => {
+    async function fetchStats() {
+      if (!players.length) return;
+      const stats = {};
+      for (const name of players) {
+        try {
+          const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
+          if (res.ok) {
+            const data = await res.json();
+            stats[name] = {
+              waters: data.waters ?? '',
+              dog: !!data.dog,
+              twoClubs: data.two_clubs ?? ''
+            };
           } else {
-            return name;
+            stats[name] = { waters: '', dog: false, twoClubs: '' };
           }
-        } else {
-          return '';
+        } catch {
+          stats[name] = { waters: '', dog: false, twoClubs: '' };
         }
-      });
-      // Find backend team_points by matching player names
-      let backendTeamPoints;
-      if (backendTeams && backendTeams.length > 0) {
-        const groupKey = (group.players || []).map(p => p && p.trim && p.trim()).sort().join('|');
-        const found = backendTeams.find(t => {
-          if (!Array.isArray(t.players)) return false;
-          const teamKey = t.players.map(p => p && p.trim && p.trim()).sort().join('|');
-          return teamKey === groupKey;
-        });
-        backendTeamPoints = found?.team_points;
       }
-      return {
-        groupNum: idx + 1,
-        teeTime: group.teeTime,
-        players: displayPlayers,
-        teamPoints,
-        backendTeamPoints,
-        thru,
-      };
-    });
-  }
-
-  // Helper: calculate net and points
-  function getPlayingHandicap(entry) {
-  // Use entry.handicap and comp.handicapallowance for correct PH
-  const ch = parseFloat(entry.handicap || 0);
-  const allowance = comp?.handicapallowance ? parseFloat(comp.handicapallowance) : 100;
-  return Math.round(ch * (allowance / 100));
-  }
-  function getNet(entry) {
-    return entry.total - getPlayingHandicap(entry);
-  }
-  function getStablefordPoints(entry) {
-    // Allocate shots per hole using stroke index
-    const ph = getPlayingHandicap(entry);
-    let points = 0;
-    for (let i = 0; i < (entry.scores?.length || 0); i++) {
-      const gross = parseInt(entry.scores[i] || 0);
-      if (!gross) continue;
-      const hole = defaultHoles[i];
-      // Calculate shots for this hole
-      let shots = 0;
-      if (ph > 0) {
-        shots = Math.floor(ph / 18);
-        // Extra shots for lowest indexes
-        if (hole.index <= (ph % 18)) shots += 1;
-      }
-      const net = gross - shots;
-      const par = hole.par;
-      if (net === par - 2) points += 4; // eagle
-      else if (net === par - 1) points += 3; // birdie
-      else if (net === par) points += 2; // par
-      else if (net === par + 1) points += 1; // bogey
-      // else 0
+      setMiniTableStats(stats);
     }
-    return points;
-  }
+    fetchStats();
+  }, [players, compId, groupIdx]);
 
-  // Compact display name: prefer explicit nickname/displayName, then parenthetical nickname, then first name
-  function compactDisplayName(entry) {
-    if (!entry) return '';
-    if (entry.displayName && entry.displayName.trim()) return entry.displayName.trim();
-    if (entry.nick && entry.nick.trim()) return entry.nick.trim();
-    if (entry.name && typeof entry.name === 'string') {
-      const m = entry.name.match(/\(([^)]+)\)/);
-      if (m && m[1]) return m[1].trim();
-      const q = entry.name.match(/"([^"]+)"/);
-      if (q && q[1]) return q[1].trim();
-      // also try single-quoted nicknames like: Devon 'Tugger' Martindale
-      const s = entry.name.match(/'([^']+)'/);
-      if (s && s[1]) return s[1].trim();
-      // do not fallback to first name — only return an explicit nickname
-      return '';
-    }
-    return '';
-  }
-
-  // Export visible leaderboard area to PDF
-  async function exportToPDF() {
-    try {
-      const element = exportRef.current;
-      if (!element) {
-        alert('Export area not found');
-        return;
-      }
-      // Use html2canvas to render the element
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      // Filename: YYYYMMDD_DTH_LEADERBOARD_COMPTYPE
-      try {
-        const d = comp?.date ? new Date(comp.date) : new Date();
-        const y = String(d.getFullYear());
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        const datePart = `${y}${m}${dd}`;
-        const compTypeDisplay = (COMP_TYPE_DISPLAY[comp?.type] || comp?.type || '').toString().toUpperCase();
-        const typePart = compTypeDisplay.replace(/[^A-Z0-9 ]/g, '').trim().replace(/\s+/g, '_') || 'COMPETITION';
-        const filename = `${datePart}_DTH_LEADERBOARD_${typePart}.pdf`;
-        pdf.save(filename);
-      } catch (e) {
-        pdf.save(`${(comp?.name || 'results').replace(/[^a-z0-9_-]/gi, '_')}_leaderboard.pdf`);
-      }
-    } catch (err) {
-      console.error('Export to PDF failed', err);
-      console.warn('Falling back to text-only PDF export');
-      try {
-        exportPlainPDF();
-        return;
-      } catch (e) {
-        console.error('Fallback export failed', e);
-      }
-      alert('Failed to export PDF. Try using the browser Print -> Save as PDF.');
-    }
-  }
-
-  // Fallback: generate a simple text PDF using jsPDF (no images/styles)
-  function exportPlainPDF() {
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const margin = 10;
-    const lineHeight = 7;
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    let y = margin;
-    pdf.setFontSize(12);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text(`${(comp?.name) || 'Competition'} - Leaderboard`, margin, y);
-    y += lineHeight;
-    pdf.setFontSize(10);
-    // Robust date formatting to DD/MM/YYYY
-    let formattedDate = '-';
-    if (comp?.date) {
-      try {
-        const d = new Date(comp.date);
-        if (!isNaN(d.getTime())) {
-          const dd = String(d.getDate()).padStart(2, '0');
-          const mm = String(d.getMonth() + 1).padStart(2, '0');
-          const yyyy = d.getFullYear();
-          formattedDate = `${dd}/${mm}/${yyyy}`;
-        }
-      } catch (e) {
-        formattedDate = formatDate(comp?.date);
-      }
-    }
-    pdf.text(`Date: ${formattedDate}`, margin, y);
-    // Include competition type (friendly display if available)
-    const compTypeDisplay = COMP_TYPE_DISPLAY[comp?.type] || comp?.type || '';
-    if (compTypeDisplay) {
-      pdf.text(`Type: ${compTypeDisplay}`, margin + 80, y);
-    }
-    y += lineHeight * 1.2;
-
-    // Course, Handicap Allowance, Notes
-  const courseText = comp?.club || comp?.course || '-';
-    const allowanceText = comp?.handicapallowance && comp.handicapallowance !== 'N/A' ? `${comp.handicapallowance}%` : (comp?.handicapallowance === 'N/A' ? 'N/A' : '100%');
-    const notesText = comp?.notes || '-';
-    pdf.text(`Course: ${courseText}`, margin, y);
-    pdf.text(`Handicap Allowance: ${allowanceText}`, margin + 80, y);
-    y += lineHeight * 1.2;
-    pdf.text(`Notes: ${notesText}`, margin, y);
-    y += lineHeight * 1.2;
-
-    // Good Scores header
-    pdf.setFont(undefined, 'bold');
-    pdf.text('Good Scores', margin, y);
-    y += lineHeight;
-    pdf.setFont(undefined, 'normal');
-    // Print good scores (use leaderboardRows filtered earlier) - show nickname when available
-    if (goodScores && goodScores.length > 0) {
-      goodScores.forEach(p => {
-        if (y > pageHeight - margin - lineHeight) {
-          pdf.addPage();
-          y = margin;
-        }
-        const displayName = (compactDisplayName(p) || p.name || '').toUpperCase();
-        const line = `${displayName}: Net ${p.dthNet}`;
-        pdf.text(line, margin, y);
-        y += lineHeight;
-      });
-    } else {
-      pdf.text('No one. Everyone shit.', margin, y);
-      y += lineHeight;
-    }
-    y += lineHeight * 0.5;
-
-    // Table header
-    const headers = ['Pos', 'Name', 'Thru', 'Gross', 'Net', 'DTH Net', 'Dog', 'Waters', '2Clubs', 'Fines'];
-    const colWidths = [12, 60, 12, 18, 18, 18, 10, 18, 18, 18];
-    let x = margin;
-    pdf.setFont(undefined, 'bold');
-    headers.forEach((h, i) => {
-      pdf.text(h, x, y);
-      x += colWidths[i] || 20;
-    });
-    pdf.setFont(undefined, 'normal');
-    y += lineHeight;
-
-    // Rows
-    leaderboardRows.forEach(r => {
-      if (y > pageHeight - margin - lineHeight) {
-        pdf.addPage();
-        y = margin;
-      }
-      let x = margin;
-      const display = (compactDisplayName(r) || r.name || '');
-      const rowValues = [r.position, display, String(r.thru), String(r.total), String(r.net), String(r.dthNet), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
-      rowValues.forEach((val, i) => {
-        // truncate long names
-        let text = String(val || '');
-        if (i === 1 && text.length > 24) text = text.slice(0, 21) + '...';
-        pdf.text(text, x, y);
-        x += colWidths[i] || 20;
-      });
-      y += lineHeight;
-    });
-
-    try {
-      const d = comp?.date ? new Date(comp.date) : new Date();
-      const y = String(d.getFullYear());
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      const datePart = `${y}${m}${dd}`;
-      const compTypeDisplay = (COMP_TYPE_DISPLAY[comp?.type] || comp?.type || '').toString().toUpperCase();
-      const typePart = compTypeDisplay.replace(/[^A-Z0-9 ]/g, '').trim().replace(/\s+/g, '_') || 'COMPETITION';
-      const filename = `${datePart}_DTH_LEADERBOARD_${typePart}.pdf`;
-      pdf.save(filename);
-    } catch (e) {
-      pdf.save(`${(comp?.name || 'results').replace(/[^a-z0-9_-]/gi, '_')}_leaderboard.pdf`);
-    }
-  }
-
-  // Determine if any player has played less than 18 holes
-  const showThru = entries.some(e => (e.scores?.filter(s => s && s !== '').length || 0) < 18);
-
-  function isAdmin(user) {
-    return user && (user.role === 'admin' || user.isAdmin || user.isadmin || (user.username && ['devon','arno','arno_cap'].includes(user.username.toLowerCase())) );
-  }
-  async function saveFines(teamId, userId, fines, playerName, compId) {
-    try {
-      if (teamId && userId) {
-        const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
-  const url = apiUrl(`/api/teams/${teamId}/users/${userId}`);
-        const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
-        
-        const res = await fetch(url, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(adminSecret ? { 'X-Admin-Secret': adminSecret } : {})
-          },
-          body: JSON.stringify(body)
-        });
-        if (!res.ok) {
-          const text = await res.text();
-          console.error('Failed to save fines, response not ok', res.status, text);
-          alert('Failed to save fines: ' + res.status + ' ' + text);
-          return;
-        }
-        const data = await res.json();
-        
-        setEntries(es => es.map(e => (e.teamId === teamId && e.userId === userId) ? { ...e, fines: data.fines ?? (fines !== '' ? fines : '') } : e));
-        return;
-      }
-      // fallback
-      if (!compId || !playerName) {
-        console.warn('Fallback saveFines missing compId or playerName', { compId, playerName });
-        alert('Cannot save fines: missing team/user and insufficient fallback data');
-        return;
-      }
-  const url = apiUrl(`/api/competitions/${compId}/players/${encodeURIComponent(playerName)}/fines`);
-      const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
-      const res = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+  // Save player data
+  async function handleSavePlayer(name) {
+    if (!canEdit(name)) return;
+    setSaving(prev => ({ ...prev, [name]: true }));
+    setError('');
+    const data = playerData[name];
+    const mini = miniTableStats[name] || {};
+  try {
+      const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+        teebox: data.teebox,
+        handicap: data.handicap,
+        scores: data.scores,
+        waters: mini.waters ?? '',
+        dog: mini.dog ?? false,
+        two_clubs: mini.twoClubs ?? ''
       });
       if (!res.ok) {
-        const text = await res.text();
-        console.error('Fallback save failed', res.status, text);
-        alert('Fallback save failed: ' + res.status + ' ' + text);
-        return;
+        const errText = await res.text();
+        console.error('Save failed:', errText);
+        throw new Error('Failed to save: ' + errText);
       }
-      const data = await res.json();
       
-      setEntries(es => es.map(e => (e.name === playerName ? { ...e, fines: data.fines ?? (fines !== '' ? fines : '') } : e)));
-    } catch (err) {
-      console.error('Failed to save fines', err);
-      alert('Failed to save fines: ' + (err.message || err));
+      try {
+        // Immediately notify server to rebroadcast this saved medal update so other
+        // clients see popups instantly (optimistic global popups). The server will
+        // rebroadcast this as `medal-player-updated` to the competition room.
+  const payload = { competitionId: Number(compId), groupId: Number(groupIdx), playerName: name, group: groups[groupIdx], _clientBroadcast: true };
+        try { socket.emit('client-medal-saved', payload); } catch (e) { /* ignore socket emit errors */ }
+      } catch (e) { }
+    } catch (e) {
+      setError('Failed to save for ' + name + ': ' + (e.message || e));
+      console.error('Save error:', e);
+    } finally {
+      setSaving(prev => ({ ...prev, [name]: false }));
     }
   }
 
-  // Compute leaderboard rows with position, thru, dthNet, etc.
-  const leaderboardRows = entries.map(entry => {
-    const holesPlayed = entry.scores?.filter(s => s && s !== '').length || 0;
-    let thru = holesPlayed === 18 ? 'F' : holesPlayed;
-  // Course Handicap (CH) entered manually
-  const ch = entry.handicap !== '' ? parseFloat(entry.handicap) || 0 : 0;
-  // Playing Handicap (PH) = CH * allowance%
-  const allowance = comp?.handicapallowance ? parseFloat(comp.handicapallowance) : 100;
-  const ph = Math.round(ch * (allowance / 100));
-    // DTH Net = Gross - CH
-    const dthNet = entry.total - ch;
-  // Net = gross total minus playing handicap (PH). For full rounds this equals sum(gross - strokesReceived).
-  const totalGross = parseInt(entry.total || 0);
-  const net = totalGross - ph;
-    return {
-      ...entry,
-      thru,
-      ch,
-      ph,
-      dthNet,
-      net
+  function handleChange(name, field, value) {
+    if (!canEdit(name)) return;
+    setPlayerData(prev => ({
+      ...prev,
+      [name]: {
+        ...prev[name],
+        [field]: value
+      }
+    }));
+    // Persist teebox or handicap change immediately
+    if (!compId || !groups.length) return;
+    const patchBody = {};
+    if (field === 'teebox') patchBody.teebox = value;
+    if (field === 'handicap') patchBody.handicap = value;
+    if (Object.keys(patchBody).length > 0) {
+      patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody).catch(() => {});
+    }
+  }
+
+  // Birdie/Eagle/Blowup popup state
+  const [showBirdie, setShowBirdie] = useState(false);
+  const [birdieHole, setBirdieHole] = useState(null);
+  const [birdiePlayer, setBirdiePlayer] = useState(null);
+  const birdieTimeoutRef = useRef(null);
+  const [showEagle, setShowEagle] = useState(false);
+  const [eagleHole, setEagleHole] = useState(null);
+  const [eaglePlayer, setEaglePlayer] = useState(null);
+  const eagleTimeoutRef = useRef(null);
+  const [showBlowup, setShowBlowup] = useState(false);
+  const [blowupHole, setBlowupHole] = useState(null);
+  const [blowupPlayer, setBlowupPlayer] = useState(null);
+  const blowupTimeoutRef = useRef(null);
+  // Delayed-show refs to avoid showing popups while user is rapidly changing values
+  const birdieShowDelayRef = useRef(null);
+  const eagleShowDelayRef = useRef(null);
+  const blowupShowDelayRef = useRef(null);
+  // Keep a ref copy of playerData so delayed callbacks can read latest values
+  const playerDataRef = useRef(playerData);
+  useEffect(() => { playerDataRef.current = playerData; }, [playerData]);
+  // Track recent local per-hole saves so we can ignore short-lived server echoes
+  // that might arrive out-of-order and overwrite a newer local edit.
+  const pendingLocalSavesRef = useRef({});
+  // Debounced save timers per player:hole to batch rapid clicks and avoid request reordering
+  const saveTimeoutsRef = useRef({});
+  // debug helper (enable by setting localStorage.setItem('dth:debug','1') in the browser)
+  const debugLog = (...args) => {
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem && localStorage.getItem('dth:debug') === '1') {
+        // eslint-disable-next-line no-console
+        console.debug('[dth-debug]', ...args);
+      }
+    } catch (e) {}
+  };
+
+  async function handleScoreChange(name, idx, value) {
+    if (!canEdit(name)) return;
+    // remember last-edited hole for this competition (so refresh/navigation returns here)
+    try { setMobileSelectedHole(idx + 1); localStorage.setItem(`dth:mobileSelectedHole:${compId}`, String(idx + 1)); } catch (e) {}
+    // mark this hole as a recent local save so we can ignore immediate server echoes
+    try {
+      const key = `${name}:${idx}`;
+      const ts = Date.now();
+      pendingLocalSavesRef.current[key] = { value: String(value), ts };
+      // expire after 5s
+      setTimeout(() => {
+        try {
+          if (pendingLocalSavesRef.current[key] && pendingLocalSavesRef.current[key].ts === ts) {
+            delete pendingLocalSavesRef.current[key];
+          }
+        } catch (e) {}
+      }, 5000);
+    } catch (e) {}
+    setPlayerData(prev => {
+      const existing = Array.isArray(prev[name]?.scores) ? prev[name].scores : Array.from({ length: 18 }, () => '');
+      const updatedScores = existing.map((v, i) => i === idx ? value : v);
+      return {
+        ...prev,
+        [name]: {
+          ...prev[name],
+          scores: updatedScores
+        }
+      };
+    });
+    // Birdie/Eagle/Blowup detection logic
+    const gross = parseInt(value, 10);
+    const hole = holesArr[idx];
+    if (gross > 0 && hole) {
+      // Eagle (2 under)
+            if (gross === hole.par - 2) {
+        if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
+        eagleShowDelayRef.current = setTimeout(() => {
+          const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+          if (latest === gross) {
+            const sig = `eagle:${name}:${hole.number}:${compId}`;
+            if (checkAndMark(sig)) {
+                      showLocalPopup({ type: 'eagle', name, holeNumber: hole.number, sig });
+            }
+          }
+        }, 2000);
+      } else {
+        if (eagleShowDelayRef.current) { clearTimeout(eagleShowDelayRef.current); eagleShowDelayRef.current = null; }
+      }
+
+      // Birdie (1 under)
+            if (gross === hole.par - 1) {
+        if (birdieShowDelayRef.current) clearTimeout(birdieShowDelayRef.current);
+        birdieShowDelayRef.current = setTimeout(() => {
+          const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+          if (latest === gross) {
+            const sig = `birdie:${name}:${hole.number}:${compId}`;
+            if (checkAndMark(sig)) {
+                    showLocalPopup({ type: 'birdie', name, holeNumber: hole.number, sig });
+            }
+          }
+        }, 2000);
+      } else {
+        if (birdieShowDelayRef.current) { clearTimeout(birdieShowDelayRef.current); birdieShowDelayRef.current = null; }
+      }
+
+      // Blowup (>= par + 3)
+      if (gross >= hole.par + 3) {
+        if (blowupShowDelayRef.current) clearTimeout(blowupShowDelayRef.current);
+        blowupShowDelayRef.current = setTimeout(() => {
+          const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
+                  if (latest === gross) {
+            const sig = `blowup:${name}:${hole.number}:${compId}`;
+                      showLocalPopup({ type: 'blowup', name, holeNumber: hole.number, sig });
+          }
+        }, 2000);
+      } else {
+        if (blowupShowDelayRef.current) { clearTimeout(blowupShowDelayRef.current); blowupShowDelayRef.current = null; }
+      }
+    }
+    // Debounced save: schedule a small delay to batch rapid clicks and avoid request reordering.
+    try {
+      if (!compId || !groups.length) return;
+      const key = `${name}:${idx}`;
+      if (saveTimeoutsRef.current[key]) clearTimeout(saveTimeoutsRef.current[key]);
+      debugLog('scheduling debounced save', { key, value, compId, groupIdx });
+      saveTimeoutsRef.current[key] = setTimeout(async () => {
+        try {
+          debugLog('debounced save firing', { key, compId, groupIdx });
+          // Read latest scores from ref (reflects any rapid local changes)
+          const latestScores = playerDataRef.current?.[name]?.scores || Array.from({ length: 18 }, () => '');
+          const newScores = Array.isArray(latestScores) ? latestScores.map(v => (v == null ? '' : v)) : Array(18).fill('');
+          const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), { scores: newScores });
+          debugLog('server save result', { key, status: res && res.status });
+          if (!res.ok) {
+            const errText = await res.text();
+            setError('Failed to save for ' + name + ': ' + errText);
+          } else {
+            // If server persisted the same value we had pending for this hole, clear pending marker
+            try {
+              const strokeStr = String(newScores[idx] ?? '');
+              const pendingKey = `${name}:${idx}`;
+              const pending = pendingLocalSavesRef.current[pendingKey];
+              if (pending && String(pending.value) === strokeStr) delete pendingLocalSavesRef.current[pendingKey];
+            } catch (e) {}
+          }
+        } catch (err) {
+          setError('Failed to save for ' + name + ': ' + (err.message || err));
+        } finally {
+          try { delete saveTimeoutsRef.current[key]; } catch (e) {}
+        }
+  }, 500);
+    } catch (err) {
+      console.error('Error scheduling debounced save', err);
+    }
+  }
+
+  // ...existing code...
+
+  async function handleMiniTableChange(name, field, value) {
+    if (!canEdit(name)) return;
+    if (field === 'dog' && value) {
+      // Only allow one player to have the dog
+      setMiniTableStats(prev => {
+        const updated = { ...prev };
+        for (const player of players) {
+          updated[player] = {
+            ...updated[player],
+            dog: player === name
+          };
+        }
+        return updated;
+      });
+      // Persist dog=false for all others, dog=true for selected
+      if (!compId || !groups.length) return;
+      try {
+        for (const player of players) {
+          const patchBody = { dog: player === name };
+          await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(player)}`), patchBody);
+        }
+      } catch (err) {
+        setError('Failed to save dog for group: ' + (err.message || err));
+      }
+    const sig = `dog:${name}:g:${groupIdx ?? ''}:c:${compId}`;
+    if (checkAndMark(sig)) {
+      // Show a local toast and ask server to rebroadcast to other clients
+      try { showLocalPopup({ type: 'dog', name, sig }); } catch (e) {}
+    }
+      return;
+    }
+    // Normal update for other fields
+    setMiniTableStats(prev => ({
+      ...prev,
+      [name]: {
+        ...prev[name],
+        [field]: value
+      }
+    }));
+    // Persist mini table field to backend
+    if (!compId || !groups.length) return;
+    try {
+      const patchBody = {};
+      if (field === 'waters') patchBody.waters = value;
+      if (field === 'twoClubs') patchBody.two_clubs = value;
+      await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody);
+      // Re-fetch latest mini table data for sync
+      const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
+      if (res.ok) {
+        const data = await res.json();
+        setMiniTableStats(prev => ({
+          ...prev,
+          [name]: {
+            waters: data.waters ?? '',
+            dog: !!data.dog,
+            twoClubs: data.two_clubs ?? ''
+          }
+        }));
+      }
+    } catch (err) {
+      setError('Failed to save mini table for ' + name + ': ' + (err.message || err));
+    }
+    // Show popups for Waters
+    if (field === 'waters' && value && Number(value) > 0) {
+    const sig = `waters:${name}:g:${groupIdx ?? ''}:c:${compId}`;
+        if (checkAndMark(sig)) {
+          try { showLocalPopup({ type: 'waters', name, sig }); } catch (e) {}
+        }
+      }
+  }
+
+  // Cleanup any pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      [watersTimeoutRef, birdieTimeoutRef, eagleTimeoutRef, blowupTimeoutRef, birdieShowDelayRef, eagleShowDelayRef, blowupShowDelayRef].forEach(ref => {
+        try { if (ref && ref.current) clearTimeout(ref.current); } catch (e) { /* ignore */ }
+      });
     };
-  });
-  // Sort: finished first, then by net
-  leaderboardRows.sort((a, b) => {
-    const thruA = a.thru === 'F' ? 18 : (typeof a.thru === 'number' ? a.thru : -1);
-    const thruB = b.thru === 'F' ? 18 : (typeof b.thru === 'number' ? b.thru : -1);
-    if (thruA !== thruB) return thruB - thruA;
-    return a.net - b.net;
-  });
-  leaderboardRows.forEach((p, i) => (p.position = i + 1));
-  // Good Scores section
-  const goodScores = leaderboardRows.filter(p => typeof p.dthNet === 'number' && p.dthNet < 70 && p.thru === 'F');
+  }, []);
+
+  if (loading) return <PageBackground><TopMenu {...props} /><div className="p-8 text-white">Loading...</div></PageBackground>;
+  if (!groups.length) return <PageBackground><TopMenu {...props} /><div className="p-8 text-white">No groups found.</div></PageBackground>;
+
+  async function handleConfirmReset() {
+    // Clear gross scores for all players locally and persist to backend
+    const cleared = {};
+    for (const name of players) {
+      cleared[name] = {
+        ...playerData[name],
+        scores: Array(18).fill('')
+      };
+    }
+    setPlayerData(prev => ({ ...prev, ...cleared }));
+    setShowResetModal(false);
+    // Persist clears to backend (PATCH per player)
+    try {
+      for (const name of players) {
+        await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), { scores: Array(18).fill(null) });
+      }
+    } catch (err) {
+      console.error('Failed to persist cleared scores', err);
+      setError('Failed to persist cleared scores: ' + (err.message || err));
+    }
+  }
+
   return (
     <PageBackground>
-      <TopMenu userComp={comp} competitionList={comp ? [comp] : []} />
-  <div className="flex flex-col items-center px-4 mt-12" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
-  <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#0e3764', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <span style={{lineHeight:1}}>Leaderboard</span>
+      <TopMenu {...props} userComp={comp} competitionList={comp ? [comp] : []} />
+      <div className="flex flex-col items-center px-4 mt-12">
+        <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#0e3764', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+          {props.overrideTitle || 'Medal Competition: Scorecard'}
         </h1>
-        {comp?.date && (
-          <div className="text-lg text-white text-center mb-2 font-semibold" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
-            {new Date(comp.date).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}
+        {/* Comp Info Section */}
+  <div className="max-w-4xl w-full mb-4 p-4 rounded-xl border-2 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', background: 'rgba(14,55,100,0.95)' }}>
+          {/* Mobile: two columns each with two lines (visible on xs, hidden on sm+) */}
+          <div className="flex w-full sm:hidden text-xs font-normal">
+            <div className="w-1/2 pr-2">
+              <div className="whitespace-normal">Date: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.date ? (new Date(comp.date).toLocaleDateString()) : '-'}</span></div>
+              <div className="whitespace-normal">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.club || '-'}</span></div>
+            </div>
+            <div className="w-1/2 pl-2">
+              <div className="whitespace-normal">Allowance: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.handicapallowance ? comp.handicapallowance + '%' : '-'}</span></div>
+            </div>
           </div>
-        )}
-        <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
-      </div>
-      <div className="flex flex-col items-center px-4 mt-8">
-        <div ref={exportRef} className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
-          <div className="flex justify-center mb-4">
-            <button
-              onClick={() => { exportToPDF(); }}
-              className="py-2 px-4 bg-[#0e3764] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#0e3764] transition"
-              style={{ fontFamily: 'Lato, Arial, sans-serif' }}
-            >
-              Export Results
-            </button>
+          {/* Desktop/tablet: single-line row with three equal columns (hidden on xs, visible on sm+) */}
+          <div className="hidden sm:flex w-full text-sm font-normal">
+            <div className="flex-1 min-w-0 text-center">Date: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.date ? (new Date(comp.date).toLocaleDateString()) : '-'}</span></div>
+            <div className="flex-1 min-w-0 text-center">Club: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.club || '-'}</span></div>
+            <div className="flex-1 min-w-0 text-center">Allowance: <span className="font-bold" style={{ color: '#FFD700' }}>{comp?.handicapallowance ? comp.handicapallowance + '%' : '-'}</span></div>
           </div>
-          {/* Competition Info Section */}
-          {comp && (
-            <div className="text-white/90 text-base mb-4" style={{minWidth: 260, textAlign: 'left'}}>
-              <span className="font-semibold">Date:</span> {comp.date ? (new Date(comp.date).toLocaleDateString('en-GB')) : '-'} <br />
-              <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type || ''} <br />
-              <span className="font-semibold">Course:</span> {comp?.club || comp?.course || '-'} <br />
-              <span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance && comp.handicapallowance !== 'N/A' ? comp.handicapallowance + '%' : 'N/A'} <br />
-              <div style={{ marginTop: 8, marginBottom: 6, textDecoration: 'underline', textUnderlineOffset: 3 }} className="font-semibold">Notes:</div>
-              {canEditNotes(currentUser, comp) ? (
-                editingNotes ? (
-                  <div className="mt-2">
-                    <textarea
-                      value={notesDraft}
-                      onChange={e => setNotesDraft(e.target.value)}
-                      placeholder={notesDraft ? '' : 'Captain, click to add more notes...'}
-                      className="w-full bg-white/5 text-white p-2 rounded resize-y h-24 focus:outline-none"
-                    />
-                    <div className="flex gap-2 mt-2">
-                      <button onClick={saveNotes} className="py-1 px-3 bg-[#FFD700] text-[#002F5F] rounded font-semibold">Save</button>
-                      <button onClick={() => { setNotesDraft(comp?.notes || ''); setEditingNotes(false); }} className="py-1 px-3 bg-transparent border border-white/20 rounded">Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-2 cursor-text" onClick={() => setEditingNotes(true)}>
-                    <div className="whitespace-pre-wrap">{comp.notes}</div>
-                    <div className="text-white/60 italic mt-2">Captain, click to add more notes...</div>
-                  </div>
-                )
+        </div>
+
+        
+
+  <div className="max-w-4xl w-full bg-[#0e3764] rounded-2xl shadow-2xl p-8 border-4 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+          {/* Group buttons removed above mini table */}
+          {/* Mini Table for Waters, Dog, 2 Clubs, etc. */}
+          <div className="flex flex-col items-start mb-6" style={{ gap: '1rem' }}>
+            {/* Tee Time selector: admin-visible, placed immediately above the Handicaps table */}
+            <div className="w-full flex items-center justify-center mb-2">
+              <div className="text-sm text-white mr-3">Tee Time:</div>
+              {isAdmin && groups && groups.length > 1 ? (
+                <select
+                  value={groupIdx}
+                  onChange={e => setGroupIdx(Number(e.target.value))}
+                  className="inline-block bg-transparent text-white font-bold rounded px-3 py-1 h-8 align-middle"
+                  style={{ border: '1px solid #FFD700', lineHeight: '1.5' }}
+                >
+                  {groups.map((g, i) => (
+                    <option key={i} value={i} style={{ color: '#0e3764' }}>{g.teeTime ? `${g.teeTime} — 4 Ball ${i + 1}` : `4 Ball ${i + 1}`}</option>
+                  ))}
+                </select>
               ) : (
-                <div className="mt-2">{comp.notes || '-'}</div>
+                <div className="font-bold" style={{ color: '#FFD700' }}>{groups[groupIdx]?.teeTime || '-'}</div>
               )}
-              {/* Good Scores section */}
-              <div className="mt-4 mb-2 text-white text-base font-semibold" style={{maxWidth: '100%', textAlign: 'left'}}>
-                <div style={{marginBottom: 4, marginLeft: 0, textDecoration: 'underline', textUnderlineOffset: 3}}>Good Scores</div>
-                {goodScores.length === 0
-                  ? <div style={{marginLeft: 0}}>No one. Everyone shit.</div>
-                  : goodScores.map(p => (
-                      <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{(compactDisplayName(p) || p.name).toUpperCase()}: Net {p.dthNet}</div>
-                    ))}
+            </div>
+            <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
+              <h3 className="text-sm font-semibold text-white mb-2 text-center">Handicaps and Tees</h3>
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-0 border text-white text-xs sm:text-sm rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
+            <thead>
+                <tr>
+                <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}></th>
+                <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
+                <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Tee</th>
+                <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>CH</th>
+                <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>PH</th>
+                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+              </tr>
+            </thead>
+            <tbody>
+                {players.map((name, idx) => (
+                  <tr key={name}>
+                    <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
+                    <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>
+                      {/* Mobile: show Initial + Surname only. Desktop: full name */}
+                      <span className="block sm:hidden truncate whitespace-nowrap" title={name}>
+                        {(() => {
+                          try {
+                            const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+                            if (parts.length === 0) return '';
+                            if (parts.length === 1) return parts[0];
+                            // remove nickname tokens wrapped in quotes or parentheses from initial detection
+                            const first = parts[0].replace(/^["'\(]+|["'\)]+$/g, '');
+                            const surname = parts[parts.length - 1].replace(/^["'\(]+|["'\)]+$/g, '');
+                            const initial = (first && first[0]) ? first[0].toUpperCase() : '';
+                            return initial ? `${initial}. ${surname}` : surname;
+                          } catch (e) {
+                            return name;
+                          }
+                        })()}
+                      </span>
+                      <span className="hidden sm:block truncate whitespace-nowrap" title={name}>{name}</span>
+                    </td>
+                      <td className="border px-2 py-1 text-center">
+                      <select
+                        value={playerData[name]?.teebox || ''}
+                        onChange={e => handleChange(name, 'teebox', e.target.value)}
+                        className="w-16 sm:w-24 text-center bg-transparent rounded focus:outline-none font-semibold"
+                        style={{
+                          border: 'none',
+                          color:
+                            playerData[name]?.teebox === 'Red' ? '#FF4B4B' :
+                            playerData[name]?.teebox === 'White' ? '#FFFFFF' :
+                            '#FFD700'
+                        }}
+                      >
+                        <option value="" style={{ color: '#FFD700' }}>Select</option>
+                        <option value="Yellow" style={{ color: '#FFD700' }}>Yellow</option>
+                        <option value="White" style={{ color: '#FFFFFF', background: '#0e3764' }}>White</option>
+                        <option value="Red" style={{ color: '#FF4B4B', background: '#0e3764' }}>Red</option>
+                      </select>
+                    </td>
+                    <td className="border px-2 py-1 text-center">
+                      {useMobilePicker ? (
+                        <select
+                          className="w-12 sm:w-16 text-center bg-transparent rounded focus:outline-none font-semibold"
+                          style={{ border: 'none', color: '#FFD700' }}
+                          value={playerData[name]?.handicap ?? ''}
+                          onChange={e => handleChange(name, 'handicap', e.target.value)}
+                        >
+                          <option value="">-</option>
+                          {Array.from({ length: 55 }).map((_, i) => (
+                            <option key={i} value={String(i)}>{i}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-12 sm:w-16 text-center bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                          style={{ border: 'none', color: '#FFD700' }}
+                          value={playerData[name]?.handicap || ''}
+                          onChange={e => handleChange(name, 'handicap', e.target.value)}
+                        />
+                      )}
+                    </td>
+                    <td className="border border-white px-2 py-1 text-center font-bold" style={{ color: '#FFD700' }}>
+                      {computePH(playerData[name]?.handicap)}
+                    </td>
+                    <td className="hidden sm:table-cell border px-2 py-1 text-center">
+                      <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'waters', e.target.value); }} disabled={!canEdit(name)} />
+                    </td>
+                    <td className="hidden sm:table-cell border px-2 py-1 text-center">
+                      <input type="checkbox" checked={!!miniTableStats[name]?.dog} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'dog', e.target.checked); }} disabled={!canEdit(name)} />
+                    </td>
+                    <td className="hidden sm:table-cell border px-2 py-1 text-center">
+                      <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.twoClubs || ''} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'twoClubs', e.target.value); }} disabled={!canEdit(name)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            
+              </table>
               </div>
             </div>
-          )}
-          {/* Leaderboard Table */}
-          {leaderboardRows.length === 0 ? (
-            <div className="text-white/80">No scores submitted yet.</div>
-          ) : (
-            <div className="w-full overflow-x-auto">
-              <table className="min-w-full border text-center mb-8 text-[10px] sm:text-base" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
-                <thead>
-                  <tr style={{ background: '#00204A' }}>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Pos</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5 text-left" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Thru</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboardRows.map((entry, idx) => (
-                    <tr key={entry.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
-                      <td className="border px-0.5 sm:px-2 py-0.5 font-bold">{entry.position}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>
-                        <div className="max-w-[8ch] sm:max-w-none truncate">{(compactDisplayName(entry) || entry.name).toUpperCase()}</div>
+            {/* Extras mobile table: quick access to Waters/Dog/2 Clubs */}
+            <div className="sm:hidden w-full mb-3 mt-2">
+              <h3 className="text-sm font-semibold text-white mb-2 text-center">Extras</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full border text-white text-xs rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', borderColor: '#FFD700' }}>
+                  <thead>
+                    <tr>
+                      <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700'}}></th>
+                      <th className="border px-2 py-1 text-left" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700'}}>Name</th>
+                      <th className="border px-2 py-1 text-center" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700'}}>Waters</th>
+                      <th className="border px-2 py-1 text-center" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700'}}>Dog</th>
+                      <th className="border px-2 py-1 text-center" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700'}}>2 Clubs</th>
+                    </tr>
+                    {/* Removed erroneous insertion here; pair Score rows are rendered inside the main front/back tables after the appropriate player rows. */}
+                  </thead>
+                  <tbody>
+                    {players.map((name, idx) => (
+                      <tr key={'extras-' + name}>
+                        <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
+                        <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>
+                          <span className="truncate whitespace-nowrap" title={name}>
+                            {(() => {
+                              try {
+                                const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+                                if (parts.length === 0) return '';
+                                if (parts.length === 1) return parts[0];
+                                const first = parts[0].replace(/^["'\(]+|["'\)]+$/g, '');
+                                const surname = parts[parts.length - 1].replace(/^["'\(]+|["'\)]+$/g, '');
+                                const initial = (first && first[0]) ? first[0].toUpperCase() : '';
+                                return initial ? `${initial}. ${surname}` : surname;
+                              } catch (e) {
+                                return name;
+                              }
+                            })()}
+                          </span>
+                        </td>
+                        <td className="border px-2 py-1 text-center">
+                          <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'waters', e.target.value); }} disabled={!canEdit(name)} />
+                        </td>
+                        <td className="border px-2 py-1 text-center">
+                          <input type="checkbox" checked={!!miniTableStats[name]?.dog} onChange={e => handleMiniTableChange(name, 'dog', e.target.checked)} />
+                        </td>
+                        <td className="border px-2 py-1 text-center">
+                          <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none' }} value={miniTableStats[name]?.twoClubs || ''} onChange={e => handleMiniTableChange(name, 'twoClubs', e.target.value)} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="w-full sm:w-auto mt-3">
+              <button
+                className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
+                style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
+                onClick={() => setShowResetModal(true)}
+              >
+                Reset Scores
+              </button>
+            </div>
+          </div>
+          {/* Scorecard Table UI: Front 9 and Back 9, PAR/STROKE/HOLE headings, gross/net rows, Medal logic */}
+          {/* Mobile-only per-hole entry (compact cards for mobile) */}
+          <div className="sm:hidden w-full mt-4">
+            {/* Decide mobile rendering mode */}
+            {(() => {
+              const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+              const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
+              const isMedalMobile = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('medal')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('medal'));
+              if (isAlliance || is4bbb) {
+                const group = groups[groupIdx] || { players: [] };
+                const best = computeGroupBestTwoTotals(group);
+                          const hole = holesArr[mobileSelectedHole - 1];
+                return (
+                  <div>
+                    {/* For 4BBB show pair BB Scores (AB and CD) in mobile header; otherwise show Alliance total */}
+                    {is4bbb ? (
+                      <div className="grid grid-cols-1 gap-2 mb-3">
+                        {(() => {
+                          const pairTotals = (start) => {
+                            const nameA = (players && players[start]) || '';
+                            const nameB = (players && players[start + 1]) || '';
+                            const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
+                            const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
+                            const perHole = holesArr.map((_, i) => {
+                              const a = stabA.perHole?.[i];
+                              const b = stabB.perHole?.[i];
+                              if (a == null && b == null) return null;
+                              return Math.max(Number(a || 0), Number(b || 0));
+                            });
+                            const front = perHole.slice(0, 9).reduce((s, v) => s + (v != null ? v : 0), 0);
+                            const back = perHole.slice(9, 18).reduce((s, v) => s + (v != null ? v : 0), 0);
+                            const total = front + back;
+                            const hasAny = perHole.some(v => v != null);
+                            return { perHole, front, back, total: hasAny ? total : null };
+                          };
+                          const ab = pairTotals(0);
+                          const cd = pairTotals(2);
+                          return (
+                            <>
+                              <div className="w-full p-3 rounded border-2 text-center" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
+                                <div className="font-extrabold text-2xl text-white">Team AB | BB Score: <span style={{ color: '#FFD700' }}>{ab.total != null ? ab.total : ''}</span></div>
+                              </div>
+                              <div className="w-full p-3 rounded border-2 text-center" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
+                                <div className="font-extrabold text-2xl text-white">Team CD | BB Score: <span style={{ color: '#FFD700' }}>{cd.total != null ? cd.total : ''}</span></div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="w-full p-3 rounded border-2 text-center mb-3" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
+                        <div className="font-extrabold text-2xl text-white">Alliance Score: <span style={{ color: '#FFD700' }}>{best.total}</span></div>
+                      </div>
+                    )}
+
+                    <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
+                      <div className="flex items-center justify-center mb-3">
+                        <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 1 ? 18 : h - 1))}>◀</button>
+                        <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
+                        <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 18 ? 1 : h + 1))}>▶</button>
+                      </div>
+                      <div className="space-y-3">
+                        {players.map((pName) => {
+                          const stable = computePlayerStablefordTotals(pName);
+                          const grossArr = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
+                          const curVal = grossArr[mobileSelectedHole - 1] || '';
+                          const grossTotal = grossArr.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                          // par label
+                          let parSumPlayer = 0; let anyScorePlayer = false;
+                          for (let i = 0; i < grossArr.length; i++) { const v = parseInt(grossArr[i], 10); if (Number.isFinite(v)) { parSumPlayer += (holesArr[i]?.par || 0); anyScorePlayer = true; } }
+                          const diffPlayer = grossTotal - parSumPlayer;
+                          const parLabelPlayer = anyScorePlayer ? (diffPlayer === 0 ? ' (E)' : ` (${diffPlayer > 0 ? '+' : ''}${diffPlayer})`) : '';
+                          const initialLabel = (() => { try { const parts = (pName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return pName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return pName; } })();
+
+                          return (
+                            <div key={`mob-${pName}`} className="p-2 rounded border border-white/10 relative">
+                              <div className="flex items-center justify-between">
+                                <div className="font-semibold">{initialLabel}</div>
+                              </div>
+                              <div className="text-xs font-semibold mt-1" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
+
+                                  <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                                    {(() => {
+                                      // compute gross front/back totals (first 9 / last 9) for mobile Out/In display
+                                      const grossArrLocal = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
+                                      const grossFront = grossArrLocal.slice(0,9).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                                      const grossBack = grossArrLocal.slice(9,18).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                                      return (
+                                        <>
+                                          <div>Out: <span className="font-bold">{grossFront}</span></div>
+                                          <div className="text-right">In: <span className="font-bold">{grossBack}</span></div>
+                                          <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
+                                          <div className="text-right">Points: <span className="font-bold">{stable.total}</span></div>
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+
+                              <div className="absolute right-3 top-3 flex items-center gap-3">
+                                <button aria-label={`big-dec-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
+                                <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center' }}>{curVal || '-'}</div>
+                                <button aria-label={`big-inc-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (isMedalMobile) {
+                const hole = holesArr[mobileSelectedHole - 1];
+                return (
+                  <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
+                    <div className="flex items-center justify-center mb-3">
+                      <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 1 ? 18 : h - 1))}>◀</button>
+                      <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
+                      <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 18 ? 1 : h + 1))}>▶</button>
+                    </div>
+                    <div className="space-y-3">
+                      {players.map((pName) => {
+                        const grossArr = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
+                        const curVal = grossArr[mobileSelectedHole - 1] || '';
+                        const grossTotal = grossArr.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                        const playingHandicap = computePH(playerData[pName]?.handicap) || 0;
+                        let netFront = 0; let netBack = 0;
+                        holesArr.forEach((h, idx) => {
+                          const raw = grossArr[idx];
+                          const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
+                          let strokesReceived = 0;
+                          if (playingHandicap > 0) {
+                            if (playingHandicap >= 18) {
+                              strokesReceived = 1;
+                              if (playingHandicap - 18 >= h.index) strokesReceived = 2;
+                              else if (h.index <= (playingHandicap % 18)) strokesReceived = 2;
+                            } else if (h.index <= playingHandicap) strokesReceived = 1;
+                          }
+                          const net = Number.isFinite(gross) ? (gross - strokesReceived) : 0;
+                          if (idx < 9) netFront += net; else netBack += net;
+                        });
+                        const totalNet = netFront + netBack;
+                        // par label for totals
+                        let parSumPlayer = 0; let anyScorePlayer = false;
+                        for (let i = 0; i < grossArr.length; i++) { const v = parseInt(grossArr[i], 10); if (Number.isFinite(v)) { parSumPlayer += (holesArr[i]?.par || 0); anyScorePlayer = true; } }
+                        const diffPlayer = grossTotal - parSumPlayer;
+                        const parLabelPlayer = anyScorePlayer ? (diffPlayer === 0 ? ' (E)' : ` (${diffPlayer > 0 ? '+' : ''}${diffPlayer})`) : '';
+                        const initialLabel = (() => { try { const parts = (pName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return pName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return pName; } })();
+
+                        return (
+                          <div key={`mob-medal-${pName}`} className="p-2 rounded border border-white/10 relative">
+                            <div className="flex items-center justify-between">
+                              <div className="font-semibold">{initialLabel}</div>
+                            </div>
+                            <div className="text-xs font-semibold mt-1" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
+
+                                <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                                  {(() => {
+                                    // show gross front/back on mobile for medal view as well
+                                    const grossArrLocal = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
+                                    const grossFront = grossArrLocal.slice(0,9).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                                    const grossBack = grossArrLocal.slice(9,18).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                                    return (
+                                      <>
+                                        <div>Out: <span className="font-bold">{grossFront}</span></div>
+                                        <div className="text-right">In: <span className="font-bold">{grossBack}</span></div>
+                                        <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
+                                        <div className="text-right">Net: <span className="font-bold">{totalNet}</span></div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+
+                            <div className="absolute right-3 top-3 flex items-center gap-3">
+                              <button aria-label={`big-dec-medal-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
+                              <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center' }}>{curVal || '-'}</div>
+                              <button aria-label={`big-inc-medal-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Default: per-player cards
+              return (
+                <>
+                  {players.map((name) => {
+                    const pIdx = players.indexOf(name);
+                    return (
+                      <div key={`mobile-${name}`} className="mb-4 p-3 rounded border text-white relative pb-16" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className={`font-bold ${playerColors[pIdx % playerColors.length]} truncate`} style={{ minWidth: 0 }}></div>
+                          <div className="text-xs font-semibold" style={{ color: '#FFD700' }}>PH {computePH(playerData[name]?.handicap)}</div>
+                        </div>
+                        <div className="divide-y divide-white/10">
+                          {holesArr.map((hole, hIdx) => (
+                            <div key={hole.number} className="flex items-center justify-between py-2">
+                              <div className="w-20">
+                                <div className="text-sm font-bold">Hole {hole.number}</div>
+                                <div className="text-xs text-white/80">Par {hole.par} • S{hole.index}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button aria-label={`decrement-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = Math.max(0, cur - 1); handleScoreChange(name, hIdx, String(next)); }} disabled={!canEdit(name)}>−</button>
+                                <input inputMode="numeric" pattern="[0-9]*" className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none" value={playerData[name]?.scores?.[hIdx] ?? ''} onChange={e => { if (!canEdit(name)) return; const v = (e.target.value || '').replace(/[^0-9]/g, ''); handleScoreChange(name, hIdx, v); }} disabled={!canEdit(name)} onFocus={e => {
+                                  try {
+                                    // Avoid forcing scroll on touch/mobile devices which can cause
+                                    // the page to jump/bounce when the user is intentionally
+                                    // scrolling to the bottom. Only auto-scroll for non-touch
+                                    // or wide viewports (desktop/tablet).
+                                    if (typeof window !== 'undefined' && (!('ontouchstart' in window) || window.innerWidth > 700)) {
+                                      e.currentTarget.scrollIntoView({ block: 'center' });
+                                    }
+                                  } catch (err) {}
+                                }} />
+                                <button aria-label={`increment-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = cur + 1; handleScoreChange(name, hIdx, String(next)); }} disabled={!canEdit(name)}>+</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* per-player summary simplified */}
+                        <div className="mt-3 text-sm font-bold">
+                          <div className="flex justify-between"><div>Out: </div><div>In: </div></div>
+                          <div className="absolute left-1/2 transform -translate-x-1/2 bottom-4"><div className="text-center px-6 py-3 rounded-2xl border-4 font-extrabold text-2xl" style={{ borderColor: '#FFD700', background: '#1B3A6B', color: 'white' }}>Score</div></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
+          </div>
+          <div className="hidden sm:block overflow-x-auto">
+            {/* Front 9 Table */}
+            <h3 className="text-lg font-bold text-center mb-2 text-white">Front 9</h3>
+            <table className="min-w-full border text-center mb-8">
+              <thead>
+                <tr className="bg-gray-800/90">
+                  <th className="border px-2 py-1 bg-white/5"></th>
+                  <th className="border px-2 py-1 bg-white/5">HOLE</th>
+                      {holesArr.slice(0,9).map(hole => (
+                    <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
+                  ))}
+                  <th className="border px-2 py-1 bg-white/5 font-bold">Out</th>
+                </tr>
+                <tr className="bg-blue-900/90">
+                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}></th>
+                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>PAR</th>
+                      {holesArr.slice(0,9).map(hole => (
+                    <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
+                  ))}
+                  <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
+                </tr>
+                <tr className="bg-gray-900/90">
+                  <th className="border px-2 py-1 bg-white/5"></th>
+                  <th className="border px-2 py-1 bg-white/5">STROKE</th>
+                      {holesArr.slice(0,9).map(hole => (
+                    <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
+                  ))}
+                  <th className="border px-2 py-1 bg-white/5"></th>
+                </tr>
+              </thead>
+              <tbody>
+                  {players.map((name, pIdx) => {
+                  const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                  const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
+                  const resultLabel = (isAlliance || is4bbb) ? 'Points' : 'Net';
+                  // For Alliance and 4BBB we want per-hole stableford points for the player
+                  const stable = (isAlliance || is4bbb) ? computePlayerStablefordTotals(name) : null;
+                  // Return an array: the player's rows, and optionally the pair 'Score' row immediately after player B (pIdx===1) and player D (pIdx===3)
+                  return [
+                  <React.Fragment key={name + '-rows-front'}>
+                    {/* Gross row */}
+                    <tr key={name + '-gross-front'}>
+                      <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pIdx % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
+                        <span className="hidden sm:inline">{String.fromCharCode(65 + pIdx)}</span>
                       </td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.total}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.dthNet}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.dog ? '🐶' : ''}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.waters || ''}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.twoClubs || ''}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">
-                        {isAdmin(currentUser) ? (
-                          <input
-                            type="number"
-                            min="0"
-                            value={entry.fines || ''}
-                            onChange={e => {
-                              const v = e.target.value;
-                              // optimistic UI
-                              setEntries(es => es.map(x => x.name === entry.name ? { ...x, fines: v } : x));
-                              // save immediately; pass player name and comp id for fallback when team/user ids are missing
-                              saveFines(entry.teamId, entry.userId, v, entry.name, comp?.id || id);
-                            }}
-                            className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
-                            style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
-                          />
-                        ) : (
-                          entry.fines || ''
-                        )}
+                      <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
+                      {holesArr.slice(0,9).map((hole, hIdx) => (
+                        <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
+                          <div className="flex items-center justify-center">
+                            {useMobilePicker ? (
+                              <select
+                                value={playerData[name]?.scores?.[hIdx] ?? ''}
+                                onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx, e.target.value); }}
+                                disabled={!canEdit(name)}
+                                className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base px-0 ${scoreCellClass(name, hIdx)}`}
+                                style={{ border: 'none', color: '#FFFFFF', background: 'transparent', ...scoreCellStyle(name, hIdx) }}
+                              >
+                                <option value="">-</option>
+                                {Array.from({ length: 21 }).map((_, i) => (
+                                  <option key={i} value={String(i)}>{i}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                value={playerData[name]?.scores?.[hIdx] || ''}
+                                onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx, e.target.value); }}
+                                disabled={!canEdit(name)}
+                                className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(name, hIdx)}`}
+                                inputMode="numeric"
+                                style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(name, hIdx) }}
+                              />
+                            )}
+                          </div>
+                        </td>
+                      ))}
+                      <td className="border px-2 py-1 font-bold text-base">{Array.isArray(playerData[name]?.scores) ? playerData[name].scores.slice(0,9).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''}</td>
+                    </tr>
+                    {/* Net row (no player label cell) */}
+                    <tr key={name + '-net-front'}>
+                      <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>{resultLabel}</td>
+                      {holesArr.slice(0,9).map((hole, hIdx) => {
+                        // For Medal: show net (gross - strokesReceived). For Alliance: show stableford points.
+                        const playingHandicap = computePH(playerData[name]?.handicap) || 0;
+                        let strokesReceived = 0;
+                        if (playingHandicap > 0) {
+                          if (playingHandicap >= 18) {
+                            strokesReceived = 1;
+                            if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                            else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                          } else if (hole.index <= playingHandicap) {
+                            strokesReceived = 1;
+                          }
+                        }
+                        const rawGross = playerData[name]?.scores?.[hIdx];
+                        const gross = rawGross === '' || rawGross == null ? NaN : parseInt(rawGross, 10);
+                        if (!Number.isFinite(gross)) {
+                          return <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}></td>;
+                        }
+                        const net = gross - strokesReceived;
+                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance')) || is4bbb) {
+                          // For Alliance and 4BBB show stableford points per hole (computed using PH inside computePlayerStablefordTotals)
+                          const pts = stable ? (stable.perHole ? stable.perHole[hIdx] : stablefordPoints(net, hole.par)) : stablefordPoints(net, hole.par);
+                          return (
+                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                              {pts != null ? pts : ''}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                            {net}
+                          </td>
+                        );
+                      })}
+                      {/* Net front 9 total */}
+                      <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
+                        {(() => {
+                          const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                          if (isAlliance || is4bbb) {
+                            // sum stableford points for front 9
+                            const pts = computePlayerStablefordTotals(name);
+                            return pts.front;
+                          }
+                          const playingHandicap = computePH(playerData[name]?.handicap) || 0;
+                          let netFrontTotal = 0;
+                          holesArr.slice(0,9).forEach((hole, hIdx) => {
+                            let strokesReceived = 0;
+                            if (playingHandicap > 0) {
+                              if (playingHandicap >= 18) {
+                                strokesReceived = 1;
+                                if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                                else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                              } else if (hole.index <= playingHandicap) {
+                                strokesReceived = 1;
+                              }
+                            }
+                            const gross = parseInt(playerData[name]?.scores?.[hIdx], 10) || 0;
+                            const net = gross ? gross - strokesReceived : 0;
+                            if (typeof net === 'number') netFrontTotal += net;
+                          });
+                          return netFrontTotal;
+                        })()}
                       </td>
                     </tr>
+                  </React.Fragment>,
+                  (is4bbb && (pIdx === 1 || pIdx === 3)) ? (() => {
+                    const pairStart = pIdx === 1 ? 0 : 2;
+                    const nameA = players[pairStart];
+                    const nameB = players[pairStart + 1];
+                    const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0) };
+                    const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0) };
+                          const perHoleFront = holesArr.slice(0, 9).map((_, idx) => {
+                      const holeIdx = idx;
+                      const a = stabA.perHole?.[holeIdx];
+                      const b = stabB.perHole?.[holeIdx];
+                      if (a == null && b == null) return null;
+                      return Math.max(Number(a || 0), Number(b || 0));
+                    });
+                    const frontSum = perHoleFront.reduce((s, v) => s + (v != null ? v : 0), 0);
+                    return (
+                      <tr key={`pair-score-front-${pairStart}`}>
+                        <td className="border px-2 py-1 bg-white/5" />
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>BB Score</td>
+                        {perHoleFront.map((val, hIdx) => (
+                          <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                            {val != null ? val : ''}
+                          </td>
+                        ))}
+                        {(() => {
+                          const frontCount = perHoleFront.filter(v => v != null).length;
+                          return (
+                            <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{frontCount ? frontSum : ''}</td>
+                          );
+                        })()}
+                      </tr>
+                    );
+                  })() : null
+                  ];
+                })}
+                {/* For 4BBB, render pair 'Score' rows after player B and player D (pairs A+B and C+D). */}
+                
+                {/* Alliance team 'Score' row: sum of best two stableford totals (only for alliance comps, not 4BBB) */}
+                {((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) && !((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb'))) && (
+                  (() => {
+                    const group = groups[groupIdx] || { players: [] };
+                    const best = computeGroupBestTwoTotals(group);
+                    return (
+                      <tr key={`group-score-front-${groupIdx}`}>
+                        <td className="border px-2 py-1 bg-white/5" />
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Score</td>
+                        {holesArr.slice(0,9).map((_, hIdx) => {
+                          const val = best.perHole ? best.perHole[hIdx] : 0;
+                          return (
+                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                              {val != null ? val : 0}
+                            </td>
+                          );
+                        })}
+                        <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{best.front}</td>
+                      </tr>
+                    );
+                  })()
+                )}
+              </tbody>
+            </table>
+            {/* Back 9 Table */}
+            <h3 className="text-lg font-bold text-center mb-2 text-white">Back 9</h3>
+            <table className="min-w-full border text-center">
+              <thead>
+                <tr className="bg-gray-800/90">
+                  <th className="border px-2 py-1 bg-white/5"></th>
+                  <th className="border px-2 py-1 bg-white/5">HOLE</th>
+                  {holesArr.slice(9,18).map(hole => (
+                    <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  <th className="border px-2 py-1 bg-white/5 font-bold">In</th>
+                  <th className="border px-2 py-1 bg-white/5 font-bold">TOTAL</th>
+                </tr>
+                <tr className="bg-blue-900/90">
+                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}></th>
+                  <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>PAR</th>
+                  {holesArr.slice(9,18).map(hole => (
+                    <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
+                  ))}
+                  <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
+                  <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>72</th>
+                </tr>
+                <tr className="bg-gray-900/90">
+                  <th className="border px-2 py-1 bg-white/5"></th>
+                  <th className="border px-2 py-1 bg-white/5">STROKE</th>
+                  {holesArr.slice(9,18).map(hole => (
+                    <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
+                  ))}
+                  <th className="border px-2 py-1 bg-white/5 border-r"></th>
+                  <th className="border px-2 py-1 bg-white/5 border-r"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {players.map((name, pIdx) => {
+                  const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                  const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
+                  const resultLabel = (isAlliance || is4bbb) ? 'Points' : 'Net';
+                  const stable = isAlliance ? computePlayerStablefordTotals(name) : null;
+
+                  // Return an array: the player's rows, and optionally the pair 'Score' row immediately after player B (pIdx===1) and player D (pIdx===3)
+                  return [
+                  <React.Fragment key={name + '-rows-back'}>
+                    {/* Gross row */}
+                    <tr key={name + '-gross-back'}>
+                      <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pIdx % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
+                        <span className="hidden sm:inline">{String.fromCharCode(65 + pIdx)}</span>
+                      </td>
+                      <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
+                      {holesArr.slice(9,18).map((hole, hIdx) => (
+                        <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
+                          <div className="flex items-center justify-center">
+                            {useMobilePicker ? (
+                              <select
+                                value={playerData[name]?.scores?.[hIdx+9] ?? ''}
+                                onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx+9, e.target.value); }}
+                                disabled={!canEdit(name)}
+                                className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base px-0 ${scoreCellClass(name, hIdx+9)}`}
+                                style={{ border: 'none', color: '#FFFFFF', background: 'transparent', ...scoreCellStyle(name, hIdx+9) }}
+                              >
+                                <option value="">-</option>
+                                {Array.from({ length: 21 }).map((_, i) => (
+                                  <option key={i} value={String(i)}>{i}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                value={playerData[name]?.scores?.[hIdx+9] || ''}
+                                onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx+9, e.target.value); }}
+                                disabled={!canEdit(name)}
+                                className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(name, hIdx+9)}`}
+                                inputMode="numeric"
+                                style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(name, hIdx+9) }}
+                              />
+                            )}
+                          </div>
+                        </td>
+                      ))}
+                      <td className="border px-2 py-1 font-bold text-base">{
+                        Array.isArray(playerData[name]?.scores) ? playerData[name].scores.slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''
+                      }</td>
+                      <td className="border px-2 py-1 font-bold text-base">{
+                        Array.isArray(playerData[name]?.scores) ? playerData[name].scores.reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''
+                      }</td>
+                    </tr>
+                    {/* Net row (no player label cell) */}
+                    <tr key={name + '-net-back'}>
+                      <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>{resultLabel}</td>
+                      {holesArr.slice(9,18).map((hole, hIdx) => {
+                        const playingHandicap = computePH(playerData[name]?.handicap) || 0;
+                        let strokesReceived = 0;
+                        if (playingHandicap > 0) {
+                          if (playingHandicap >= 18) {
+                            strokesReceived = 1;
+                            if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                            else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                          } else if (hole.index <= playingHandicap) {
+                            strokesReceived = 1;
+                          }
+                        }
+                        const rawGross = playerData[name]?.scores?.[hIdx+9];
+                        const gross = rawGross === '' || rawGross == null ? NaN : parseInt(rawGross, 10);
+                        if (!Number.isFinite(gross)) {
+                          return <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}></td>;
+                        }
+                        const net = gross - strokesReceived;
+                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance')) || is4bbb) {
+                          // For Alliance and 4BBB show stableford points per hole
+                          const holeIdx = 9 + hIdx;
+                          const pts = stable ? (stable.perHole ? stable.perHole[holeIdx] : stablefordPoints(net, hole.par)) : stablefordPoints(net, hole.par);
+                          return (
+                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                              {pts != null ? pts : ''}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                            {net}
+                          </td>
+                        );
+                      })}
+                      {/* Net back 9 and total */}
+                      <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
+                        {(() => {
+                          const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                          if (isAlliance || is4bbb) {
+                            const pts = stable ? stable.back : computePlayerStablefordTotals(name).back;
+                            return pts;
+                          }
+                          const playingHandicap = computePH(playerData[name]?.handicap) || 0;
+                          let netBackTotal = 0;
+                          holesArr.slice(9,18).forEach((hole, hIdx) => {
+                            let strokesReceived = 0;
+                            if (playingHandicap > 0) {
+                              if (playingHandicap >= 18) {
+                                strokesReceived = 1;
+                                if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                                else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                              } else if (hole.index <= playingHandicap) {
+                                strokesReceived = 1;
+                              }
+                            }
+                            const gross = parseInt(playerData[name]?.scores?.[hIdx+9], 10) || 0;
+                            const net = gross ? gross - strokesReceived : 0;
+                            if (typeof net === 'number') netBackTotal += net;
+                          });
+                          return netBackTotal;
+                        })()}
+                      </td>
+                      <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
+                        {(() => {
+                          const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
+                          if (isAlliance || is4bbb) {
+                            const pts = stable ? stable.total : computePlayerStablefordTotals(name).total;
+                            return pts;
+                          }
+                          const playingHandicap = computePH(playerData[name]?.handicap) || 0;
+                          let netTotal = 0;
+                          holesArr.forEach((hole, hIdx) => {
+                            let strokesReceived = 0;
+                            if (playingHandicap > 0) {
+                              if (playingHandicap >= 18) {
+                                strokesReceived = 1;
+                                if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
+                                else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
+                              } else if (hole.index <= playingHandicap) {
+                                strokesReceived = 1;
+                              }
+                            }
+                            const gross = parseInt(playerData[name]?.scores?.[hIdx], 10) || 0;
+                            const net = gross ? gross - strokesReceived : 0;
+                            if (typeof net === 'number') netTotal += net;
+                          });
+                          return netTotal;
+                        })()}
+                      </td>
+                    </tr>
+                  </React.Fragment>,
+                  (is4bbb && (pIdx === 1 || pIdx === 3)) ? (() => {
+                    const pairStart = pIdx === 1 ? 0 : 2;
+                    const nameA = players[pairStart];
+                    const nameB = players[pairStart + 1];
+                    const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0) };
+                    const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0) };
+                        const perHoleBack = defaultHoles.slice(9, 18).map((_, idx) => {
+                          const holeIdx = 9 + idx;
+                          const a = stabA.perHole?.[holeIdx];
+                          const b = stabB.perHole?.[holeIdx];
+                          if (a == null && b == null) return null;
+                          return Math.max(Number(a || 0), Number(b || 0));
+                        });
+                        const backSum = perHoleBack.reduce((s, v) => s + (v != null ? v : 0), 0);
+                        const totalPerHole = defaultHoles.map((_, i) => {
+                          const a = stabA.perHole?.[i];
+                          const b = stabB.perHole?.[i];
+                          if (a == null && b == null) return null;
+                          return Math.max(Number(a || 0), Number(b || 0));
+                        });
+                        const totalSum = totalPerHole.reduce((s, v) => s + (v != null ? v : 0), 0);
+                    return (
+                      <tr key={`pair-score-back-${pairStart}`}>
+                        <td className="border px-2 py-1 bg-white/5" />
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>BB Score</td>
+                        {perHoleBack.map((val, hIdx) => (
+                          <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                            {val != null ? val : ''}
+                          </td>
+                        ))}
+                        {(() => {
+                          const backCount = perHoleBack.filter(v => v != null).length;
+                          const totalCount = totalPerHole.filter(v => v != null).length;
+                          return (
+                            <>
+                              <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{backCount ? backSum : ''}</td>
+                              <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{totalCount ? totalSum : ''}</td>
+                            </>
+                          );
+                        })()}
+                      </tr>
+                    );
+                  })() : null
+                  ];
+                })}
+                {/* Alliance team 'Score' row for Back 9: show best-two back and total */}
+                {((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) && (
+                  (() => {
+                    const group = groups[groupIdx] || { players: [] };
+                    const best = computeGroupBestTwoTotals(group);
+                    return (
+                      <tr key={`group-score-back-${groupIdx}`}>
+                        <td className="border px-2 py-1 bg-white/5" />
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Score</td>
+                        {defaultHoles.slice(9,18).map((_, hIdx) => {
+                          const idx = 9 + hIdx;
+                          const val = best.perHole ? best.perHole[idx] : 0;
+                          return (
+                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                              {val != null ? val : ''}
+                            </td>
+                          );
+                        })}
+                        <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{best.back}</td>
+                        <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{best.total}</td>
+                      </tr>
+                    );
+                  })()
+                )}
+              </tbody>
+            </table>
+          </div>
+          {error && <div className="text-red-300 mt-4 font-semibold">{error}</div>}
         </div>
       </div>
+      
+      {/* Reset Scores Confirmation Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-6 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
+            <h2 className="text-2xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif' }}>Clear all gross scores?</h2>
+            <div className="text-sm text-white mb-4 text-center" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>This will clear only the gross score input row for every player. Net calculations and running totals will update accordingly. This action cannot be undone.</div>
+            <div className="flex gap-3">
+              <button className="px-4 py-2 rounded-2xl font-bold shadow border border-white" style={{ backgroundColor: '#1B3A6B', color: 'white' }} onClick={() => { setShowResetModal(false); }}>Cancel</button>
+              <button className="px-4 py-2 rounded-2xl font-bold shadow border border-white" style={{ backgroundColor: '#FF4B4B', color: 'white' }} onClick={handleConfirmReset}>Yes, clear scores</button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageBackground>
   );
 }
-
-export default MedalLeaderboard;
