@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { apiUrl } from './api';
+import socket from './socket';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
 import html2canvas from 'html2canvas';
@@ -141,6 +142,81 @@ function getPlayingHandicap(entry, comp) {
           })
           .catch(() => setLoading(false));
       }, []);
+
+      // Real-time: join competition room and refresh leaderboard when relevant socket events arrive
+      useEffect(() => {
+        if (!comp || !comp.id) return;
+        const compId = Number(comp.id);
+        try { socket.emit('join', { competitionId: compId }); } catch (e) {}
+        const handler = (msg) => {
+          try {
+            if (!msg || Number(msg.competitionId) !== compId) return;
+            // Re-fetch competition and backend teams
+            fetch(apiUrl(`/api/competitions/${compId}`))
+              .then(res => res.ok ? res.json() : null)
+              .then(async data => {
+                if (!data) return;
+                setComp(data);
+                setGroups(Array.isArray(data.groups) ? data.groups : []);
+                // rebuild entries
+                const usersList = Array.isArray(data.users) ? data.users : [];
+                const built = [];
+                if (Array.isArray(data.groups)) {
+                  data.groups.forEach((group, groupIdx) => {
+                    if (Array.isArray(group.players)) {
+                      group.players.forEach((name, i) => {
+                        const scores = group.scores?.[name] || Array(18).fill('');
+                        const handicap = group.handicaps?.[name] ?? '';
+                        const gross = scores.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
+                        const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
+                        const userId = matchedUser?.id || null;
+                        const displayNameFromUser = matchedUser?.displayName || matchedUser?.display_name || matchedUser?.displayname || '';
+                        const nickFromUser = matchedUser?.nick || matchedUser?.nickname || '';
+                        const waters = group.waters?.[name] ?? '';
+                        const dog = group.dog?.[name] ?? false;
+                        const twoClubs = group.two_clubs?.[name] ?? group.twoClubs?.[name] ?? '';
+                        const fines = group.fines?.[name] ?? '';
+                        const teamId = group.teamId || group.id || group.team_id || group.group_id || null;
+                        built.push({ name, scores, total: gross || 0, handicap, groupIdx, userId, displayName: displayNameFromUser, nick: nickFromUser, waters, dog, twoClubs, fines, teamId });
+                      });
+                    }
+                  });
+                }
+                setEntries(built);
+                // Refresh backend team points map
+                const teamIds = Array.from(new Set([].concat(...(data.groups || []).map(g => {
+                  if (!g) return [];
+                  if (Array.isArray(g.teamIds) && g.teamIds.length > 0) return g.teamIds.filter(Boolean);
+                  const t = (g.teamId || g.id || g.team_id || g.group_id);
+                  return t ? [t] : [];
+                }))));
+                if (teamIds.length > 0) {
+                  fetch(apiUrl(`/api/teams?competitionId=${data.id}`))
+                    .then(res => res.ok ? res.json() : null)
+                    .then(allTeams => {
+                      if (allTeams && Array.isArray(allTeams)) {
+                        const map = {};
+                        (allTeams || []).forEach(t => { if (t && t.id != null) map[t.id] = t.team_points ?? t.teamPoints ?? null; });
+                        setBackendTeamPointsMap(map);
+                        return;
+                      }
+                    })
+                    .catch(() => {});
+                }
+              })
+              .catch(() => {});
+          } catch (e) {}
+        };
+        try {
+          socket.on('scores-updated', handler);
+          socket.on('medal-player-updated', handler);
+          socket.on('team-user-updated', handler);
+        } catch (e) {}
+        return () => {
+          try { socket.emit('leave', { competitionId: compId }); } catch (e) {}
+          try { socket.off('scores-updated', handler); socket.off('medal-player-updated', handler); socket.off('team-user-updated', handler); } catch (e) {}
+        };
+      }, [comp]);
 
       // Use holes from competition payload when available, otherwise defaultHoles
       const holesArr = (comp && Array.isArray(comp.holes) && comp.holes.length === 18)

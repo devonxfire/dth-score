@@ -434,6 +434,14 @@ export default function Scorecard(props) {
         await fetchAllScores();
         setScoresLoading(false);
       }
+      // Fetch full competition and ask server to rebroadcast a full-competition payload
+      try {
+        const compRes = await fetch(apiUrl(`/api/competitions/${competition.id}`));
+        if (compRes.ok) {
+          const compData = await compRes.json();
+          try { socket && socket.emit && socket.emit('client-medal-saved', { competitionId: Number(competition.id), fullCompetition: compData }); } catch (e) {}
+        }
+      } catch (e) {}
     } catch (err) {
       console.error('Failed to flush saves', err);
     }
