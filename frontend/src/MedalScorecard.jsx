@@ -997,7 +997,8 @@ export default function MedalScorecard(props) {
             </div>
             <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
               <h3 className="text-sm font-semibold text-white mb-2 text-center">Handicaps and Tees</h3>
-              <table className="w-full min-w-[300px] border text-white text-xs sm:text-sm rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-0 border text-white text-xs sm:text-sm rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
             <thead>
                 <tr>
                 <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}></th>
@@ -1056,7 +1057,7 @@ export default function MedalScorecard(props) {
                     <td className="border px-2 py-1 text-center">
                       {useMobilePicker ? (
                         <select
-                          className="w-12 sm:w-16 text-center bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                          className="w-12 sm:w-16 text-center bg-transparent rounded focus:outline-none font-semibold"
                           style={{ border: 'none', color: '#FFD700' }}
                           value={playerData[name]?.handicap ?? ''}
                           onChange={e => handleChange(name, 'handicap', e.target.value)}
@@ -1094,6 +1095,7 @@ export default function MedalScorecard(props) {
               </tbody>
             
               </table>
+              </div>
             </div>
             {/* Extras mobile table: quick access to Waters/Dog/2 Clubs */}
             <div className="sm:hidden w-full mb-3 mt-2">
@@ -1442,17 +1444,32 @@ export default function MedalScorecard(props) {
                       {holesArr.slice(0,9).map((hole, hIdx) => (
                         <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                           <div className="flex items-center justify-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="20"
-                              value={playerData[name]?.scores?.[hIdx] || ''}
-                              onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx, e.target.value); }}
-                              disabled={!canEdit(name)}
-                              className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(name, hIdx)}`}
-                              inputMode="numeric"
-                              style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(name, hIdx) }}
-                            />
+                            {useMobilePicker ? (
+                              <select
+                                value={playerData[name]?.scores?.[hIdx] ?? ''}
+                                onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx, e.target.value); }}
+                                disabled={!canEdit(name)}
+                                className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base px-0 ${scoreCellClass(name, hIdx)}`}
+                                style={{ border: 'none', color: '#FFFFFF', background: 'transparent', ...scoreCellStyle(name, hIdx) }}
+                              >
+                                <option value="">-</option>
+                                {Array.from({ length: 21 }).map((_, i) => (
+                                  <option key={i} value={String(i)}>{i}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                value={playerData[name]?.scores?.[hIdx] || ''}
+                                onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx, e.target.value); }}
+                                disabled={!canEdit(name)}
+                                className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(name, hIdx)}`}
+                                inputMode="numeric"
+                                style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(name, hIdx) }}
+                              />
+                            )}
                           </div>
                         </td>
                       ))}
@@ -1637,17 +1654,32 @@ export default function MedalScorecard(props) {
                       {holesArr.slice(9,18).map((hole, hIdx) => (
                         <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                           <div className="flex items-center justify-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="20"
-                              value={playerData[name]?.scores?.[hIdx+9] || ''}
-                              onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx+9, e.target.value); }}
-                              disabled={!canEdit(name)}
-                              className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(name, hIdx+9)}`}
-                              inputMode="numeric"
-                              style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(name, hIdx+9) }}
-                            />
+                            {useMobilePicker ? (
+                              <select
+                                value={playerData[name]?.scores?.[hIdx+9] ?? ''}
+                                onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx+9, e.target.value); }}
+                                disabled={!canEdit(name)}
+                                className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base px-0 ${scoreCellClass(name, hIdx+9)}`}
+                                style={{ border: 'none', color: '#FFFFFF', background: 'transparent', ...scoreCellStyle(name, hIdx+9) }}
+                              >
+                                <option value="">-</option>
+                                {Array.from({ length: 21 }).map((_, i) => (
+                                  <option key={i} value={String(i)}>{i}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                value={playerData[name]?.scores?.[hIdx+9] || ''}
+                                onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx+9, e.target.value); }}
+                                disabled={!canEdit(name)}
+                                className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(name, hIdx+9)}`}
+                                inputMode="numeric"
+                                style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(name, hIdx+9) }}
+                              />
+                            )}
                           </div>
                         </td>
                       ))}

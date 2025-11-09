@@ -575,7 +575,8 @@ export default function Scorecard(props) {
                   {/* 4 Ball number removed as per user request */}
                   {groupPlayers.length >= 2 && (
                     <div className="my-2">
-                      <table className="min-w-[300px] border text-white text-sm rounded mb-2" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
+                      <div className="overflow-x-auto">
+                      <table className="w-full min-w-0 border text-white text-sm rounded mb-2" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
                         <thead>
                           <tr>
                             <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}></th>
@@ -815,6 +816,7 @@ export default function Scorecard(props) {
                           })}
                         </tbody>
                       </table>
+                      </div>
                     </div>
                   )}
                   {competition.notes && <><span className="font-semibold">Notes from Captain:</span> {competition.notes} <br /></>}
