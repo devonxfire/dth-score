@@ -1214,12 +1214,22 @@ export default function MedalScorecard(props) {
                               </div>
                               <div className="text-xs font-semibold mt-1" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
 
-                              <div className="grid grid-cols-2 gap-2 text-sm mt-3">
-                                <div>Out: <span className="font-bold">{stable.front}</span></div>
-                                <div className="text-right">In: <span className="font-bold">{stable.back}</span></div>
-                                <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
-                                <div className="text-right">Points: <span className="font-bold">{stable.total}</span></div>
-                              </div>
+                                  <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                                    {(() => {
+                                      // compute gross front/back totals (first 9 / last 9) for mobile Out/In display
+                                      const grossArrLocal = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
+                                      const grossFront = grossArrLocal.slice(0,9).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                                      const grossBack = grossArrLocal.slice(9,18).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                                      return (
+                                        <>
+                                          <div>Out: <span className="font-bold">{grossFront}</span></div>
+                                          <div className="text-right">In: <span className="font-bold">{grossBack}</span></div>
+                                          <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
+                                          <div className="text-right">Points: <span className="font-bold">{stable.total}</span></div>
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
 
                               <div className="absolute right-3 top-3 flex items-center gap-3">
                                 <button aria-label={`big-dec-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
@@ -1280,12 +1290,22 @@ export default function MedalScorecard(props) {
                             </div>
                             <div className="text-xs font-semibold mt-1" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
 
-                            <div className="grid grid-cols-2 gap-2 text-sm mt-3">
-                              <div>Out: <span className="font-bold">{netFront}</span></div>
-                              <div className="text-right">In: <span className="font-bold">{netBack}</span></div>
-                              <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
-                              <div className="text-right">Net: <span className="font-bold">{totalNet}</span></div>
-                            </div>
+                                <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                                  {(() => {
+                                    // show gross front/back on mobile for medal view as well
+                                    const grossArrLocal = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
+                                    const grossFront = grossArrLocal.slice(0,9).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                                    const grossBack = grossArrLocal.slice(9,18).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                                    return (
+                                      <>
+                                        <div>Out: <span className="font-bold">{grossFront}</span></div>
+                                        <div className="text-right">In: <span className="font-bold">{grossBack}</span></div>
+                                        <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
+                                        <div className="text-right">Net: <span className="font-bold">{totalNet}</span></div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
 
                             <div className="absolute right-3 top-3 flex items-center gap-3">
                               <button aria-label={`big-dec-medal-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
