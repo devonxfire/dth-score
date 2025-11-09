@@ -335,13 +335,19 @@ function getPlayingHandicap(entry, comp) {
             const pairB = [groupPlayers[2], groupPlayers[3]];
 
             const computeTeamPointsForPlayers = (playersArr) => {
-              const perHoleBestTwo = Array(18).fill(0).map((_, hIdx) => {
+              // For a 2-player pair (4BBB), team points are the better ball per hole (max of the two players).
+              // For larger groups (e.g., Alliance), the team points are the sum of the best two players per hole.
+              const perHole = Array(18).fill(0).map((_, hIdx) => {
                 const vals = playersArr.map(p => (p.perHole && Number.isFinite(p.perHole[hIdx]) ? p.perHole[hIdx] : 0));
                 vals.sort((a,b) => b - a);
+                if (playersArr.length === 2) {
+                  return vals[0] || 0; // best-one (better ball)
+                }
+                // sum top two for groups larger than 2
                 return (vals[0] || 0) + (vals[1] || 0);
               });
-              const front = perHoleBestTwo.slice(0,9).reduce((s, v) => s + (v || 0), 0);
-              const back = perHoleBestTwo.slice(9,18).reduce((s, v) => s + (v || 0), 0);
+              const front = perHole.slice(0,9).reduce((s, v) => s + (v || 0), 0);
+              const back = perHole.slice(9,18).reduce((s, v) => s + (v || 0), 0);
               return front + back;
             };
 
@@ -354,8 +360,15 @@ function getPlayingHandicap(entry, comp) {
             const computedA = computeTeamPointsForPlayers(pairA);
             const computedB = computeTeamPointsForPlayers(pairB);
 
-            teams.push({ groupIdx: idx, players: pairA, teamPoints: (typeof backendA === 'number' ? backendA : computedA), computedTeamPoints: computedA, teeTime: group.teeTime || '', teamId: teamIdA });
-            teams.push({ groupIdx: idx, players: pairB, teamPoints: (typeof backendB === 'number' ? backendB : computedB), computedTeamPoints: computedB, teeTime: group.teeTime || '', teamId: teamIdB });
+            // Prefer the computed BB score for display when there's a mismatch with DB for 2-player pairs
+            const chosenA = (typeof backendA === 'number' && backendA === computedA) ? backendA : computedA;
+            const chosenB = (typeof backendB === 'number' && backendB === computedB) ? backendB : computedB;
+
+            // Build debug per-hole arrays (max per-hole for pair)
+            const perHoleBestA = Array(18).fill(0).map((_, i) => Math.max((pairA[0].perHole?.[i] || 0), (pairA[1].perHole?.[i] || 0)));
+            const perHoleBestB = Array(18).fill(0).map((_, i) => Math.max((pairB[0].perHole?.[i] || 0), (pairB[1].perHole?.[i] || 0)));
+            teams.push({ groupIdx: idx, players: pairA, teamPoints: chosenA, computedTeamPoints: computedA, backendTeamPoints: (typeof backendA === 'number' ? backendA : undefined), teeTime: group.teeTime || '', teamId: teamIdA, debug: { perHoleBest: perHoleBestA, playersPerHole: [(pairA[0].perHole || []), (pairA[1].perHole || [])] } });
+            teams.push({ groupIdx: idx, players: pairB, teamPoints: chosenB, computedTeamPoints: computedB, backendTeamPoints: (typeof backendB === 'number' ? backendB : undefined), teeTime: group.teeTime || '', teamId: teamIdB, debug: { perHoleBest: perHoleBestB, playersPerHole: [(pairB[0].perHole || []), (pairB[1].perHole || [])] } });
           } else {
             const perHoleBestTwo = Array(18).fill(0).map((_, hIdx) => {
               const vals = groupPlayers.map(p => (p.perHole && Number.isFinite(p.perHole[hIdx]) ? p.perHole[hIdx] : 0));
@@ -473,7 +486,33 @@ function getPlayingHandicap(entry, comp) {
       }
 
   const rowsForUI = [];
-  teams.forEach(team => { team.players.forEach(p => { const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0; const thru = holesPlayed === 18 ? 'F' : holesPlayed; rowsForUI.push({ pos: team.pos, teamPoints: team.teamPoints, computedTeamPoints: team.computedTeamPoints ?? null, teeTime: team.teeTime, name: p.name, displayName: p.displayName || '', userId: p.userId || null, teamId: team.teamId || null, dog: p.dog || false, waters: p.waters || '', twoClubs: p.twoClubs || '', fines: p.fines || '', gross: p.gross, net: p.net, dthNet: p.dthNet, points: p.points, thru }); }); });
+  // Build per-player rows, but for team competitions (4BBB) show the team's BB score in the Score column
+  teams.forEach(team => {
+    (team.players || []).forEach(p => {
+      const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0;
+      const thru = holesPlayed === 18 ? 'F' : holesPlayed;
+      // Use the team's teamPoints for the Score column so both teammates display the same BB Score
+      rowsForUI.push({
+        pos: team.pos,
+        teamPoints: team.teamPoints,
+        computedTeamPoints: team.computedTeamPoints ?? null,
+        teeTime: team.teeTime,
+        name: p.name,
+        displayName: p.displayName || '',
+        userId: p.userId || null,
+        teamId: team.teamId || null,
+        dog: p.dog || false,
+        waters: p.waters || '',
+        twoClubs: p.twoClubs || '',
+        fines: p.fines || '',
+        gross: p.gross,
+        net: p.net,
+        dthNet: p.dthNet,
+        points: p.points,
+        thru
+      });
+    });
+  });
 
   // rowsForUI is built by iterating `teams` (already sorted by teamPoints and assigned positions).
   // Avoid re-sorting by individual player points here because that can separate teammates
@@ -569,7 +608,7 @@ function getPlayingHandicap(entry, comp) {
                             <div className="max-w-[8ch] sm:max-w-none truncate">{(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}</div>
                           </td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
-                          <td className="border px-0.5 sm:px-2 py-0.5">{entry.teamPoints}{(entry.computedTeamPoints != null && entry.computedTeamPoints !== entry.teamPoints) ? ` (calc ${entry.computedTeamPoints})` : ''}</td>
+                          <td className="border px-0.5 sm:px-2 py-0.5">{entry.teamPoints}{(entry.backendTeamPoints !== undefined && entry.backendTeamPoints !== entry.teamPoints) ? ` (db ${entry.backendTeamPoints})` : (entry.computedTeamPoints != null && entry.computedTeamPoints !== entry.teamPoints ? ` (calc ${entry.computedTeamPoints})` : '')}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.gross}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.dthNet}</td>

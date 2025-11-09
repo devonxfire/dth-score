@@ -429,7 +429,7 @@ export default function MedalScorecard(props) {
                 }
               } catch (e) {}
               const gross = parseInt(strokes, 10);
-              const hole = defaultHoles[idx];
+              const hole = holesArr[idx];
               if (!gross || !hole) return;
               if (gross === hole.par - 2) {
                 if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
@@ -738,7 +738,7 @@ export default function MedalScorecard(props) {
     });
     // Birdie/Eagle/Blowup detection logic
     const gross = parseInt(value, 10);
-    const hole = defaultHoles[idx];
+    const hole = holesArr[idx];
     if (gross > 0 && hole) {
       // Eagle (2 under)
             if (gross === hole.par - 2) {
@@ -1144,7 +1144,7 @@ export default function MedalScorecard(props) {
               if (isAlliance || is4bbb) {
                 const group = groups[groupIdx] || { players: [] };
                 const best = computeGroupBestTwoTotals(group);
-                const hole = defaultHoles[mobileSelectedHole - 1];
+                          const hole = holesArr[mobileSelectedHole - 1];
                 return (
                   <div>
                     {/* For 4BBB show pair BB Scores (AB and CD) in mobile header; otherwise show Alliance total */}
@@ -1156,7 +1156,7 @@ export default function MedalScorecard(props) {
                             const nameB = (players && players[start + 1]) || '';
                             const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
                             const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0), front: 0, back: 0, total: 0 };
-                            const perHole = defaultHoles.map((_, i) => {
+                            const perHole = holesArr.map((_, i) => {
                               const a = stabA.perHole?.[i];
                               const b = stabB.perHole?.[i];
                               if (a == null && b == null) return null;
@@ -1202,7 +1202,7 @@ export default function MedalScorecard(props) {
                           const grossTotal = grossArr.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
                           // par label
                           let parSumPlayer = 0; let anyScorePlayer = false;
-                          for (let i = 0; i < grossArr.length; i++) { const v = parseInt(grossArr[i], 10); if (Number.isFinite(v)) { parSumPlayer += (defaultHoles[i]?.par || 0); anyScorePlayer = true; } }
+                          for (let i = 0; i < grossArr.length; i++) { const v = parseInt(grossArr[i], 10); if (Number.isFinite(v)) { parSumPlayer += (holesArr[i]?.par || 0); anyScorePlayer = true; } }
                           const diffPlayer = grossTotal - parSumPlayer;
                           const parLabelPlayer = anyScorePlayer ? (diffPlayer === 0 ? ' (E)' : ` (${diffPlayer > 0 ? '+' : ''}${diffPlayer})`) : '';
                           const initialLabel = (() => { try { const parts = (pName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return pName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return pName; } })();
@@ -1246,7 +1246,7 @@ export default function MedalScorecard(props) {
               }
 
               if (isMedalMobile) {
-                const hole = defaultHoles[mobileSelectedHole - 1];
+                const hole = holesArr[mobileSelectedHole - 1];
                 return (
                   <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
                     <div className="flex items-center justify-center mb-3">
@@ -1261,7 +1261,7 @@ export default function MedalScorecard(props) {
                         const grossTotal = grossArr.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
                         const playingHandicap = computePH(playerData[pName]?.handicap) || 0;
                         let netFront = 0; let netBack = 0;
-                        defaultHoles.forEach((h, idx) => {
+                        holesArr.forEach((h, idx) => {
                           const raw = grossArr[idx];
                           const gross = raw === '' || raw == null ? NaN : parseInt(raw, 10);
                           let strokesReceived = 0;
@@ -1278,7 +1278,7 @@ export default function MedalScorecard(props) {
                         const totalNet = netFront + netBack;
                         // par label for totals
                         let parSumPlayer = 0; let anyScorePlayer = false;
-                        for (let i = 0; i < grossArr.length; i++) { const v = parseInt(grossArr[i], 10); if (Number.isFinite(v)) { parSumPlayer += (defaultHoles[i]?.par || 0); anyScorePlayer = true; } }
+                        for (let i = 0; i < grossArr.length; i++) { const v = parseInt(grossArr[i], 10); if (Number.isFinite(v)) { parSumPlayer += (holesArr[i]?.par || 0); anyScorePlayer = true; } }
                         const diffPlayer = grossTotal - parSumPlayer;
                         const parLabelPlayer = anyScorePlayer ? (diffPlayer === 0 ? ' (E)' : ` (${diffPlayer > 0 ? '+' : ''}${diffPlayer})`) : '';
                         const initialLabel = (() => { try { const parts = (pName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return pName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return pName; } })();
@@ -1332,7 +1332,7 @@ export default function MedalScorecard(props) {
                           <div className="text-xs font-semibold" style={{ color: '#FFD700' }}>PH {computePH(playerData[name]?.handicap)}</div>
                         </div>
                         <div className="divide-y divide-white/10">
-                          {defaultHoles.map((hole, hIdx) => (
+                          {holesArr.map((hole, hIdx) => (
                             <div key={hole.number} className="flex items-center justify-between py-2">
                               <div className="w-20">
                                 <div className="text-sm font-bold">Hole {hole.number}</div>
@@ -1366,7 +1366,7 @@ export default function MedalScorecard(props) {
                 <tr className="bg-gray-800/90">
                   <th className="border px-2 py-1 bg-white/5"></th>
                   <th className="border px-2 py-1 bg-white/5">HOLE</th>
-                  {defaultHoles.slice(0,9).map(hole => (
+                      {holesArr.slice(0,9).map(hole => (
                     <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
                   ))}
                   <th className="border px-2 py-1 bg-white/5 font-bold">Out</th>
@@ -1374,7 +1374,7 @@ export default function MedalScorecard(props) {
                 <tr className="bg-blue-900/90">
                   <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}></th>
                   <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>PAR</th>
-                  {defaultHoles.slice(0,9).map(hole => (
+                      {holesArr.slice(0,9).map(hole => (
                     <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
                   ))}
                   <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
@@ -1382,7 +1382,7 @@ export default function MedalScorecard(props) {
                 <tr className="bg-gray-900/90">
                   <th className="border px-2 py-1 bg-white/5"></th>
                   <th className="border px-2 py-1 bg-white/5">STROKE</th>
-                  {defaultHoles.slice(0,9).map(hole => (
+                      {holesArr.slice(0,9).map(hole => (
                     <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
                   ))}
                   <th className="border px-2 py-1 bg-white/5"></th>
@@ -1404,7 +1404,7 @@ export default function MedalScorecard(props) {
                         <span className="hidden sm:inline">{String.fromCharCode(65 + pIdx)}</span>
                       </td>
                       <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
-                      {defaultHoles.slice(0,9).map((hole, hIdx) => (
+                      {holesArr.slice(0,9).map((hole, hIdx) => (
                         <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                           <div className="flex items-center justify-center">
                             <input
@@ -1426,7 +1426,7 @@ export default function MedalScorecard(props) {
                     {/* Net row (no player label cell) */}
                     <tr key={name + '-net-front'}>
                       <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>{resultLabel}</td>
-                      {defaultHoles.slice(0,9).map((hole, hIdx) => {
+                      {holesArr.slice(0,9).map((hole, hIdx) => {
                         // For Medal: show net (gross - strokesReceived). For Alliance: show stableford points.
                         const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                         let strokesReceived = 0;
@@ -1464,14 +1464,14 @@ export default function MedalScorecard(props) {
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
                           const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                          if (isAlliance) {
+                          if (isAlliance || is4bbb) {
                             // sum stableford points for front 9
                             const pts = computePlayerStablefordTotals(name);
                             return pts.front;
                           }
                           const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netFrontTotal = 0;
-                          defaultHoles.slice(0,9).forEach((hole, hIdx) => {
+                          holesArr.slice(0,9).forEach((hole, hIdx) => {
                             let strokesReceived = 0;
                             if (playingHandicap > 0) {
                               if (playingHandicap >= 18) {
@@ -1497,7 +1497,7 @@ export default function MedalScorecard(props) {
                     const nameB = players[pairStart + 1];
                     const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0) };
                     const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0) };
-                    const perHoleFront = defaultHoles.slice(0, 9).map((_, idx) => {
+                          const perHoleFront = holesArr.slice(0, 9).map((_, idx) => {
                       const holeIdx = idx;
                       const a = stabA.perHole?.[holeIdx];
                       const b = stabB.perHole?.[holeIdx];
@@ -1536,7 +1536,7 @@ export default function MedalScorecard(props) {
                       <tr key={`group-score-front-${groupIdx}`}>
                         <td className="border px-2 py-1 bg-white/5" />
                         <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Score</td>
-                        {defaultHoles.slice(0,9).map((_, hIdx) => {
+                        {holesArr.slice(0,9).map((_, hIdx) => {
                           const val = best.perHole ? best.perHole[hIdx] : 0;
                           return (
                             <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
@@ -1558,7 +1558,7 @@ export default function MedalScorecard(props) {
                 <tr className="bg-gray-800/90">
                   <th className="border px-2 py-1 bg-white/5"></th>
                   <th className="border px-2 py-1 bg-white/5">HOLE</th>
-                  {defaultHoles.slice(9,18).map(hole => (
+                  {holesArr.slice(9,18).map(hole => (
                     <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
                   ))}
                   <th className="border px-2 py-1 bg-white/5 font-bold">In</th>
@@ -1567,7 +1567,7 @@ export default function MedalScorecard(props) {
                 <tr className="bg-blue-900/90">
                   <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}></th>
                   <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>PAR</th>
-                  {defaultHoles.slice(9,18).map(hole => (
+                  {holesArr.slice(9,18).map(hole => (
                     <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
                   ))}
                   <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
@@ -1576,7 +1576,7 @@ export default function MedalScorecard(props) {
                 <tr className="bg-gray-900/90">
                   <th className="border px-2 py-1 bg-white/5"></th>
                   <th className="border px-2 py-1 bg-white/5">STROKE</th>
-                  {defaultHoles.slice(9,18).map(hole => (
+                  {holesArr.slice(9,18).map(hole => (
                     <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
                   ))}
                   <th className="border px-2 py-1 bg-white/5 border-r"></th>
@@ -1599,7 +1599,7 @@ export default function MedalScorecard(props) {
                         <span className="hidden sm:inline">{String.fromCharCode(65 + pIdx)}</span>
                       </td>
                       <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
-                      {defaultHoles.slice(9,18).map((hole, hIdx) => (
+                      {holesArr.slice(9,18).map((hole, hIdx) => (
                         <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                           <div className="flex items-center justify-center">
                             <input
@@ -1626,7 +1626,7 @@ export default function MedalScorecard(props) {
                     {/* Net row (no player label cell) */}
                     <tr key={name + '-net-back'}>
                       <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>{resultLabel}</td>
-                      {defaultHoles.slice(9,18).map((hole, hIdx) => {
+                      {holesArr.slice(9,18).map((hole, hIdx) => {
                         const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                         let strokesReceived = 0;
                         if (playingHandicap > 0) {
@@ -1664,13 +1664,13 @@ export default function MedalScorecard(props) {
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
                           const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                          if (isAlliance) {
+                          if (isAlliance || is4bbb) {
                             const pts = stable ? stable.back : computePlayerStablefordTotals(name).back;
                             return pts;
                           }
                           const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netBackTotal = 0;
-                          defaultHoles.slice(9,18).forEach((hole, hIdx) => {
+                          holesArr.slice(9,18).forEach((hole, hIdx) => {
                             let strokesReceived = 0;
                             if (playingHandicap > 0) {
                               if (playingHandicap >= 18) {
@@ -1691,13 +1691,13 @@ export default function MedalScorecard(props) {
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
                           const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                          if (isAlliance) {
+                          if (isAlliance || is4bbb) {
                             const pts = stable ? stable.total : computePlayerStablefordTotals(name).total;
                             return pts;
                           }
                           const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netTotal = 0;
-                          defaultHoles.forEach((hole, hIdx) => {
+                          holesArr.forEach((hole, hIdx) => {
                             let strokesReceived = 0;
                             if (playingHandicap > 0) {
                               if (playingHandicap >= 18) {
