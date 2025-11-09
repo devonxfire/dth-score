@@ -160,7 +160,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
   <TopMenu user={user} userComp={userComp} competitionList={competitionList} />
   <div className="flex flex-col items-center px-4 mt-12">
           <div className="mb-10">
-            <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+            <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#0e3764', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
               Competitions
             </h1>
             <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
@@ -185,7 +185,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
               </div>
             )}
             {/* Mobile: stacked table rows for better responsiveness (keeps table feel) */}
-            <table className="w-full sm:hidden border-collapse text-base shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700', borderRadius: 8, border: '2px solid #FFD700' }}>
+            <table className="w-full sm:hidden border-collapse text-base shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700', borderRadius: 8, border: '2px solid #FFD700' }}>
               <tbody>
                 {loading ? (
                   <tr><td className="px-3 py-4 text-white/80">Loading competition data...</td></tr>
@@ -279,14 +279,14 @@ function RecentCompetitions({ user = {}, comps = [] }) {
 
             {/* Desktop table (hidden on small screens) */}
             <div className="hidden sm:block">
-            <table className="w-full border-collapse text-base shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
+            <table className="w-full border-collapse text-base shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
               <thead>
                 <tr style={{ background: '#00204A' }}>
-                  <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Date</th>
-                  <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Type</th>
-                  <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Course</th>
-                  <th className="border px-2 py-1 w-[100px] text-center" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Status</th>
-                  <th className={`border border-white px-2 py-1${isAdmin(user) ? ' w-[260px]' : ''}`} style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Action</th>
+                  <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Date</th>
+                  <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Type</th>
+                  <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Course</th>
+                  <th className="border px-2 py-1 w-[100px] text-center" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Status</th>
+                  <th className={`border border-white px-2 py-1${isAdmin(user) ? ' w-[260px]' : ''}`} style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Action</th>
                 </tr>
               </thead>
             <tbody>
@@ -443,8 +443,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
         </div>
         {/* Delete Competition Modal */}
         {showDeleteModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border-4 border-[#FFD700]">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-[#0e3764] rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border-4 border-[#FFD700]">
               <div className="flex flex-col items-center mb-4">
                 <span className="text-5xl mb-2" role="img" aria-label="Warning">⚠️</span>
                 <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Delete Competition?</h2>
@@ -461,7 +461,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 </button>
                 <button
                   className="px-5 py-2 rounded-2xl font-bold shadow border border-white transition text-lg"
-                  style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                  style={{ backgroundColor: '#FFD700', color: '#0e3764', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
                   onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
                   onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
                   onClick={() => handleDelete(deleteCompId)}

@@ -262,7 +262,7 @@ function Leaderboard() {
               ← Back to Scorecard
             </button>
           </div>
-          {comp && <div className="text-lg font-semibold text-white/90 mb-1"><span>Type: </span>{COMP_TYPE_DISPLAY[comp] || comp?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')}</div>}
+          {comp && <div className="text-lg font-semibold text-white/90 mb-1"><span>Type: </span>{COMP_TYPE_DISPLAY[comp] || comp?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/(Four\s+Bbb)/i, '4BBB')}</div>}
           {compRaw && COMP_TYPE_DISPLAY[compKey] &&
             <div className="text-lg font-semibold text-white/90 mb-1">
               <span>Type: </span>{COMP_TYPE_DISPLAY[compKey]}

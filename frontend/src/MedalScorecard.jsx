@@ -39,6 +39,20 @@ function getPlayerColorsFor(props) {
 export default function MedalScorecard(props) {
   // Compute player colors based on competition type or overrideTitle
   const playerColors = getPlayerColorsFor(props);
+  // Render numeric inputs as native picker selects on touch/narrow viewports
+  const [useMobilePicker, setUseMobilePicker] = useState(false);
+  useEffect(() => {
+    function update() {
+      try {
+        const isTouch = typeof window !== 'undefined' && (('ontouchstart' in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0));
+        const isNarrow = typeof window !== 'undefined' && window.innerWidth <= 768;
+        setUseMobilePicker(Boolean(isTouch && isNarrow));
+      } catch (e) { setUseMobilePicker(false); }
+    }
+    update();
+    try { window.addEventListener('resize', update); } catch (e) {}
+    return () => { try { window.removeEventListener('resize', update); } catch (e) {} };
+  }, []);
 
   // holesArr will be set after comp state is initialized (see further below)
   // Helper to send PATCH requests with an X-Origin-Socket header when possible
@@ -934,11 +948,11 @@ export default function MedalScorecard(props) {
     <PageBackground>
       <TopMenu {...props} userComp={comp} competitionList={comp ? [comp] : []} />
       <div className="flex flex-col items-center px-4 mt-12">
-        <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+        <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#0e3764', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
           {props.overrideTitle || 'Medal Competition: Scorecard'}
         </h1>
         {/* Comp Info Section */}
-        <div className="max-w-4xl w-full mb-4 p-4 rounded-xl border-2 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', background: 'rgba(0,47,95,0.95)' }}>
+  <div className="max-w-4xl w-full mb-4 p-4 rounded-xl border-2 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', background: 'rgba(14,55,100,0.95)' }}>
           {/* Mobile: two columns each with two lines (visible on xs, hidden on sm+) */}
           <div className="flex w-full sm:hidden text-xs font-normal">
             <div className="w-1/2 pr-2">
@@ -959,7 +973,7 @@ export default function MedalScorecard(props) {
 
         
 
-        <div className="max-w-4xl w-full bg-[#002F5F] rounded-2xl shadow-2xl p-8 border-4 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+  <div className="max-w-4xl w-full bg-[#0e3764] rounded-2xl shadow-2xl p-8 border-4 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
           {/* Group buttons removed above mini table */}
           {/* Mini Table for Waters, Dog, 2 Clubs, etc. */}
           <div className="flex flex-col items-start mb-6" style={{ gap: '1rem' }}>
@@ -974,7 +988,7 @@ export default function MedalScorecard(props) {
                   style={{ border: '1px solid #FFD700', lineHeight: '1.5' }}
                 >
                   {groups.map((g, i) => (
-                    <option key={i} value={i} style={{ color: '#002F5F' }}>{g.teeTime ? `${g.teeTime} — 4 Ball ${i + 1}` : `4 Ball ${i + 1}`}</option>
+                    <option key={i} value={i} style={{ color: '#0e3764' }}>{g.teeTime ? `${g.teeTime} — 4 Ball ${i + 1}` : `4 Ball ${i + 1}`}</option>
                   ))}
                 </select>
               ) : (
@@ -983,17 +997,17 @@ export default function MedalScorecard(props) {
             </div>
             <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
               <h3 className="text-sm font-semibold text-white mb-2 text-center">Handicaps and Tees</h3>
-              <table className="w-full min-w-[300px] border text-white text-xs sm:text-sm rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
+              <table className="w-full min-w-[300px] border text-white text-xs sm:text-sm rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
             <thead>
                 <tr>
-                <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}></th>
-                <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
-                <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Tee</th>
-                <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>CH</th>
-                <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>PH</th>
-                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
-                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
-                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+                <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}></th>
+                <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
+                <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Tee</th>
+                <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>CH</th>
+                <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>PH</th>
+                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                <th className="hidden sm:table-cell border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
               </tr>
             </thead>
             <tbody>
@@ -1035,22 +1049,33 @@ export default function MedalScorecard(props) {
                       >
                         <option value="" style={{ color: '#FFD700' }}>Select</option>
                         <option value="Yellow" style={{ color: '#FFD700' }}>Yellow</option>
-                        <option value="White" style={{ color: '#FFFFFF', background: '#002F5F' }}>White</option>
-                        <option value="Red" style={{ color: '#FF4B4B', background: '#002F5F' }}>Red</option>
+                        <option value="White" style={{ color: '#FFFFFF', background: '#0e3764' }}>White</option>
+                        <option value="Red" style={{ color: '#FF4B4B', background: '#0e3764' }}>Red</option>
                       </select>
                     </td>
                     <td className="border px-2 py-1 text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-12 sm:w-16 text-center bg-transparent rounded focus:outline-none font-semibold no-spinner"
-                        style={{
-                          border: 'none',
-                          color: '#FFD700'
-                        }}
-                        value={playerData[name]?.handicap || ''}
-                        onChange={e => handleChange(name, 'handicap', e.target.value)}
-                      />
+                      {useMobilePicker ? (
+                        <select
+                          className="w-12 sm:w-16 text-center bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                          style={{ border: 'none', color: '#FFD700' }}
+                          value={playerData[name]?.handicap ?? ''}
+                          onChange={e => handleChange(name, 'handicap', e.target.value)}
+                        >
+                          <option value="">-</option>
+                          {Array.from({ length: 55 }).map((_, i) => (
+                            <option key={i} value={String(i)}>{i}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-12 sm:w-16 text-center bg-transparent rounded focus:outline-none font-semibold no-spinner"
+                          style={{ border: 'none', color: '#FFD700' }}
+                          value={playerData[name]?.handicap || ''}
+                          onChange={e => handleChange(name, 'handicap', e.target.value)}
+                        />
+                      )}
                     </td>
                     <td className="border border-white px-2 py-1 text-center font-bold" style={{ color: '#FFD700' }}>
                       {computePH(playerData[name]?.handicap)}
@@ -1074,14 +1099,14 @@ export default function MedalScorecard(props) {
             <div className="sm:hidden w-full mb-3 mt-2">
               <h3 className="text-sm font-semibold text-white mb-2 text-center">Extras</h3>
               <div className="overflow-x-auto">
-                <table className="w-full border text-white text-xs rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', borderColor: '#FFD700' }}>
+                <table className="w-full border text-white text-xs rounded" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', borderColor: '#FFD700' }}>
                   <thead>
                     <tr>
-                      <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}></th>
-                      <th className="border px-2 py-1 text-left" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}>Name</th>
-                      <th className="border px-2 py-1 text-center" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}>Waters</th>
-                      <th className="border px-2 py-1 text-center" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}>Dog</th>
-                      <th className="border px-2 py-1 text-center" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700'}}>2 Clubs</th>
+                      <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700'}}></th>
+                      <th className="border px-2 py-1 text-left" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700'}}>Name</th>
+                      <th className="border px-2 py-1 text-center" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700'}}>Waters</th>
+                      <th className="border px-2 py-1 text-center" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700'}}>Dog</th>
+                      <th className="border px-2 py-1 text-center" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700'}}>2 Clubs</th>
                     </tr>
                     {/* Removed erroneous insertion here; pair Score rows are rendered inside the main front/back tables after the appropriate player rows. */}
                   </thead>
@@ -1340,7 +1365,17 @@ export default function MedalScorecard(props) {
                               </div>
                               <div className="flex items-center gap-2">
                                 <button aria-label={`decrement-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = Math.max(0, cur - 1); handleScoreChange(name, hIdx, String(next)); }} disabled={!canEdit(name)}>−</button>
-                                <input inputMode="numeric" pattern="[0-9]*" className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none" value={playerData[name]?.scores?.[hIdx] ?? ''} onChange={e => { if (!canEdit(name)) return; const v = (e.target.value || '').replace(/[^0-9]/g, ''); handleScoreChange(name, hIdx, v); }} disabled={!canEdit(name)} onFocus={e => e.currentTarget.scrollIntoView({ block: 'center' })} />
+                                <input inputMode="numeric" pattern="[0-9]*" className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none" value={playerData[name]?.scores?.[hIdx] ?? ''} onChange={e => { if (!canEdit(name)) return; const v = (e.target.value || '').replace(/[^0-9]/g, ''); handleScoreChange(name, hIdx, v); }} disabled={!canEdit(name)} onFocus={e => {
+                                  try {
+                                    // Avoid forcing scroll on touch/mobile devices which can cause
+                                    // the page to jump/bounce when the user is intentionally
+                                    // scrolling to the bottom. Only auto-scroll for non-touch
+                                    // or wide viewports (desktop/tablet).
+                                    if (typeof window !== 'undefined' && (!('ontouchstart' in window) || window.innerWidth > 700)) {
+                                      e.currentTarget.scrollIntoView({ block: 'center' });
+                                    }
+                                  } catch (err) {}
+                                }} />
                                 <button aria-label={`increment-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = cur + 1; handleScoreChange(name, hIdx, String(next)); }} disabled={!canEdit(name)}>+</button>
                               </div>
                             </div>

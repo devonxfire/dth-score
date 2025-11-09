@@ -525,7 +525,7 @@ function getPlayingHandicap(entry, comp) {
         <PageBackground>
           <TopMenu userComp={comp} competitionList={comp ? [comp] : []} />
           <div className="flex flex-col items-center px-4 mt-12" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
-            <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#0e3764', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
               <span style={{lineHeight:1}}>Leaderboard</span>
             </h1>
             {comp?.date && (
@@ -538,14 +538,14 @@ function getPlayingHandicap(entry, comp) {
 
           <div className="flex flex-col items-center px-4 mt-8">
             <div ref={exportRef} className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
-              <div className="flex justify-center mb-4">
-                <button onClick={() => exportToPDF()} className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#002F5F] transition" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>Export Results</button>
+                <div className="flex justify-center mb-4">
+                <button onClick={() => exportToPDF()} className="py-2 px-4 bg-[#0e3764] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#0e3764] transition" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>Export Results</button>
               </div>
 
               {comp && (
                 <div className="text-white/90 text-base mb-4" style={{minWidth: 260, textAlign: 'left'}}>
                   <span className="font-semibold">Date:</span> {comp.date ? (new Date(comp.date).toLocaleDateString('en-GB')) : '-'} <br />
-                  <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp?.type] || (comp?.type ? comp.type.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ') : '')} <br />
+                  <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp?.type] || (comp?.type ? comp.type.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/(Four\s+Bbb)/i, '4BBB') : '')} <br />
                   <span className="font-semibold">Course:</span> {comp?.club || comp?.course || '-'} <br />
                   <span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance && comp.handicapallowance !== 'N/A' ? comp.handicapallowance + '%' : 'N/A'} <br />
 
@@ -584,20 +584,20 @@ function getPlayingHandicap(entry, comp) {
                 <div className="text-white/80">No scores submitted yet.</div>
               ) : (
                 <div className="w-full overflow-x-auto">
-                  <table className="min-w-full border text-center mb-8 text-[10px] sm:text-base" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
+                  <table className="min-w-full border text-center mb-8 text-[10px] sm:text-base" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
                     <thead>
                       <tr style={{ background: '#00204A' }}>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Pos</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5 text-left" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Thru</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Score</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Pos</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5 text-left" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Thru</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Score</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
                       </tr>
                     </thead>
                     <tbody>

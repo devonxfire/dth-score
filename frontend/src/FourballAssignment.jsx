@@ -1,10 +1,14 @@
 
 import { useState, useEffect } from 'react';
 import { apiUrl } from './api';
+import PageBackground from './PageBackground';
+import { useNavigate, useParams } from 'react-router-dom';
 
 export default function FourballAssignment({ fourballs, onAssign, initialGroups }) {
   // fourballs: number of 4balls
   // onAssign: callback with array of { players: [], teeTime: '' }
+  const navigate = useNavigate();
+  const params = useParams();
   const [groups, setGroups] = useState(() => {
     if (initialGroups && Array.isArray(initialGroups) && initialGroups.length > 0) {
       // Pad or trim to match fourballs count
@@ -132,100 +136,74 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
     // Pass the full 4-player groups back to the caller so the competition keeps 4-ball units.
     onAssign(groupsWithDisplay);
   }
-
   return (
-    <>
-      <div className="flex flex-col items-center mb-10 w-full">
-        <h3
-          className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2"
-          style={{ color: '#1B3A6B', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}
-        >
-          Assign Players to 4 Balls & Tee Times
-        </h3>
+    <PageBackground hideFooter>
+      <div className="max-w-4xl w-full h-screen flex flex-col justify-start bg-[#002F5F] p-8 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+        <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+          4 Ball Assignment
+        </h1>
         <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, width: '100%', background: 'white', opacity: 0.7, borderRadius: 2}}></div>
-      </div>
-      <div className="flex flex-col items-center bg-transparent">
-        {/* Outer yellow square wrapper to ensure a visible thin border behind the rounded panel */}
-        <div style={{ background: '#FFD700', padding: '1px', borderRadius: 0 }} className="w-full max-w-4xl mx-auto">
-          <form onSubmit={handleSubmit} className="w-full rounded-2xl text-white mx-auto p-6" style={{ background: 'rgba(0,47,95,0.95)' }}>
-          {groups.map((group, idx) => (
-            <div key={idx} className="mb-6 border-b border-white/30 pb-4">
-              <div className="mb-2 font-extrabold" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.2rem' }}>4 Ball {idx + 1}</div>
-              <div className="mb-2">
-                <label className="block mb-1 font-bold" htmlFor={`teeTime-${idx}`} style={{ color: '#FFD700', fontFamily: 'Lato, Arial, sans-serif' }}>Tee Time</label>
-                <div className="relative flex items-center">
-                  <input
-                    id={`teeTime-${idx}`}
-                    type="time"
-                    value={group.teeTime}
-                    onChange={e => handleTeeTimeChange(idx, e.target.value)}
-                    className="border border-white bg-transparent rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
-                    style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}
-                    required
-                  />
-                  
-                </div>
+
+        {groups.map((group, idx) => (
+          <div key={idx} className="mb-6 border-b border-white/30 pb-4">
+            <div className="mb-2 font-extrabold" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.2rem' }}>4 Ball {idx + 1}</div>
+            <div className="mb-2">
+              <label className="block mb-1 font-bold" htmlFor={`teeTime-${idx}`} style={{ color: '#FFD700', fontFamily: 'Lato, Arial, sans-serif' }}>Tee Time</label>
+              <div className="relative flex items-center">
+                <input
+                  id={`teeTime-${idx}`}
+                  type="time"
+                  value={group.teeTime}
+                  onChange={e => handleTeeTimeChange(idx, e.target.value)}
+                  className="border border-white bg-transparent rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
+                  style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}
+                  required
+                />
               </div>
+            </div>
+            <div className="flex flex-col gap-2 mt-2">
               {group.players.map((player, pIdx) => (
-                <div key={pIdx} className="mb-2 flex items-center">
-                  <select
-                    value={['Guest 1','Guest 2','Guest 3'].includes(player) ? '' : player}
-                    onChange={e => handlePlayerChange(idx, pIdx, e.target.value)}
-                    className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
-                    style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700 }}
-                    required
-                  >
-                    <option value="" style={{ color: '#1B3A6B', fontWeight: 700 }}>Select player</option>
-                    {/* Show all available players not already assigned elsewhere, plus the current selection */}
-                    {[
-                      ...available.filter(name => !groups.flatMap(g => g.players).includes(name) || name === player),
-                      ...(player && !available.includes(player) && !['Guest 1','Guest 2','Guest 3'].includes(player) ? [player] : [])
-                    ]
-                      .filter((name, i, arr) => name && arr.indexOf(name) === i)
-                      .map((name, optIdx) => (
-                        <option key={`${name}-${idx}-${pIdx}-${optIdx}`} value={name} style={{ color: '#1B3A6B', fontWeight: 700 }}>{name}</option>
-                      ))}
-                  </select>
-                  {(['Guest 1','Guest 2','Guest 3'].includes(player)) && (
-                    <input
-                      type="text"
-                      className="border border-white bg-transparent rounded px-2 py-1 ml-2 focus:outline-none focus:ring-2 focus:ring-white"
-                      style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}
-                      placeholder="Enter guest name"
-                      value={guestNames[idx][pIdx]}
-                      onChange={e => handleGuestNameChange(idx, pIdx, e.target.value)}
-                      required
-                    />
-                  )}
-                </div>
+                <select
+                  key={pIdx}
+                  className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
+                  style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700 }}
+                  value={player}
+                  onChange={e => handlePlayerChange(idx, pIdx, e.target.value)}
+                  required
+                >
+                  <option value="" style={{ color: '#1B3A6B', fontWeight: 700 }}>Select player</option>
+                  {[...available.filter(name => !groups.flatMap(g => g.players).includes(name) || name === player), ...(player && !available.includes(player) ? [player] : [])]
+                    .filter((name, i, arr) => name && arr.indexOf(name) === i)
+                    .map((name, optIdx) => (
+                      <option key={`${name}-${idx}-${pIdx}-${optIdx}`} value={name} style={{ color: '#1B3A6B', fontWeight: 700 }}>{name}</option>
+                    ))}
+                </select>
               ))}
             </div>
-          ))}
-          <div className="flex flex-col gap-3">
             <button
-              type="button"
-              className="w-full py-3 px-4 border border-white text-[#1B3A6B] font-extrabold rounded-2xl transition text-lg"
-              style={{ backgroundColor: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', boxShadow: '0 2px 8px 0 rgba(255,215,0,0.10)' }}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = '#FFE066'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
-              onClick={addGroup}
-            >
-              Add Another Tee Time
-            </button>
-
-            <button
-              type="submit"
-              className="w-full py-3 px-4 border border-white text-[#1B3A6B] font-extrabold rounded-2xl transition text-lg"
-              style={{ backgroundColor: '#1B3A6B', color: 'white', fontFamily: 'Merriweather, Georgia, serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = '#22457F'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = '#1B3A6B'}
-            >
-              Save Groups
-            </button>
+              className="mt-2 px-4 py-2 rounded bg-red-700 text-white font-bold"
+              onClick={() => {
+                // remove group
+                const newGroups = groups.filter((_, i) => i !== idx);
+                setGroups(newGroups);
+                setGuestNames(prev => prev.filter((_, i) => i !== idx));
+              }}
+              disabled={groups.length <= 1}
+            >Remove Group</button>
           </div>
-        </form>
+        ))}
+
+        <button
+          className="w-full py-3 px-4 mt-2 rounded-2xl font-bold shadow border border-white transition text-lg"
+          style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+          onClick={addGroup}
+        >{groups.length === 0 ? 'Add A Tee Time' : 'Add Another Tee Time'}</button>
+        <button
+          className="w-full py-3 px-4 mt-4 rounded-2xl font-bold shadow border border-white transition text-lg"
+          style={{ backgroundColor: '#1B3A6B', color: 'white', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+          onClick={handleSubmit}
+        >Save & Continue</button>
       </div>
-      </div>
-    </>
+    </PageBackground>
   );
 }

@@ -400,7 +400,7 @@ export default function Scorecard(props) {
   {/* Birdie Celebration Popup */}
       {showBirdie && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
+          <div className="bg-[#0e3764] rounded-2xl shadow-2xl p-8 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle">
             <span className="text-6xl mb-2" role="img" aria-label="Birdie">🕊️</span>
             <h2 className="text-3xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Birdie!</h2>
             <div className="text-lg font-semibold text-white mb-1" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>For {birdiePlayer} on Hole {birdieHole}</div>
@@ -431,7 +431,7 @@ export default function Scorecard(props) {
       {/* Tee/Handicap Modal */}
       {showTeeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm flex flex-col items-center rounded-2xl shadow-2xl border-4 border-[#FFD700] bg-[#002F5F] p-8">
+            <div className="w-full max-w-sm flex flex-col items-center rounded-2xl shadow-2xl border-4 border-[#FFD700] bg-[#0e3764] p-8">
             <h2 className="text-3xl font-extrabold mb-4 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>Set Your Tee & Handicap</h2>
             <label className="mb-2 w-full text-left text-white font-semibold" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>Tee Box</label>
             <select
@@ -446,19 +446,22 @@ export default function Scorecard(props) {
               <option value="Red">Red</option>
             </select>
             <label className="mb-2 w-full text-left text-white font-semibold" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>FULL Course Handicap</label>
-            <input
-              type="number"
+            <select
               className="mb-4 w-full p-2 border border-white bg-transparent text-white rounded focus:outline-none"
               value={inputHandicap}
               onChange={e => setInputHandicap(e.target.value)}
-              min="0"
-              max="54"
               style={{ fontFamily: 'Lato, Arial, sans-serif' }}
-            />
+            >
+              {/* Use a select so mobile devices show the native picker (scroll wheel) */}
+              <option value="">Select Handicap</option>
+              {Array.from({ length: 55 }).map((_, i) => (
+                <option key={i} value={String(i)}>{i}</option>
+              ))}
+            </select>
             {teeError && <div className="text-red-300 mb-2 font-semibold" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>{teeError}</div>}
-            <button
+              <button
               className="w-full py-2 px-4 border border-white text-white font-bold rounded-2xl transition text-lg"
-              style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+              style={{ backgroundColor: '#FFD700', color: '#0e3764', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
               onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
               onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
               disabled={savingTee}
@@ -545,7 +548,7 @@ export default function Scorecard(props) {
         <>
           <div className="flex flex-col items-center px-4">
             <div className="mt-12">
-              <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+              <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight" style={{ color: '#0e3764', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
                 {groupForPlayer && competition.groups.length > 1
                   ? `4 BALL #${competition.groups.indexOf(groupForPlayer) + 1}'s Scorecard`
                   : 'Scorecard'}
@@ -560,7 +563,7 @@ export default function Scorecard(props) {
                 <div className="mb-2 text-white/90" style={{ fontFamily: 'Lato, Arial, sans-serif', color: 'white' }}>
                   <span className="font-semibold">Date:</span> {formatDate(competition.date)} <br />
                   <span className="font-semibold">Club:</span> {competition.club || '-'} <br />
-                  <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ')} <br />
+                  <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[competition.type] || competition.type?.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/(Four\s+Bbb)/i, '4BBB')} <br />
                   {/* Tee Box removed as per user request */}
                   <span className="font-semibold">Handicap Allowance:</span> {
                     competition.handicapallowance && competition.handicapallowance !== 'N/A'
@@ -572,17 +575,17 @@ export default function Scorecard(props) {
                   {/* 4 Ball number removed as per user request */}
                   {groupPlayers.length >= 2 && (
                     <div className="my-2">
-                      <table className="min-w-[300px] border text-white text-sm rounded mb-2" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
+                      <table className="min-w-[300px] border text-white text-sm rounded mb-2" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
                         <thead>
                           <tr>
-                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}></th>
-                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
-                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Tee</th>
-                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>CH</th>
-                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>PH</th>
-                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
-                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
-                            <th className="border px-2 py-1" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+                            <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}></th>
+                            <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
+                            <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Tee</th>
+                            <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>CH</th>
+                            <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>PH</th>
+                            <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                            <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                            <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
                           </tr>
                         </thead>
                         <tbody>

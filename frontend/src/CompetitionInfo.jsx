@@ -76,13 +76,13 @@ export default function CompetitionInfo({ user }) {
         <TopMenu user={user} userComp={isPlayerInComp ? comp : null} isPlayerInComp={isPlayerInComp} competitionList={comp ? [comp] : []} />
         <div className="flex flex-col items-center px-4 mt-12">
           <div className="mb-10">
-            <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#002F5F', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+            <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-1 leading-tight flex items-end justify-center gap-2" style={{ color: '#0e3764', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
               Competition Info
             </h1>
             <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
           </div>
   {/* Mobile stacked info (keeps blue theme, full-width buttons) */}
-  <table className="w-full sm:hidden border-collapse text-base shadow-xl overflow-hidden bg-white/10 mb-6" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700', borderRadius: 8, border: '2px solid #FFD700' }}>
+  <table className="w-full sm:hidden border-collapse text-base shadow-xl overflow-hidden bg-white/10 mb-6" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700', borderRadius: 8, border: '2px solid #FFD700' }}>
     <tbody>
       <tr className="border-b border-white/20">
         <td className="px-3 py-3"><strong className="text-[#FFD700]">Date:</strong> <span className="text-white">{formatDate(comp.date)}</span></td>
@@ -154,7 +154,7 @@ export default function CompetitionInfo({ user }) {
                   navigate(`/scorecard/${compId}`);
                 }
               }} className="w-full py-2 rounded-2xl bg-[#FFD700] text-[#002F5F] font-semibold flex items-center justify-center gap-2 scorecard-pulse">
-                <SignalIcon className="h-5 w-5" style={{ color: '#002F5F' }} />
+                  <SignalIcon className="h-5 w-5" style={{ color: '#0e3764' }} />
                 <span>My Scorecard</span>
               </button>
             )}

@@ -194,7 +194,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
   return (
     <div
       className="flex flex-wrap justify-between gap-6 mt-0 sm:mt-8 mb-4 w-full px-4 sm:px-8 sm:max-w-4xl sm:mx-auto rounded-none sm:rounded-2xl"
-      style={{ background: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}
+      style={{ background: '#0e3764', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(14,55,100,0.10)' }}
     >
       {/* Mobile header: hamburger + title + sign out */}
       <div className="w-full flex items-center justify-between sm:hidden">
