@@ -65,6 +65,51 @@ export default function AllianceAssignment(props) {
     setGroups(prev => prev.filter((_, i) => i !== idx));
   }
 
+  // Helper: random tee time between 07:00 and 16:50 in 10-minute steps
+  function getRandomTeeTime() {
+    const hour = Math.floor(Math.random() * (16 - 7 + 1)) + 7; // 7..16
+    const mins = [0,10,20,30,40,50][Math.floor(Math.random() * 6)];
+    const hh = String(hour).padStart(2, '0');
+    const mm = String(mins).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
+
+  async function randomizeGroup(idx) {
+    try {
+      const res = await fetch(apiUrl('/api/users'));
+      if (!res.ok) throw new Error('failed');
+      const users = await res.json();
+      const allNames = users.map(u => u.name || u.username || u.id).filter(Boolean).filter(n => !/^guest/i.test(n));
+      const otherAssigned = groups.flatMap((g, i) => i === idx ? [] : (Array.isArray(g.players) ? g.players : [])).filter(Boolean);
+      let candidates = allNames.filter(n => !otherAssigned.includes(n));
+      if (candidates.length < 4) candidates = allNames.slice();
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+      const chosen = candidates.slice(0, Math.min(4, candidates.length));
+      while (chosen.length < 4) chosen.push('');
+      const newGroups = groups.map((g, i) => i === idx ? { ...g, players: chosen, teeTime: getRandomTeeTime() } : g);
+      setGroups(newGroups);
+      const selected = newGroups.flatMap(g => g.players).filter(Boolean);
+      setAvailablePlayers(allNames.filter(n => !selected.includes(n)));
+    } catch (e) {
+      try {
+        const pool = Array.from(new Set([...availablePlayers, ...groups[idx].players.filter(Boolean)]));
+        if (pool.length === 0) return;
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        const chosen = pool.slice(0, 4);
+        const newGroups = groups.map((g, i) => i === idx ? { ...g, players: chosen, teeTime: getRandomTeeTime() } : g);
+        setGroups(newGroups);
+        const selected = newGroups.flatMap(g => g.players).filter(Boolean);
+        setAvailablePlayers(prev => prev.filter(n => !selected.includes(n)));
+      } catch (err) {}
+    }
+  }
+
   async function handleSave() {
     setError('');
     setSaving(true);
@@ -159,6 +204,10 @@ export default function AllianceAssignment(props) {
               onClick={() => removeGroup(idx)}
               disabled={groups.length <= 1}
             >Remove Group</button>
+            <button
+              className="mt-2 ml-2 px-4 py-2 rounded bg-blue-600 text-white font-bold"
+              onClick={() => randomizeGroup(idx)}
+            >Randomise</button>
           </div>
         ))}
         <button
