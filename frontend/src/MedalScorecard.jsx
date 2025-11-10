@@ -209,6 +209,8 @@ export default function MedalScorecard(props) {
   const [showDogPopup, setShowDogPopup] = useState(false);
   const [dogPlayer, setDogPlayer] = useState(null);
   const [showResetModal, setShowResetModal] = useState(false);
+  // guard against double-touch/click causing immediate increment after activation
+  const placeholderActivateRef = useRef({});
   // Mobile selected player for compact score entry
   const [mobileSelectedPlayer, setMobileSelectedPlayer] = useState('');
   // Persist mobile-selected hole per-competition so refresh/navigation restores last-edited hole.
@@ -1333,9 +1335,59 @@ export default function MedalScorecard(props) {
                                 </div>
 
                                 <div className="absolute right-3 top-3 flex items-center gap-3">
-                                  <button aria-label={`big-dec-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
-                                  <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center' }}>{curVal || '-'}</div>
-                                  <button aria-label={`big-inc-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
+                                  {(() => {
+                                    const displayVal = (curVal !== '' ? String(curVal) : String(hole?.par ?? '-'));
+                                    const isPlaceholder = (curVal === '');
+                                    return (
+                                      <>
+                                        <button
+                                          aria-label={`big-dec-${pName}`}
+                                          className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                                          style={{ background: '#6B7280', color: '#ffffff' }}
+                                          onClick={() => {
+                                              if (!canEdit(pName)) return;
+                                              const key = `${pName}:${mobileSelectedHole - 1}`;
+                                              const last = placeholderActivateRef.current[key];
+                                              if (last && (Date.now() - last) < 400) return; // ignore immediate duplicate events
+                                              const parsed = Number.isFinite(parseInt(curVal, 10)) ? parseInt(curVal, 10) : null;
+                                              const base = (parsed !== null) ? parsed : (hole?.par || 0);
+                                              if (parsed === null) {
+                                                // first activation: set to par (no movement)
+                                                placeholderActivateRef.current[key] = Date.now();
+                                                setTimeout(() => { try { delete placeholderActivateRef.current[key]; } catch (e) {} }, 500);
+                                                handleScoreChange(pName, mobileSelectedHole - 1, String(base));
+                                              } else {
+                                                const next = Math.max(0, base - 1);
+                                                handleScoreChange(pName, mobileSelectedHole - 1, String(next));
+                                              }
+                                            }}
+                                        >−</button>
+                                        <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center', color: isPlaceholder ? '#9CA3AF' : '#ffffff' }}>{displayVal}</div>
+                                        <button
+                                          aria-label={`big-inc-${pName}`}
+                                          className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                                          style={{ background: '#6B7280', color: '#ffffff' }}
+                                          onClick={() => {
+                                            if (!canEdit(pName)) return;
+                                            const key = `${pName}:${mobileSelectedHole - 1}`;
+                                            const last = placeholderActivateRef.current[key];
+                                            if (last && (Date.now() - last) < 400) return; // ignore immediate duplicate events
+                                            const parsed = Number.isFinite(parseInt(curVal, 10)) ? parseInt(curVal, 10) : null;
+                                            const base = (parsed !== null) ? parsed : (hole?.par || 0);
+                                            if (parsed === null) {
+                                              // first activation: set to par (no movement)
+                                              placeholderActivateRef.current[key] = Date.now();
+                                              setTimeout(() => { try { delete placeholderActivateRef.current[key]; } catch (e) {} }, 500);
+                                              handleScoreChange(pName, mobileSelectedHole - 1, String(base));
+                                            } else {
+                                              const next = base + 1;
+                                              handleScoreChange(pName, mobileSelectedHole - 1, String(next));
+                                            }
+                                          }}
+                                        >+</button>
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               </div>
 
@@ -1355,12 +1407,12 @@ export default function MedalScorecard(props) {
                           );
                         })}
 
-                        {/* also keep a general mobile Save button (visible for any mobile picker) */}
-                        {useMobilePicker && (
+                        {/* also keep a general mobile Save button (visible for alliance mobile view) */}
+                        {!is4bbb && (
                           <div className="mt-3 text-center">
                             <button
-                              className="px-4 py-2 rounded-2xl font-semibold"
-                              style={{ background: '#FFD700', color: '#002F5F' }}
+                              className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
+                              style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
                               onClick={() => { flushAndSaveAll(); }}
                               disabled={saveStatus === 'saving'}
                             >
@@ -1437,25 +1489,72 @@ export default function MedalScorecard(props) {
                                 </div>
 
                             <div className="absolute right-3 top-3 flex items-center gap-3">
-                              <button aria-label={`big-dec-medal-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(Math.max(0, cur - 1))); }}>−</button>
-                              <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center' }}>{curVal || '-'}</div>
-                              <button aria-label={`big-inc-medal-${pName}`} className="w-10 h-10 rounded-full flex items-center justify-center text-xl" style={{ background: '#6B7280', color: '#ffffff' }} onClick={() => { if (!canEdit(pName)) return; const cur = parseInt(curVal || '0', 10) || 0; handleScoreChange(pName, mobileSelectedHole - 1, String(cur + 1)); }}>+</button>
+                              {(() => {
+                                const displayVal = (curVal !== '' ? String(curVal) : String(hole?.par ?? '-'));
+                                const isPlaceholder = (curVal === '');
+                                return (
+                                  <>
+                                    <button
+                                      aria-label={`big-dec-medal-${pName}`}
+                                      className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                                      style={{ background: '#6B7280', color: '#ffffff' }}
+                                      onClick={() => {
+                                        if (!canEdit(pName)) return;
+                                        const key = `${pName}:${mobileSelectedHole - 1}`;
+                                        const last = placeholderActivateRef.current[key];
+                                        if (last && (Date.now() - last) < 400) return;
+                                        const parsed = Number.isFinite(parseInt(curVal, 10)) ? parseInt(curVal, 10) : null;
+                                        const base = (parsed !== null) ? parsed : (hole?.par || 0);
+                                        if (parsed === null) {
+                                          placeholderActivateRef.current[key] = Date.now();
+                                          setTimeout(() => { try { delete placeholderActivateRef.current[key]; } catch (e) {} }, 500);
+                                          handleScoreChange(pName, mobileSelectedHole - 1, String(base));
+                                        } else {
+                                          const next = Math.max(0, base - 1);
+                                          handleScoreChange(pName, mobileSelectedHole - 1, String(next));
+                                        }
+                                      }}
+                                    >−</button>
+                                    <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center', color: isPlaceholder ? '#9CA3AF' : '#ffffff' }}>{displayVal}</div>
+                                    <button
+                                      aria-label={`big-inc-medal-${pName}`}
+                                      className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                                      style={{ background: '#6B7280', color: '#ffffff' }}
+                                      onClick={() => {
+                                        if (!canEdit(pName)) return;
+                                        const key = `${pName}:${mobileSelectedHole - 1}`;
+                                        const last = placeholderActivateRef.current[key];
+                                        if (last && (Date.now() - last) < 400) return;
+                                        const parsed = Number.isFinite(parseInt(curVal, 10)) ? parseInt(curVal, 10) : null;
+                                        const base = (parsed !== null) ? parsed : (hole?.par || 0);
+                                        if (parsed === null) {
+                                          placeholderActivateRef.current[key] = Date.now();
+                                          setTimeout(() => { try { delete placeholderActivateRef.current[key]; } catch (e) {} }, 500);
+                                          handleScoreChange(pName, mobileSelectedHole - 1, String(base));
+                                        } else {
+                                          const next = base + 1;
+                                          handleScoreChange(pName, mobileSelectedHole - 1, String(next));
+                                        }
+                                      }}
+                                    >+</button>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         );
                       })}
-                        {/* Save Scores button for mobile: helpful to flush debounced saves and force immediate persistence */}
-                        {useMobilePicker && (
-                          <div className="mt-3 text-center">
-                            <button
-                              className="px-4 py-2 rounded-2xl font-semibold"
-                              style={{ background: '#FFD700', color: '#002F5F' }}
-                              onClick={() => { flushAndSaveAll(); }}
-                            >
-                              Save Scores
-                            </button>
-                          </div>
-                        )}
+                        {/* Save Scores button for medal mobile view: flush debounced saves and force immediate persistence */}
+                        <div className="mt-3 text-center">
+                          <button
+                            className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
+                            style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                            onClick={() => { flushAndSaveAll(); }}
+                            disabled={saveStatus === 'saving'}
+                          >
+                            {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save Scores')}
+                          </button>
+                        </div>
                     </div>
                   </div>
                 );
@@ -1480,8 +1579,8 @@ export default function MedalScorecard(props) {
                                 <div className="text-xs text-white/80">Par {hole.par} • S{hole.index}</div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <button aria-label={`decrement-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = Math.max(0, cur - 1); handleScoreChange(name, hIdx, String(next)); }} disabled={!canEdit(name)}>−</button>
-                                <input inputMode="numeric" pattern="[0-9]*" className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none" value={playerData[name]?.scores?.[hIdx] ?? ''} onChange={e => { if (!canEdit(name)) return; const v = (e.target.value || '').replace(/[^0-9]/g, ''); handleScoreChange(name, hIdx, v); }} disabled={!canEdit(name)} onFocus={e => {
+                                <button aria-label={`decrement-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { if (!canEdit(name)) return; const key = `${name}:${hIdx}`; const last = placeholderActivateRef.current[key]; if (last && (Date.now() - last) < 400) return; const raw = playerData[name]?.scores?.[hIdx]; const parsed = Number.isFinite(parseInt(raw, 10)) ? parseInt(raw, 10) : null; const base = (parsed !== null) ? parsed : (hole?.par || 0); if (parsed === null) { placeholderActivateRef.current[key] = Date.now(); setTimeout(() => { try { delete placeholderActivateRef.current[key]; } catch (e) {} }, 500); handleScoreChange(name, hIdx, String(base)); } else { const next = Math.max(0, base - 1); handleScoreChange(name, hIdx, String(next)); } }} disabled={!canEdit(name)}>−</button>
+                                <input inputMode="numeric" pattern="[0-9]*" className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none placeholder-gray-400" placeholder={hole?.par ?? ''} value={playerData[name]?.scores?.[hIdx] ?? ''} onChange={e => { if (!canEdit(name)) return; const v = (e.target.value || '').replace(/[^0-9]/g, ''); handleScoreChange(name, hIdx, v); }} disabled={!canEdit(name)} onFocus={e => {
                                   try {
                                     // Avoid forcing scroll on touch/mobile devices which can cause
                                     // the page to jump/bounce when the user is intentionally
@@ -1492,7 +1591,7 @@ export default function MedalScorecard(props) {
                                     }
                                   } catch (err) {}
                                 }} />
-                                <button aria-label={`increment-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { if (!canEdit(name)) return; const cur = parseInt(playerData[name]?.scores?.[hIdx] || '0', 10) || 0; const next = cur + 1; handleScoreChange(name, hIdx, String(next)); }} disabled={!canEdit(name)}>+</button>
+                                <button aria-label={`increment-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { if (!canEdit(name)) return; const key = `${name}:${hIdx}`; const last = placeholderActivateRef.current[key]; if (last && (Date.now() - last) < 400) return; const raw = playerData[name]?.scores?.[hIdx]; const parsed = Number.isFinite(parseInt(raw, 10)) ? parseInt(raw, 10) : null; const base = (parsed !== null) ? parsed : (hole?.par || 0); if (parsed === null) { placeholderActivateRef.current[key] = Date.now(); setTimeout(() => { try { delete placeholderActivateRef.current[key]; } catch (e) {} }, 500); handleScoreChange(name, hIdx, String(base)); } else { const next = base + 1; handleScoreChange(name, hIdx, String(next)); } }} disabled={!canEdit(name)}>+</button>
                               </div>
                             </div>
                           ))}

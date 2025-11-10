@@ -372,12 +372,16 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                 </button>
                 <button onClick={() => {
                 setMenuOpen(false);
-                if (!allowCompLinks) return; // disabled
-                if (openComp && compId && resolvedName) {
+                // Allow navigation if there's either an open competition OR the user has a scorecardComp
+                if (!allowCompLinks && !scorecardComp) return; // disabled
+                // Prefer openComp when available; otherwise use scorecardComp
+                const targetComp = openComp || scorecardComp || null;
+                const targetCompId = targetComp ? (targetComp.id || targetComp._id || targetComp.joinCode || targetComp.joincode) : null;
+                if (targetComp && targetCompId && resolvedName) {
                   let group = null;
                   let playerObj = null;
-                  if (scorecardComp.groups) {
-                    group = scorecardComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
+                  if (targetComp.groups) {
+                    group = targetComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
                     if (group && Array.isArray(group.members)) {
                       playerObj = group.members.find(m => (m.name === resolvedName || m.displayName === resolvedName)) || null;
                     }
@@ -393,7 +397,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                       };
                     }
                   }
-                    navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: openComp } });
+                  navigate(`/scorecard/${targetCompId}`, { state: { player: playerObj, competition: targetComp } });
                 } else if (compId) {
                   // Admins/fallback: allow opening scorecard without a player state
                   navigate(`/scorecard/${compId}`);
