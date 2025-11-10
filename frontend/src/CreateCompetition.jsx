@@ -69,9 +69,11 @@ function CreateCompetition({ user, onSignOut }) {
     }
     return {
       type: 'fourBbbStableford',
-      date: null,
+      // default the date to today for convenience
+      date: today,
       club: 'Westlake Golf Club',
-      handicapAllowance: '95',
+      // default allowance for 4BBB should be 85%
+      handicapAllowance: '85',
       notes: '',
     };
   });

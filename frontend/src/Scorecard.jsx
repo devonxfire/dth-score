@@ -878,6 +878,23 @@ export default function Scorecard(props) {
                         >
                           {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save Scores')}
                         </button>
+                        {/* Mobile Leaderboard button (matches Competition Info UI) */}
+                        <div className="mt-2">
+                          {(() => {
+                            const today = new Date();
+                            const isOpenComp = competition && (competition.status === 'Open' || (competition.date && new Date(competition.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate())));
+                            return (
+                              <button
+                                className="w-full py-2 rounded-2xl bg-[#1B3A6B] text-white font-semibold flex items-center justify-center gap-2 border border-white"
+                                style={{ opacity: isOpenComp ? 1 : 0.5, pointerEvents: isOpenComp ? 'auto' : 'none' }}
+                                onClick={() => { if (!isOpenComp || !competition) return; navigate(`/leaderboard/${competition.id}`, { state: { competition } }); }}
+                              >
+                                <TrophyIcon className="h-5 w-5 mr-1" style={{ color: '#FFD700' }} />
+                                Leaderboard
+                              </button>
+                            );
+                          })()}
+                        </div>
                       </div>
                       </div>
                     </div>

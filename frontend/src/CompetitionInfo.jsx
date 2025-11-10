@@ -47,6 +47,8 @@ export default function CompetitionInfo({ user }) {
 
   // For TopMenu: pass user and comp as userComp if user is a player in this comp
   const isPlayerInComp = user && comp && comp.groups && comp.groups.some(g => Array.isArray(g.players) && g.players.includes(user.name));
+  const isAdmin = user && (user.role === 'admin' || user.isAdmin || user.isadmin);
+  const showMyScorecard = Boolean(isAdmin || isPlayerInComp);
 
   if (!comp) {
     return (
@@ -141,26 +143,32 @@ export default function CompetitionInfo({ user }) {
       <tr>
         <td className="px-3 py-3">
           <div className="flex flex-col gap-3">
-            <button onClick={() => navigate('/recent')} className="w-full py-2 rounded-2xl bg-[#1B3A6B] text-white font-semibold flex items-center justify-center gap-2">
+            <button onClick={() => navigate('/recent')} className="w-full py-2 rounded-2xl bg-[#1B3A6B] text-white font-semibold flex items-center justify-center gap-2 border border-white">
               <ArrowLeftIcon className="h-5 w-5" />
               <span>Back to Competitions</span>
             </button>
-            {isPlayerInComp && isOpenComp && (
-              <button onClick={() => {
-                const medalTypes = ['medalStrokeplay', 'medal strokeplay', 'stroke'];
-                if (medalTypes.includes((comp.type || '').toLowerCase().replace(/\s+/g, ''))) {
-                  navigate(`/scorecard-medal/${compId}`);
-                } else {
-                  navigate(`/scorecard/${compId}`);
-                }
-              }} className="w-full py-2 rounded-2xl bg-[#FFD700] text-[#002F5F] font-semibold flex items-center justify-center gap-2 scorecard-pulse">
-                  <SignalIcon className="h-5 w-5" style={{ color: '#0e3764' }} />
+            {showMyScorecard && (
+              <button
+                onClick={() => {
+                  // Admins can navigate regardless; regular players only when comp is open
+                  if (!isAdmin && !isPlayerInComp) return;
+                  const medalTypes = ['medalStrokeplay', 'medal strokeplay', 'stroke'];
+                  if (medalTypes.includes((comp.type || '').toLowerCase().replace(/\s+/g, ''))) {
+                    navigate(`/scorecard-medal/${compId}`);
+                  } else {
+                    navigate(`/scorecard/${compId}`);
+                  }
+                }}
+                className="w-full py-2 rounded-2xl bg-[#FFD700] text-[#002F5F] font-semibold flex items-center justify-center gap-2 scorecard-pulse border border-white"
+                style={ (isAdmin || isOpenComp) ? { backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' } : { backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', opacity: 0.5, pointerEvents: 'none' } }
+              >
+                <SignalIcon className="h-5 w-5" style={{ color: '#0e3764' }} />
                 <span>My Scorecard</span>
               </button>
             )}
             <button
               onClick={() => { if (!isOpenComp) return; navigate(`/leaderboard/${compId}`, { state: { competition: comp } }); }}
-              className="w-full py-2 rounded-2xl bg-[#1B3A6B] text-white font-semibold flex items-center justify-center gap-2"
+              className="w-full py-2 rounded-2xl bg-[#1B3A6B] text-white font-semibold flex items-center justify-center gap-2 border border-white"
               style={{ opacity: isOpenComp ? 1 : 0.5, pointerEvents: isOpenComp ? 'auto' : 'none' }}
             >
               <TrophyIcon className="h-5 w-5" style={{ color: '#FFD700' }} />
@@ -254,11 +262,11 @@ export default function CompetitionInfo({ user }) {
                 <ArrowLeftIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" />
                 Back to Competitions
               </button>
-              {isPlayerInComp && isOpenComp && (
                 <button
-                  className="py-2 px-4 border border-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap scorecard-pulse"
-                  style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                  className="py-2 px-4 border border-white rounded-2xl font-extrabold transition flex flex-row items-center whitespace-nowrap"
+                  style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', fontFamily: 'Merriweather, Georgia, serif', opacity: (isAdmin || (isPlayerInComp && isOpenComp)) ? 1 : 0.5, pointerEvents: (isAdmin || (isPlayerInComp && isOpenComp)) ? 'auto' : 'none' }}
                   onClick={() => {
+                    if (!isPlayerInComp || !isOpenComp) return;
                     const medalTypes = ['medalStrokeplay', 'medal strokeplay', 'stroke'];
                     if (medalTypes.includes((comp.type || '').toLowerCase().replace(/\s+/g, ''))) {
                       navigate(`/scorecard-medal/${compId}`);
@@ -266,13 +274,12 @@ export default function CompetitionInfo({ user }) {
                       navigate(`/scorecard/${compId}`);
                     }
                   }}
-                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
-                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
+                  onMouseOver={e => { if (isPlayerInComp && isOpenComp) e.currentTarget.style.backgroundColor = '#ffe066'; }}
+                  onMouseOut={e => { if (isPlayerInComp && isOpenComp) e.currentTarget.style.backgroundColor = '#FFD700'; }}
                 >
                   <SignalIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" style={{ color: '#002F5F' }} />
                   My Scorecard
                 </button>
-              )}
               <button
                   className="py-2 px-4 border border-white text-white rounded-2xl font-semibold transition flex flex-row items-center whitespace-nowrap"
                   style={{ backgroundColor: '#1B3A6B', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', opacity: isOpenComp ? 1 : 0.5, pointerEvents: isOpenComp ? 'auto' : 'none' }}
