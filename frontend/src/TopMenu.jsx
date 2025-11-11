@@ -301,8 +301,9 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                       if (!pickId) return;
                       try {
                         const compRes = await fetch(apiUrl(`/api/competitions/${pickId}`));
-                        if (compRes.ok) {
+                          if (compRes.ok) {
                           const compData = await compRes.json();
+                          try { console.debug('TopMenu: navigating to leaderboard (desktop) pickId:', pickId, 'compData:', compData); } catch (e) {}
                           try { console.debug('TopMenu: navigating to leaderboard (desktop) pickId:', pickId, 'compData:', compData); } catch (e) {}
                           navigate(`/leaderboard/${pickId}`, { state: { competition: compData } });
                           return;
@@ -310,6 +311,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                       } catch (e) {
                         try { console.debug('TopMenu: navigating to leaderboard (desktop) fallback pickId:', pickId, 'pick:', pick); } catch (e) {}
                         navigate(`/leaderboard/${pickId}`, { state: { competition: pick } });
+                        return;
                         return;
                       }
                     } catch (e) {
@@ -429,6 +431,7 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                             if (compRes.ok) {
                               const compData = await compRes.json();
                                   try { console.debug('TopMenu: navigating to leaderboard (mobile) pickId:', pickId, 'compData:', compData); } catch (e) {}
+                                  try { console.debug('TopMenu: navigating to leaderboard (mobile) pickId:', pickId, 'compData:', compData); } catch (e) {}
                                   navigate(`/leaderboard/${pickId}`, { state: { competition: compData } });
                                   return;
                                 }
@@ -440,9 +443,22 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                         }
                       }
                     } catch (e) {}
-          if (!compId) return; try { const res = await fetch(apiUrl(`/api/competitions/${compId}`)); if (res.ok) { const data = await res.json(); try { console.debug('TopMenu: navigating to leaderboard (mobile) fallback compId:', compId, 'data:', data); } catch (e) {} navigate(`/leaderboard/${compId}`, { state: { competition: data } }); return; } } catch (e) {}
+          if (!compId) return;
+          try {
+            const res = await fetch(apiUrl(`/api/competitions/${compId}`));
+            if (res.ok) {
+              const data = await res.json();
+              try { console.debug('TopMenu: navigating to leaderboard (mobile) fallback compId:', compId, 'data:', data); } catch (e) {}
+              const dType = (data?.type || '').toString().toLowerCase();
+              const dIsMedal = dType.includes('medal') || dType.includes('stroke');
+              navigate(`/leaderboard/${compId}`, { state: { competition: data } });
+              return;
+            }
+          } catch (e) {}
           try { console.debug('TopMenu: navigating to leaderboard (mobile) final fallback compId:', compId, 'leaderboardComp:', leaderboardComp); } catch (e) {}
-          navigate(`/leaderboard/${compId}`, { state: { competition: leaderboardComp } });
+          const lbType = (leaderboardComp?.type || '').toString().toLowerCase();
+          const lbIsMedal = lbType.includes('medal') || lbType.includes('stroke');
+      navigate(`/leaderboard/${compId}`, { state: { competition: leaderboardComp } });
                 }}
                 className="text-left py-3 text-lg font-semibold"
                 style={{ color: isLeaderboardPath ? '#FFD700' : (allowCompLinks ? 'white' : '#888'), opacity: allowCompLinks ? 1 : 0.5 }}
