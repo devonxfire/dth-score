@@ -266,16 +266,17 @@ export default function CompetitionInfo({ user }) {
                   className="py-2 px-4 border border-white rounded-2xl font-extrabold transition flex flex-row items-center whitespace-nowrap"
                   style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', fontFamily: 'Merriweather, Georgia, serif', opacity: (isAdmin || (isPlayerInComp && isOpenComp)) ? 1 : 0.5, pointerEvents: (isAdmin || (isPlayerInComp && isOpenComp)) ? 'auto' : 'none' }}
                   onClick={() => {
-                    if (!isPlayerInComp || !isOpenComp) return;
-                    const medalTypes = ['medalStrokeplay', 'medal strokeplay', 'stroke'];
-                    if (medalTypes.includes((comp.type || '').toLowerCase().replace(/\s+/g, ''))) {
-                      navigate(`/scorecard-medal/${compId}`);
-                    } else {
-                      navigate(`/scorecard/${compId}`);
-                    }
-                  }}
-                  onMouseOver={e => { if (isPlayerInComp && isOpenComp) e.currentTarget.style.backgroundColor = '#ffe066'; }}
-                  onMouseOut={e => { if (isPlayerInComp && isOpenComp) e.currentTarget.style.backgroundColor = '#FFD700'; }}
+                      // Admins can navigate regardless; regular players only when they're in the comp
+                      if (!isAdmin && !isPlayerInComp) return;
+                      const medalTypes = ['medalStrokeplay', 'medal strokeplay', 'stroke'];
+                      if (medalTypes.includes((comp.type || '').toLowerCase().replace(/\s+/g, ''))) {
+                        navigate(`/scorecard-medal/${compId}`);
+                      } else {
+                        navigate(`/scorecard/${compId}`);
+                      }
+                    }}
+                    onMouseOver={e => { if (isAdmin || (isPlayerInComp && isOpenComp)) e.currentTarget.style.backgroundColor = '#ffe066'; }}
+                    onMouseOut={e => { if (isAdmin || (isPlayerInComp && isOpenComp)) e.currentTarget.style.backgroundColor = '#FFD700'; }}
                 >
                   <SignalIcon className="h-5 w-5 mr-1 inline-block align-text-bottom" style={{ color: '#002F5F' }} />
                   My Scorecard

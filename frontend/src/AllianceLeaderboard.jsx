@@ -3,6 +3,8 @@ import { apiUrl } from './api';
 import socket from './socket';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
+import { useNavigate } from 'react-router-dom';
+import { SignalIcon, TrophyIcon } from '@heroicons/react/24/solid';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
@@ -61,6 +63,7 @@ function getPlayingHandicap(entry, comp) {
       const [currentUser, setCurrentUser] = useState(null);
       const [editingNotes, setEditingNotes] = useState(false);
       const [notesDraft, setNotesDraft] = useState('');
+      const navigate = useNavigate();
 
       useEffect(() => {
         try { const raw = localStorage.getItem('user'); if (raw) setCurrentUser(JSON.parse(raw)); } catch (e) {}
@@ -595,9 +598,16 @@ function getPlayingHandicap(entry, comp) {
   // who should appear together under the same team position. Keep the teams' order so
   // paired players remain adjacent and share the same Pos and Score (teamPoints).
 
-      const goodScores = rowsForUI.filter(r => typeof r.dthNet === 'number' && r.dthNet < 70 && r.thru === 'F');
+  const goodScores = rowsForUI.filter(r => typeof r.dthNet === 'number' && r.dthNet < 70 && r.thru === 'F');
 
-      return (
+  // compute user visibility for My Scorecard
+
+  const today = new Date();
+  const isOpenComp = comp && (comp.status === 'Open' || (comp.date && new Date(comp.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate())));
+  const isPlayerInComp = currentUser && comp && comp.groups && Array.isArray(comp.groups) && comp.groups.some(g => Array.isArray(g.players) && g.players.includes(currentUser.name));
+  const showMyScorecard = Boolean((isAdmin && isAdmin(currentUser)) || isPlayerInComp);
+
+  return (
         <PageBackground>
           <TopMenu userComp={comp} competitionList={comp ? [comp] : []} />
           <div className="flex flex-col items-center px-4 mt-12" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
@@ -614,8 +624,25 @@ function getPlayingHandicap(entry, comp) {
 
           <div className="flex flex-col items-center px-4 mt-8">
             <div ref={exportRef} className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
-                <div className="flex justify-center mb-4">
+                <div className="flex justify-center gap-3 mb-4">
                 <button onClick={() => exportToPDF()} className="py-2 px-4 bg-[#0e3764] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#0e3764] transition" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>Export Results</button>
+                {showMyScorecard && (
+                  <button
+                    onClick={() => {
+                      if (!isAdmin(currentUser) && !isPlayerInComp) return;
+                      // alliance comps aren't medal-type, route to generic scorecard
+                      const cid = comp?.id || window.location.pathname.split('/').pop();
+                      navigate(`/scorecard/${cid}`);
+                    }}
+                    className="py-2 px-4 rounded-2xl font-extrabold transition flex items-center justify-center gap-2"
+                    style={ (isAdmin(currentUser) || isOpenComp) ? { backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', fontFamily: 'Lato, Arial, sans-serif' } : { backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', opacity: 0.5, pointerEvents: 'none', fontFamily: 'Lato, Arial, sans-serif' } }
+                    onMouseOver={e => { if (isAdmin(currentUser) || isOpenComp) e.currentTarget.style.backgroundColor = '#ffe066'; }}
+                    onMouseOut={e => { if (isAdmin(currentUser) || isOpenComp) e.currentTarget.style.backgroundColor = '#FFD700'; }}
+                  >
+                    <SignalIcon className="h-5 w-5" style={{ color: '#002F5F' }} />
+                    <span>My Scorecard</span>
+                  </button>
+                )}
               </div>
 
               {comp && (

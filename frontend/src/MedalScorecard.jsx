@@ -253,6 +253,7 @@ export default function MedalScorecard(props) {
     } catch (e) {}
     handleScoreChange(name, idx, String(next));
   }
+  
   // Mobile selected player for compact score entry
   const [mobileSelectedPlayer, setMobileSelectedPlayer] = useState('');
   // Persist mobile-selected hole per-competition so refresh/navigation restores last-edited hole.
@@ -546,6 +547,7 @@ export default function MedalScorecard(props) {
                 if (!name) continue;
                 const pd = copy[name] || { scores: Array(18).fill(''), teebox: '', handicap: '' };
                 const arr = Array.isArray(pd.scores) ? [...pd.scores] : Array(18).fill('');
+                let skipServerUpdate = false;
                 try {
                   const key = `${name}:${holeIdx}`;
                   const pending = pendingLocalSavesRef.current[key];
@@ -556,16 +558,28 @@ export default function MedalScorecard(props) {
                     if (String(pending.value) === strokeStr) {
                       try { debugLog('mappedScores: server confirms pending', { key, strokeStr, age }); } catch (e) {}
                       delete pendingLocalSavesRef.current[key];
-                      continue;
+                      skipServerUpdate = true;
                     }
                     // If we have a very recent local save, ignore the server update to avoid
                     // overwriting our newer local edit with a stale/late-arriving value.
                     if (age < 5000) {
                       try { debugLog('mappedScores: skipping server update due to recent local pending', { key, strokeStr, age, pending: pending.value }); } catch (e) {}
-                      continue;
+                      skipServerUpdate = true;
                     }
                   }
+                  // If a very recent local action exists for this cell, prefer it
+                  // over the server update to avoid transient jumps on mobile.
+                  try {
+                    const lastAct = lastActionValueRef.current[key];
+                    if (lastAct && (Date.now() - (lastAct.ts || 0) < 1200)) {
+                      if (String(lastAct.value) !== strokeStr) {
+                        try { debugLog('mappedScores: skipping server update due to recent lastAction', { key, lastAct, strokeStr }); } catch (e) {}
+                        skipServerUpdate = true;
+                      }
+                    }
+                  } catch (e) {}
                 } catch (e) {}
+                if (skipServerUpdate) continue;
                 arr[holeIdx] = strokes == null ? '' : String(strokes);
                 copy[name] = { ...pd, scores: arr };
               }
@@ -786,17 +800,40 @@ export default function MedalScorecard(props) {
         } catch (e) {}
       }, 5000);
     } catch (e) {}
-    setPlayerData(prev => {
-      const existing = Array.isArray(prev[name]?.scores) ? prev[name].scores : Array.from({ length: 18 }, () => '');
+    // Synchronously update both state and the ref copy so subsequent
+    // synchronous reads (from other handlers or scheduled callbacks)
+    // see the freshest value and avoid brief UI jumps on fast input.
+    try {
+      const prevData = playerDataRef.current || {};
+      const existing = Array.isArray(prevData[name]?.scores) ? prevData[name].scores : Array.from({ length: 18 }, () => '');
       const updatedScores = existing.map((v, i) => i === idx ? value : v);
-      return {
-        ...prev,
+      const newData = {
+        ...prevData,
         [name]: {
-          ...prev[name],
+          ...(prevData[name] || {}),
           scores: updatedScores
         }
       };
-    });
+      // update ref immediately
+      playerDataRef.current = newData;
+      // update React state
+      setPlayerData(newData);
+    } catch (e) {
+      // fallback to previous approach if anything goes wrong
+      setPlayerData(prev => {
+        const existing = Array.isArray(prev[name]?.scores) ? prev[name].scores : Array.from({ length: 18 }, () => '');
+        const updatedScores = existing.map((v, i) => i === idx ? value : v);
+        return {
+          ...prev,
+          [name]: {
+            ...prev[name],
+            scores: updatedScores
+          }
+        };
+      });
+    }
+    // Record immediate last-action value to help rapid +/- and server-echo guards
+    try { lastActionValueRef.current[`${name}:${idx}`] = { value: String(value), ts: Date.now() }; } catch (e) {}
     // Birdie/Eagle/Blowup detection logic
     const gross = parseInt(value, 10);
     const hole = holesArr[idx];
