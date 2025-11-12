@@ -103,3 +103,16 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 } */
+/* Mobile portrait helpers: hide less-important columns and show an "expand extras" toggle.
+   Hides elements with .hide-on-portrait when the viewport is narrow and in portrait orientation.
+   Tables that get the .show-extras class will reveal those columns again. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .hide-on-portrait { display: none !important; }
+  .extras-toggle { display: inline-block !important; }
+}
+
+/* By default, the extras-toggle is hidden on larger screens. */
+.extras-toggle { display: none; }
+
+/* When applied to the table container, show the hidden extras even in portrait. */
+.show-extras .hide-on-portrait { display: table-cell !important; }

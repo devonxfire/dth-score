@@ -37,6 +37,77 @@ export default function GlobalPopups() {
   const lastShown = useRef(new Map()); // key -> { type, ts }
   const POPUP_PRIORITY = { eagle: 3, birdie: 2, blowup: 1 };
 
+  // Audio elements for popup sounds. Files should be placed under
+  // `public/sounds/` (e.g. `public/sounds/eagle.mp3`, `birdie.mp3`, `blowup.mp3`,
+  // `waters.mp3`, `dog.mp3`). Browsers require a user gesture before audio
+  // playback in some contexts — playback may be blocked until the user
+  // interacts with the page.
+  const soundsRef = useRef({});
+  useEffect(() => {
+    try {
+      const base = '/sounds';
+      const load = (name) => {
+        // Try several candidate paths so we tolerate different file layouts
+        const candidates = [`${base}/${name}.mp3`, `/${name}.mp3`, `/${name}-sound.mp3`, `/${name}.ogg`];
+        for (const url of candidates) {
+          try {
+            const a = new Audio(url);
+            a.preload = 'auto';
+            a.muted = false;
+            // Keep the first candidate regardless of ability to play now; playback
+            // errors will be handled at play time. Log for debugging.
+            console.debug && console.debug('GlobalPopups: loaded sound candidate', name, url);
+            return a;
+          } catch (e) {
+            // try next candidate
+            continue;
+          }
+        }
+        return null;
+      };
+      soundsRef.current = {
+        eagle: load('eagle'),
+        birdie: load('birdie'),
+        blowup: load('blowup'),
+        waters: load('waters'),
+        dog: load('dog')
+      };
+    } catch (e) {}
+    return () => {
+      try {
+        const s = soundsRef.current || {};
+        Object.values(s).forEach(a => { try { if (a && typeof a.pause === 'function') { a.pause(); a.src = ''; } } catch (e) {} });
+      } catch (e) {}
+    };
+  }, []);
+
+  // Fallback: play a short synthesized tone if audio file playback fails or
+  // if sound files are missing/corrupt. This avoids relying on bundled MP3s.
+  const playFallbackTone = (type) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      // Choose frequency by event type
+      const freqs = { eagle: 880, birdie: 660, blowup: 120, waters: 440, dog: 520 };
+      o.frequency.value = freqs[type] || 440;
+      g.gain.value = 0.0001;
+      o.connect(g);
+      g.connect(ctx.destination);
+      const now = ctx.currentTime;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.25, now + 0.02);
+      o.start(now);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+      setTimeout(() => {
+        try { o.stop(); ctx.close(); } catch (e) {}
+      }, 600);
+    } catch (e) {}
+  };
+
   // Join all competitions so we receive their realtime events regardless of UI route.
   useEffect(() => {
     // mounted; joining competitions below
@@ -292,6 +363,21 @@ export default function GlobalPopups() {
           else if (type === 'blowup') { emoji = '💥'; title = "How Embarrassing!"; body = `${playerName || ''} just blew up on Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([400,100,400]); }
           else if (type === 'waters') { emoji = '💧'; title = 'Splash!'; body = `${playerName || ''} has earned a water`; }
           else if (type === 'dog') { emoji = '🐶'; title = 'Woof!'; body = `${playerName || ''} got the dog`; }
+
+            // Play sound for this popup type (best-effort). Some browsers require
+            // a user gesture before audio playback; playback may be blocked.
+            try {
+              const s = (soundsRef.current || {})[type];
+              if (!s) {
+                console.debug && console.debug('GlobalPopups: no sound loaded for type', type);
+                // fallback to synthesized tone
+                playFallbackTone(type);
+              } else if (typeof s.play === 'function') {
+                try { s.currentTime = 0; } catch (e) {}
+                const p = s.play();
+                if (p && typeof p.then === 'function') p.catch(err => { console.debug && console.debug('GlobalPopups: audio play failed', type, err); playFallbackTone(type); });
+              }
+            } catch (e) { /* ignore audio errors */ }
 
           // prevent lower-priority replacement for same player+hole shortly after
           try {

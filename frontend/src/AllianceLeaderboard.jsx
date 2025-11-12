@@ -63,7 +63,8 @@ function getPlayingHandicap(entry, comp) {
       const [currentUser, setCurrentUser] = useState(null);
       const [editingNotes, setEditingNotes] = useState(false);
       const [notesDraft, setNotesDraft] = useState('');
-      const navigate = useNavigate();
+  const navigate = useNavigate();
+  const [showExtras, setShowExtras] = useState(false);
 
       useEffect(() => {
         try { const raw = localStorage.getItem('user'); if (raw) setCurrentUser(JSON.parse(raw)); } catch (e) {}
@@ -625,7 +626,6 @@ function getPlayingHandicap(entry, comp) {
           <div className="flex flex-col items-center px-4 mt-8">
             <div ref={exportRef} className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
                 <div className="flex justify-center gap-3 mb-4">
-                <button onClick={() => exportToPDF()} className="py-2 px-4 bg-[#0e3764] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#0e3764] transition" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>Export Results</button>
                 {showMyScorecard && (
                   <button
                     onClick={() => {
@@ -643,6 +643,7 @@ function getPlayingHandicap(entry, comp) {
                     <span>My Scorecard</span>
                   </button>
                 )}
+                <button onClick={() => exportToPDF()} className="py-2 px-4 bg-[#0e3764] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#0e3764] transition" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>Export Results</button>
               </div>
 
               {comp && (
@@ -686,7 +687,17 @@ function getPlayingHandicap(entry, comp) {
               {rowsForUI.length === 0 ? (
                 <div className="text-white/80">No scores submitted yet.</div>
               ) : (
-                <div className="w-full overflow-x-auto">
+                <div className={"w-full overflow-x-auto " + (showExtras ? 'show-extras' : '')}>
+                  <div className="flex justify-end mb-2">
+                    <button
+                      className="extras-toggle ml-2 text-xs px-2 py-0.5 rounded font-semibold"
+                      onClick={() => setShowExtras(s => !s)}
+                      title={showExtras ? 'Hide extras' : 'View extras'}
+                      style={{ background: '#0e3764', color: '#FFD700', border: '1px solid #FFD700' }}
+                    >
+                      {showExtras ? '- Hide Extras' : '+ View Extras'}
+                    </button>
+                  </div>
                   <table className="min-w-full border text-center mb-8 text-[10px] sm:text-base" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
                     <thead>
                       <tr style={{ background: '#00204A' }}>
@@ -697,10 +708,10 @@ function getPlayingHandicap(entry, comp) {
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -708,17 +719,17 @@ function getPlayingHandicap(entry, comp) {
                         <tr key={`${entry.name}-${idx}`} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
                           <td className="border px-0.5 sm:px-2 py-0.5 font-bold">{entry.pos}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>
-                            <div className="max-w-[8ch] sm:max-w-none truncate">{(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}</div>
+                            <div className="max-w-none truncate">{(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}</div>
                           </td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.teamPoints}{(entry.backendTeamPoints !== undefined && entry.backendTeamPoints !== entry.teamPoints) ? ` (db ${entry.backendTeamPoints})` : (entry.computedTeamPoints != null && entry.computedTeamPoints !== entry.teamPoints ? ` (calc ${entry.computedTeamPoints})` : '')}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.gross}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
-                          <td className="border px-0.5 sm:px-2 py-0.5">{entry.dthNet}</td>
-                          <td className="border px-0.5 sm:px-2 py-0.5">{entry.dog ? '🐶' : ''}</td>
-                          <td className="border px-0.5 sm:px-2 py-0.5">{entry.waters || ''}</td>
-                          <td className="border px-0.5 sm:px-2 py-0.5">{entry.twoClubs || ''}</td>
-                          <td className="border px-0.5 sm:px-2 py-0.5">
+                          <td className={"border px-0.5 sm:px-2 py-0.5" + (showExtras ? ' show-extras' : '')}>{entry.dthNet}</td>
+                          <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.dog ? '🐶' : ''}</td>
+                          <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.waters || ''}</td>
+                          <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.twoClubs || ''}</td>
+                          <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">
                             {isAdmin(currentUser) ? (
                               <input
                                 type="number"

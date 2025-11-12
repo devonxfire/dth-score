@@ -71,6 +71,7 @@ function MedalLeaderboard() {
   const [currentUser, setCurrentUser] = useState(null);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
+  const [showExtras, setShowExtras] = useState(false);
   // Get comp id from URL if using react-router
   const id = location.pathname.split('/').pop();
 
@@ -736,13 +737,35 @@ function MedalLeaderboard() {
       <div className="flex flex-col items-center px-4 mt-8">
         <div ref={exportRef} className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
           <div className="flex justify-center mb-4">
-            <button
-              onClick={() => { exportToPDF(); }}
-              className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#002F5F] transition"
-              style={{ fontFamily: 'Lato, Arial, sans-serif' }}
-            >
-              Export Results
-            </button>
+            {currentUser && (() => {
+              const today = new Date();
+              const isOpenComp = comp && (comp.status === 'Open' || (comp.date && new Date(comp.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate())));
+              const isPlayerInComp = currentUser && comp && comp.groups && Array.isArray(comp.groups) && comp.groups.some(g => Array.isArray(g.players) && g.players.includes(currentUser.name));
+              const showMyScorecard = Boolean((currentUser && (currentUser.role === 'admin' || currentUser.isAdmin || currentUser.isadmin)) || isPlayerInComp);
+              return (
+                <>
+                  {showMyScorecard && (
+                    <button
+                      onClick={() => {
+                        const cid = comp?.id || window.location.pathname.split('/').pop();
+                        navigate(`/scorecard/${cid}`);
+                      }}
+                      className="py-2 px-4 rounded-2xl font-extrabold transition flex items-center justify-center gap-2 mr-3"
+                      style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)', fontFamily: 'Lato, Arial, sans-serif' }}
+                    >
+                      <span>My Scorecard</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { exportToPDF(); }}
+                    className="py-2 px-4 bg-[#002F5F] text-[#FFD700] border border-[#FFD700] rounded-2xl hover:bg-[#FFD700] hover:text-[#002F5F] transition"
+                    style={{ fontFamily: 'Lato, Arial, sans-serif' }}
+                  >
+                    Export Results
+                  </button>
+                </>
+              );
+            })()}
           </div>
           {/* Competition Info Section */}
           {comp && (
@@ -790,7 +813,17 @@ function MedalLeaderboard() {
           {leaderboardRows.length === 0 ? (
             <div className="text-white/80">No scores submitted yet.</div>
           ) : (
-            <div className="w-full overflow-x-auto">
+            <div className={"w-full overflow-x-auto " + (showExtras ? 'show-extras' : '')}>
+              <div className="flex justify-end mb-2">
+                <button
+                  className="extras-toggle ml-2 text-xs px-2 py-0.5 rounded font-semibold"
+                  onClick={() => setShowExtras(s => !s)}
+                  title={showExtras ? 'Hide extras' : 'View extras'}
+                  style={{ background: '#0e3764', color: '#FFD700', border: '1px solid #FFD700' }}
+                >
+                  {showExtras ? '- Hide Extras' : '+ View Extras'}
+                </button>
+              </div>
               <table className="min-w-full border text-center mb-8 text-[10px] sm:text-base" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
                 <thead>
                   <tr style={{ background: '#00204A' }}>
@@ -800,10 +833,10 @@ function MedalLeaderboard() {
                     <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
                     <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
                     <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -811,16 +844,16 @@ function MedalLeaderboard() {
                     <tr key={entry.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
                       <td className="border px-0.5 sm:px-2 py-0.5 font-bold">{entry.position}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>
-                        <div className="max-w-[8ch] sm:max-w-none truncate">{(compactDisplayName(entry) || entry.name).toUpperCase()}</div>
+                        <div className="max-w-none truncate">{(compactDisplayName(entry) || entry.name).toUpperCase()}</div>
                       </td>
                       <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5">{entry.total}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.dthNet}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.dog ? '🐶' : ''}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.waters || ''}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.twoClubs || ''}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">
+                      <td className={"border px-0.5 sm:px-2 py-0.5" + (showExtras ? ' show-extras' : '')}>{entry.dthNet}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.dog ? '🐶' : ''}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.waters || ''}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.twoClubs || ''}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">
                         {isAdmin(currentUser) ? (
                           <input
                             type="number"

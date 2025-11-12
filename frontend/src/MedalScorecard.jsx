@@ -267,6 +267,9 @@ export default function MedalScorecard(props) {
     return 1;
   });
 
+  // Ref to the mobile hole entry container so we can scroll it into view when returning
+  const mobileHoleRef = useRef(null);
+
   // Keep localStorage in sync when compId changes (switching competitions) — load saved hole for new comp.
   useEffect(() => {
     try {
@@ -288,6 +291,33 @@ export default function MedalScorecard(props) {
       localStorage.setItem(`dth:mobileSelectedHole:${compId}`, String(mobileSelectedHole));
     } catch (e) {}
   }, [compId, mobileSelectedHole]);
+
+  // When mobileSelectedHole changes (or on initial mount when restored from localStorage)
+  // and we're on a mobile viewport, scroll the hole entry container into view so the user
+  // sees the active hole rather than the top of the page.
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const isMobile = window.matchMedia('(max-width: 640px)').matches;
+      if (!isMobile) return;
+      // Delay slightly to allow layout to settle after navigation. Try to scroll the ref
+      // if present, otherwise fall back to a querySelector so we catch cases where
+      // the ref wasn't attached at effect time (race conditions with rendering).
+      const t = setTimeout(() => {
+        try {
+          if (mobileHoleRef && mobileHoleRef.current) {
+            mobileHoleRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+          }
+        } catch (e) {}
+        try {
+          const el = document.querySelector('[data-mobile-hole]');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (e) {}
+      }, 250);
+      return () => clearTimeout(t);
+    } catch (e) {}
+  }, [mobileSelectedHole]);
 
   // Use holes from the competition payload when available (map stroke_index -> index),
   // otherwise fall back to the defaultHoles constant.
@@ -1369,7 +1399,7 @@ export default function MedalScorecard(props) {
                   <div>
                     <PairHeader />
 
-                    <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
+                    <div ref={mobileHoleRef} data-mobile-hole className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
                       <div className="flex items-center justify-center mb-3">
                         <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 1 ? 18 : h - 1))}>◀</button>
                         <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
@@ -1525,7 +1555,7 @@ export default function MedalScorecard(props) {
               if (isMedalMobile) {
                 const hole = holesArr[mobileSelectedHole - 1];
                 return (
-                  <div className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
+                  <div ref={mobileHoleRef} data-mobile-hole className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
                     <div className="flex items-center justify-center mb-3">
                       <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 1 ? 18 : h - 1))}>◀</button>
                       <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>

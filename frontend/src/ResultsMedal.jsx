@@ -77,6 +77,7 @@ export default function ResultsMedal() {
   const location = useLocation();
   const [competition, setCompetition] = useState(null);
   const [players, setPlayers] = useState([]);
+  const [showExtras, setShowExtras] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   // Get current user from localStorage
@@ -354,7 +355,18 @@ export default function ResultsMedal() {
                 <div className="text-center text-red-400 py-8">{error}</div>
               ) : (
                 <React.Fragment>
-                  <table className="min-w-full border text-center mb-8" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
+                  <div className={"w-full overflow-x-auto " + (showExtras ? 'show-extras' : '')}>
+                    <div className="flex justify-end mb-2">
+                      <button
+                        className="extras-toggle ml-2 text-xs px-2 py-0.5 rounded font-semibold"
+                        onClick={() => setShowExtras(s => !s)}
+                        title={showExtras ? 'Hide extras' : 'View extras'}
+                        style={{ background: '#0e3764', color: '#FFD700', border: '1px solid #FFD700' }}
+                      >
+                        {showExtras ? '- Hide Extras' : '+ View Extras'}
+                      </button>
+                    </div>
+                    <table className="min-w-full border text-center mb-8" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
                     <thead>
                       <tr style={{ background: '#00204A' }}>
                         <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Pos</th>
@@ -363,10 +375,10 @@ export default function ResultsMedal() {
                         <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
                         <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
                         <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
-                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
-                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
-                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
-                        <th className="border px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
+                        <th className="border px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
+                        <th className="border px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
+                        <th className="border px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
+                        <th className="border px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Fines</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -377,11 +389,11 @@ export default function ResultsMedal() {
                           <td className="border px-2 py-0.5">{p.thru}</td>
                           <td className="border px-2 py-0.5">{p.gross}</td>
                           <td className="border px-2 py-0.5">{p.net}</td>
-                          <td className="border px-2 py-0.5">{p.dthNet}</td>
-                          <td className="border px-2 py-0.5">{p.dog ? '🐶' : ''}</td>
-                          <td className="border px-2 py-0.5">{p.waters || ''}</td>
-                          <td className="border px-2 py-0.5">{p.twoClubs || ''}</td>
-                          <td className="border px-2 py-0.5">
+                          <td className={"border px-2 py-0.5" + (showExtras ? ' show-extras' : '')}>{p.dthNet}</td>
+                          <td className="border px-2 py-0.5 hide-on-portrait">{p.dog ? '🐶' : ''}</td>
+                          <td className="border px-2 py-0.5 hide-on-portrait">{p.waters || ''}</td>
+                          <td className="border px-2 py-0.5 hide-on-portrait">{p.twoClubs || ''}</td>
+                          <td className="border px-2 py-0.5 hide-on-portrait">
                             {isAdmin(user) ? (
                               <input
                                 type="number"
@@ -414,6 +426,7 @@ export default function ResultsMedal() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
 
                      {/* ...existing code... */}
           <div className="flex flex-row items-start mt-4 justify-between">
