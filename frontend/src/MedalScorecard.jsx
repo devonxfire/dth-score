@@ -300,22 +300,66 @@ export default function MedalScorecard(props) {
       if (typeof window === 'undefined') return;
       const isMobile = window.matchMedia('(max-width: 640px)').matches;
       if (!isMobile) return;
-      // Delay slightly to allow layout to settle after navigation. Try to scroll the ref
-      // if present, otherwise fall back to a querySelector so we catch cases where
-      // the ref wasn't attached at effect time (race conditions with rendering).
-      const t = setTimeout(() => {
+
+      // On physical mobile devices the viewport can change (address bar, keyboard)
+      // and programmatic scrolling can race the layout. Do repeated attempts with
+      // increasing delays, prefer the VisualViewport API when available, and try
+      // to focus a nearby interactive element using preventScroll so the keyboard
+      // (if it opens) doesn't fight the scroll.
+      let cancelled = false;
+      const maxAttempts = 6;
+      const delays = [150, 300, 600, 1200, 2000, 3500];
+      let attempt = 0;
+
+      const doScrollOnce = () => {
+        if (cancelled) return true;
         try {
-          if (mobileHoleRef && mobileHoleRef.current) {
-            mobileHoleRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            return;
+          const el = (mobileHoleRef && mobileHoleRef.current) ? mobileHoleRef.current : document.querySelector('[data-mobile-hole]');
+          if (!el) return false;
+
+          // Center using visualViewport when available (avoids page-level scroll conflicts)
+          if (typeof window.visualViewport !== 'undefined' && window.visualViewport) {
+            try {
+              const rect = el.getBoundingClientRect();
+              const vv = window.visualViewport;
+              const targetTop = (vv.offsetTop || 0) + rect.top + (rect.height / 2) - (vv.height / 2);
+              // Use scrollTo on visualViewport for better centering when browser UI is present
+              if (typeof vv.scrollTo === 'function') vv.scrollTo({ left: vv.offsetLeft || 0, top: Math.max(0, targetTop), behavior: 'smooth' });
+              else el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (e) {
+              try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (er) {}
+            }
+          } else {
+            try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
           }
-        } catch (e) {}
-        try {
-          const el = document.querySelector('[data-mobile-hole]');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } catch (e) {}
-      }, 250);
-      return () => clearTimeout(t);
+
+          // Try to focus an input/select/button within the container without scrolling
+          try {
+            const focusable = el.querySelector && el.querySelector('input,select,button,textarea');
+            if (focusable && typeof focusable.focus === 'function') {
+              try { focusable.focus({ preventScroll: true }); } catch (e) { focusable.focus(); }
+            }
+          } catch (e) {}
+
+          return true;
+        } catch (e) {
+          return false;
+        }
+      };
+
+      const scheduleAttempt = () => {
+        if (cancelled) return;
+        const ok = doScrollOnce();
+        attempt += 1;
+        if (!ok && attempt < maxAttempts) {
+          const d = delays[Math.min(attempt, delays.length - 1)];
+          setTimeout(scheduleAttempt, d);
+        }
+      };
+
+      // Start attempts with a short initial delay
+      const initial = setTimeout(scheduleAttempt, delays[0]);
+      return () => { cancelled = true; clearTimeout(initial); };
     } catch (e) {}
   }, [mobileSelectedHole]);
 
