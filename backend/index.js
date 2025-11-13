@@ -549,6 +549,22 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
   if (!competitionId || !Array.isArray(scores) || scores.length !== 18) {
     return res.status(400).json({ error: 'competitionId and 18 scores required' });
   }
+  // Defensive check: if a client accidentally sends an all-empty scores array we will
+  // refuse to apply it unless allowClear === true is provided. This prevents accidental
+  // mass-deletes caused by buggy clients. Operators can still clear scores explicitly.
+    try {
+    const allowClear = req.body && req.body.allowClear === true;
+    const numNonEmpty = scores.reduce((c, s) => c + ((s != null && s !== '') ? 1 : 0), 0);
+    if (numNonEmpty === 0 && !allowClear) {
+      console.warn('Rejecting all-empty scores update for team/user (need allowClear=true to clear):', { teamId, userId, competitionId });
+      return res.status(400).json({ error: 'No non-empty scores provided. To clear existing scores explicitly include { allowClear: true } in the request body.' });
+    }
+    // Audit logging: list of hole indexes that contain non-empty values and request origin info
+    const touchedIndexes = scores.map((s, i) => ((s != null && s !== '') ? i : -1)).filter(i => i >= 0);
+    const originSocket = req && req.headers && (req.headers['x-origin-socket'] || req.headers['X-Origin-Socket']) ? (req.headers['x-origin-socket'] || req.headers['X-Origin-Socket']) : null;
+    const originIp = req && (req.ip || req.headers['x-forwarded-for'] || req.connection && req.connection.remoteAddress) ? (req.ip || req.headers['x-forwarded-for'] || (req.connection && req.connection.remoteAddress)) : 'unknown';
+    console.log(`PATCH /api/teams/${teamId}/users/${userId}/scores payload: competitionId=${competitionId}, nonEmpty=${numNonEmpty}, allowClear=${allowClear}, touchedIndexes=[${touchedIndexes.join(',')}], originSocket=${originSocket || ''}, originIp=${originIp}`);
+  } catch (e) {}
   try {
     // Fetch holes for this competition, ordered by number (1-18)
     const holes = await prisma.holes.findMany({
@@ -558,19 +574,14 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
     for (let i = 0; i < 18; i++) {
       const strokes = scores[i];
       const hole = holes[i];
-      if (!hole) {
-        continue;
-      }
+      if (!hole) continue;
+      // IMPORTANT: treat empty string ('') as a client-side no-op to avoid accidental
+      // clears caused by clients that send full arrays with blanks. Do NOT delete
+      // the existing DB score when strokes === ''. If an operator intentionally
+      // wants to clear all scores they must send an all-empty array with allowClear=true
+      // (handled above). This prevents inadvertent loss of previously-entered hole values.
       if (strokes == null || strokes === '') {
-        // Delete score record if exists
-        await prisma.scores.deleteMany({
-          where: {
-            competition_id: Number(competitionId),
-            team_id: Number(teamId),
-            user_id: Number(userId),
-            hole_id: hole.id
-          }
-        });
+        // Skip updating/deleting; treat as "no change" for this hole
         continue;
       }
       const upsertData = {

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "start:debug": "DEBUG_POPUPS=1 node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "test": "echo \"Error: no test specified\" && exit 1",
+  "test:scores": "node test/test_scores_patch.js"
   },
   "keywords": [],
   "author": "",
