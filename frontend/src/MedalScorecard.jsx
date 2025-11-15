@@ -187,9 +187,9 @@ export default function MedalScorecard(props) {
     if (!resolvedName) return false;
     try {
       const normViewer = resolvedName.trim().toLowerCase();
-      // if viewer is in the current players list, allow edits for anyone in that group
+      // If the viewer is a member of the current 4-ball (players list), allow edits
+      // for any row in this scorecard. Otherwise only allow editing own row.
       if (Array.isArray(players) && players.some(p => (p || '').trim().toLowerCase() === normViewer)) return true;
-      // otherwise only allow editing own row (fallback)
       return (playerName || '').trim().toLowerCase() === normViewer;
     } catch (e) {
       return false;
@@ -199,6 +199,7 @@ export default function MedalScorecard(props) {
   const [groups, setGroups] = useState([]);
   const [groupIdx, setGroupIdx] = useState(0);
   const [players, setPlayers] = useState([]);
+  const autoSetGroupIdxDone = React.useRef(false);
   const [playerData, setPlayerData] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -459,10 +460,14 @@ export default function MedalScorecard(props) {
     if (isAdmin) return; // admins can pick any group
     if (!resolvedName) return;
     const normalize = (s) => (s || '').toString().trim().toLowerCase();
+    // Only auto-select the viewer's own group once on initial load. If the viewer
+    // explicitly picks another group via the selector, do not override that choice.
+    if (autoSetGroupIdxDone.current) return;
     const foundIdx = groups.findIndex(g => Array.isArray(g.players) && g.players.some(p => normalize(p) === normalize(resolvedName)));
     if (foundIdx >= 0 && foundIdx !== groupIdx) {
       setGroupIdx(foundIdx);
     }
+    autoSetGroupIdxDone.current = true;
   }, [groups, resolvedName, isAdmin]);
 
   // Real-time: join competition room and listen for updates
@@ -1207,7 +1212,7 @@ export default function MedalScorecard(props) {
             {/* Tee Time selector: admin-visible, placed immediately above the Handicaps table */}
             <div className="w-full flex items-center justify-center mb-2">
               <div className="text-sm text-white mr-3">Tee Time:</div>
-              {isAdmin && groups && groups.length > 1 ? (
+              {groups && groups.length > 1 ? (
                 <select
                   value={groupIdx}
                   onChange={e => setGroupIdx(Number(e.target.value))}
@@ -1376,15 +1381,25 @@ export default function MedalScorecard(props) {
               </div>
             </div>
             <div className="w-full sm:w-auto mt-3">
-              <button
-                className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
-                style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                onMouseOver={e => e.currentTarget.style.backgroundColor = '#ffe066'}
-                onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFD700'}
-                onClick={() => setShowResetModal(true)}
-              >
-                Reset Scores
-              </button>
+              {(() => {
+                const normalize = s => (s || '').toString().trim().toLowerCase();
+                const viewerInGroup = resolvedName && Array.isArray(players) && players.some(p => normalize(p) === normalize(resolvedName));
+                const disabled = !(isAdmin || viewerInGroup);
+                return (
+                  <button
+                    className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
+                    style={{ backgroundColor: disabled ? '#666' : '#FFD700', color: disabled ? '#ddd' : '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                    onMouseOver={e => { if (!disabled) e.currentTarget.style.backgroundColor = '#ffe066'; }}
+                    onMouseOut={e => { if (!disabled) e.currentTarget.style.backgroundColor = '#FFD700'; }}
+                    onClick={() => { if (!disabled) setShowResetModal(true); }}
+                    disabled={disabled}
+                    aria-disabled={disabled}
+                    title={disabled ? 'You cannot reset this scorecard' : 'Reset Scores'}
+                  >
+                    Reset Scores
+                  </button>
+                );
+              })()}
             </div>
           </div>
           {/* Scorecard Table UI: Front 9 and Back 9, PAR/STROKE/HOLE headings, gross/net rows, Medal logic */}
