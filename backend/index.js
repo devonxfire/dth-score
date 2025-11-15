@@ -11,6 +11,424 @@ app.use(express.json());
 
 const prisma = new PrismaClient();
 
+// Helper: ensure teams exist for groups in a competition. This extracts the logic
+// that used to live inside the PATCH /api/competitions/:id/groups handler so
+// we can call it after creating a competition as well (automatic team creation
+// for new competitions that include groups). It will create teams for 2-player
+// groups and, for 4BBB competitions, create two teams for each 4-player group.
+async function processGroupsForCompetition(compId, groups) {
+  if (!compId || !Array.isArray(groups) || groups.length === 0) return;
+  try {
+    // Determine competition type (needed to know whether 4-player groups represent 4BBB teams)
+    const compRow = await prisma.competitions.findUnique({ where: { id: Number(compId) } });
+    const compTypeLower = (compRow?.type || '').toString().toLowerCase();
+    const isFourBbb = compTypeLower.includes('4bbb') || compTypeLower.includes('fourbbb') || (!!compRow && !!compRow.fourballs);
+
+    // Fetch all existing teams for this competition
+    const existingTeams = await prisma.teams.findMany({ where: { competition_id: Number(compId) } });
+    // Also prefetch any existing teams_users rows for this competition so we can
+    // use them as a fallback source for course_handicap when creating new teams
+    // (this mirrors what the remediation script does).
+    let teamsUsersForComp = [];
+    try {
+      teamsUsersForComp = await prisma.teams_users.findMany({ where: { teams: { competition_id: Number(compId) } }, include: { users: true, teams: true } });
+    } catch (e) {
+      // non-fatal: we'll attempt other fallbacks if this fetch fails
+      teamsUsersForComp = [];
+    }
+    // Prefetch all users once and build a normalized lookup to allow tolerant name matching
+    let usersList = [];
+    const usersByNorm = {};
+    function normalizeNameForMatch(n) {
+      if (!n && n !== 0) return '';
+      try {
+        return String(n)
+          .normalize('NFKD')
+          .replace(/[“”]/g, '"')
+          .replace(/[‘’]/g, "'")
+          .replace(/''/g, "'")
+          .replace(/["()\[\]{}]/g, '')
+          .replace(/[^\w\s\-']/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+      } catch (e) {
+        return (n || '').toString().trim().toLowerCase();
+      }
+    }
+    try {
+      usersList = await prisma.users.findMany();
+      for (const u of usersList || []) {
+        const candidates = [];
+        if (u.name) candidates.push(u.name);
+        if (u.displayName) candidates.push(u.displayName);
+        if (u.display_name) candidates.push(u.display_name);
+        if (u.displayname) candidates.push(u.displayname);
+        if (u.nick) candidates.push(u.nick);
+        if (u.nickname) candidates.push(u.nickname);
+        for (const c of candidates) {
+          if (!c) continue;
+          const k = normalizeNameForMatch(c);
+          if (!k) continue;
+          usersByNorm[k] = usersByNorm[k] || u;
+        }
+        // also index raw name
+        const rawk = normalizeNameForMatch(u.name);
+        if (rawk) usersByNorm[rawk] = usersByNorm[rawk] || u;
+      }
+    } catch (e) {
+      usersList = [];
+    }
+    // Map of team key (sorted normalized player names) to team object
+    const teamKey = (players) => players.map(p => normalizeNameForMatch(p)).sort().join('|');
+    const existingTeamMap = {};
+    for (const team of existingTeams) {
+      if (Array.isArray(team.players)) {
+        existingTeamMap[teamKey(team.players)] = team;
+      }
+    }
+
+    // Helper to ensure a team exists for a pair of players
+    async function ensureTeamForPair(pairPlayers, pairLabel, group, i, existingTeamsLocal) {
+      if (!Array.isArray(pairPlayers) || pairPlayers.length !== 2) return null;
+      const key = teamKey(pairPlayers);
+      let foundTeam = existingTeamMap[key];
+      if (foundTeam) return foundTeam;
+      // Find the most similar old team (max overlap)
+      let bestMatch = null;
+      let bestOverlap = 0;
+      for (const oldTeam of existingTeamsLocal) {
+        if (!Array.isArray(oldTeam.players)) continue;
+        const overlap = oldTeam.players.filter(p => pairPlayers.includes(p)).length;
+        if (overlap > bestOverlap) {
+          bestOverlap = overlap;
+          bestMatch = oldTeam;
+        }
+      }
+      // Create new team for this pair
+      foundTeam = await prisma.teams.create({
+        data: {
+          competition_id: Number(compId),
+          name: group && group.name ? `${group.name} ${pairLabel}` : `Group ${i + 1} ${pairLabel}`,
+          players: pairPlayers
+        }
+      });
+      // write team id back to supplied group object so callers (and subsequent GETs)
+      // can see the team association immediately without waiting for name-based lookup
+      try { if (group) { group.teamIds = group.teamIds || []; group.teamIds[pairLabel === 'A' ? 0 : 1] = foundTeam.id; } } catch (e) {}
+      // Copy teams_users and scores from bestMatch if applicable
+      if (bestMatch && Array.isArray(bestMatch.players)) {
+        for (const player of pairPlayers) {
+          if (bestMatch.players.includes(player)) {
+            // tolerant user lookup using normalized index built earlier
+            const pnorm = normalizeNameForMatch(player);
+            let user = usersByNorm[pnorm];
+            if (!user) {
+              try { user = await prisma.users.findFirst({ where: { name: player } }); } catch (e) { user = null; }
+            }
+            if (user) {
+              const oldTU = await prisma.teams_users.findFirst({ where: { team_id: bestMatch.id, user_id: user.id } });
+              if (oldTU) {
+                await prisma.teams_users.create({
+                  data: {
+                    team_id: foundTeam.id,
+                    user_id: user.id,
+                    teebox: oldTU.teebox,
+                    course_handicap: oldTU.course_handicap,
+                    waters: oldTU.waters,
+                    dog: oldTU.dog,
+                    two_clubs: oldTU.two_clubs,
+                    fines: oldTU.fines
+                  }
+                });
+              }
+              const oldScores = await prisma.scores.findMany({ where: { team_id: bestMatch.id, user_id: user.id, competition_id: Number(compId) } });
+              for (const score of oldScores) {
+                await prisma.scores.create({
+                  data: {
+                    competition_id: Number(compId),
+                    team_id: foundTeam.id,
+                    user_id: user.id,
+                    hole_id: score.hole_id,
+                    strokes: score.strokes
+                  }
+                });
+              }
+            }
+          }
+        }
+      } else {
+        // No best-match data to copy from: create teams_users rows for each player
+        for (const player of pairPlayers) {
+          // tolerant user lookup using normalized index built earlier
+          const norm = normalizeNameForMatch(player);
+          let user = usersByNorm[norm];
+          if (!user) {
+            // final fallback: try exact DB lookup by name
+            try { user = await prisma.users.findFirst({ where: { name: player } }); } catch (e) { user = null; }
+          }
+          if (!user) continue;
+          // Determine course_handicap: prefer group-provided handicaps, else any existing teams_users for this user in the comp
+          let ch = undefined;
+          try {
+            if (group && group.handicaps && group.handicaps[player] !== undefined && group.handicaps[player] !== null && group.handicaps[player] !== '') {
+              const parsed = Number(group.handicaps[player]);
+              if (!isNaN(parsed)) ch = parsed;
+            }
+          } catch (e) {}
+          if (ch === undefined) {
+            // try any teams_users within this comp prefetched earlier
+            const fallbackTu = teamsUsersForComp.find(tu => tu && tu.user_id === user.id && tu.course_handicap != null);
+            if (fallbackTu && fallbackTu.course_handicap != null) ch = Number(fallbackTu.course_handicap);
+            else {
+              // final fallback: search across all competitions for the most recent teams_users with a course_handicap
+              try {
+                const anyTu = await prisma.teams_users.findFirst({ where: { user_id: user.id, course_handicap: { not: null } }, orderBy: { id: 'desc' } });
+                if (anyTu && anyTu.course_handicap != null) ch = Number(anyTu.course_handicap);
+              } catch (e) {}
+            }
+          }
+          try {
+            await prisma.teams_users.create({
+              data: {
+                team_id: foundTeam.id,
+                user_id: user.id,
+                teebox: (group && group.teeboxes && group.teeboxes[player]) ? group.teeboxes[player] : undefined,
+                course_handicap: ch !== undefined ? ch : undefined
+              }
+            });
+          } catch (e) {
+            // ignore create errors (unique constraint or other) — non-fatal
+            try { console.warn('teams_users.create warning (ignored):', e && e.message ? e.message : e); } catch (ee) {}
+          }
+        }
+      }
+      existingTeamMap[key] = foundTeam;
+      return foundTeam;
+    }
+
+    // Iterate groups and create teams where necessary
+    for (const [i, group] of (groups || []).entries()) {
+      if (!Array.isArray(group.players) || group.players.length === 0) continue;
+      // If this is a 4-player 4-ball and the competition is of 4BBB type, create/update two teams
+      if (isFourBbb && Array.isArray(group.players) && group.players.length === 4) {
+        const pairA = [group.players[0], group.players[1]];
+        const pairB = [group.players[2], group.players[3]];
+        await ensureTeamForPair(pairA, 'A', group, i, existingTeams);
+        await ensureTeamForPair(pairB, 'B', group, i, existingTeams);
+        continue;
+      }
+      // If this is a 2-player team object, preserve old behavior
+          if (Array.isArray(group.players) && group.players.length === 2) {
+        const key = teamKey(group.players);
+        let foundTeam = existingTeamMap[key];
+        if (!foundTeam) {
+          // Find the most similar old team (max overlap)
+          let bestMatch = null;
+          let bestOverlap = 0;
+          for (const oldTeam of existingTeams) {
+            if (!Array.isArray(oldTeam.players)) continue;
+            const overlap = oldTeam.players.filter(p => group.players.includes(p)).length;
+            if (overlap > bestOverlap) {
+              bestOverlap = overlap;
+              bestMatch = oldTeam;
+            }
+          }
+          // Create new team
+          foundTeam = await prisma.teams.create({
+            data: {
+              competition_id: Number(compId),
+              name: group.name || `Group ${i + 1}`,
+              players: group.players
+            }
+          });
+          // write team id back to group so GET and UI can see team association immediately
+          try { if (group) group.teamId = foundTeam.id; } catch (e) {}
+          // Copy teams_users and scores from bestMatch if applicable
+                if (bestMatch && Array.isArray(bestMatch.players)) {
+            for (const player of group.players) {
+        if (bestMatch.players.includes(player)) {
+          // tolerant user lookup
+          const pnorm = normalizeNameForMatch(player);
+          let user = usersByNorm[pnorm];
+          if (!user) { try { user = await prisma.users.findFirst({ where: { name: player } }); } catch (e) { user = null; } }
+          if (user) {
+                  const oldTU = await prisma.teams_users.findFirst({ where: { team_id: bestMatch.id, user_id: user.id } });
+                  if (oldTU) {
+                    await prisma.teams_users.create({
+                      data: {
+                        team_id: foundTeam.id,
+                        user_id: user.id,
+                        teebox: oldTU.teebox,
+                        course_handicap: oldTU.course_handicap,
+                        waters: oldTU.waters,
+                        dog: oldTU.dog,
+                        two_clubs: oldTU.two_clubs,
+                        fines: oldTU.fines
+                      }
+                    });
+                  }
+                  const oldScores = await prisma.scores.findMany({ where: { team_id: bestMatch.id, user_id: user.id, competition_id: Number(compId) } });
+                  for (const score of oldScores) {
+                    await prisma.scores.create({
+                      data: {
+                        competition_id: Number(compId),
+                        team_id: foundTeam.id,
+                        user_id: user.id,
+                        hole_id: score.hole_id,
+                        strokes: score.strokes
+                      }
+                    });
+                  }
+                }
+              }
+            }
+                } else {
+                  // No bestMatch: create teams_users rows using any provided group.handicaps or fallbacks
+                  for (const player of group.players) {
+                    // tolerant lookup
+                    const pnorm = normalizeNameForMatch(player);
+                    let user = usersByNorm[pnorm];
+                    if (!user) { try { user = await prisma.users.findFirst({ where: { name: player } }); } catch (e) { user = null; } }
+                    if (!user) continue;
+                    let ch = undefined;
+                    try {
+                      if (group && group.handicaps && group.handicaps[player] !== undefined && group.handicaps[player] !== null && group.handicaps[player] !== '') {
+                        const parsed = Number(group.handicaps[player]);
+                        if (!isNaN(parsed)) ch = parsed;
+                      }
+                    } catch (e) {}
+                    if (ch === undefined) {
+                      const fallbackTu = teamsUsersForComp.find(tu => tu && tu.user_id === user.id && tu.course_handicap != null);
+                      if (fallbackTu && fallbackTu.course_handicap != null) ch = Number(fallbackTu.course_handicap);
+                    }
+                    try {
+                      await prisma.teams_users.create({ data: { team_id: foundTeam.id, user_id: user.id, teebox: (group && group.teeboxes && group.teeboxes[player]) ? group.teeboxes[player] : undefined, course_handicap: ch !== undefined ? ch : undefined } });
+                    } catch (e) {
+                      try { console.warn('teams_users.create warning (ignored):', e && e.message ? e.message : e); } catch (ee) {}
+                    }
+                  }
+                }
+          existingTeamMap[key] = foundTeam;
+        }
+      }
+      // Other sizes: skip
+    }
+    // After creating teams and teams_users, fetch latest teams_users for this competition
+    try {
+      const allTeams = await prisma.teams.findMany({ where: { competition_id: Number(compId) } });
+      const teamIds = (allTeams || []).map(t => t.id).filter(Boolean);
+      let allTeamUsers = [];
+      if (teamIds.length > 0) {
+        allTeamUsers = await prisma.teams_users.findMany({ where: { team_id: { in: teamIds } }, include: { users: true, teams: true } });
+      }
+      // Build handicaps map back onto the groups array so the saved competition reflects course_handicap
+      for (const group of (groups || [])) {
+        try {
+          if (!group || !Array.isArray(group.players)) continue;
+          group.handicaps = group.handicaps || {};
+          group.teeboxes = group.teeboxes || {};
+          for (const player of group.players) {
+            // look for teams_users rows matching player name within any of the group's teams (teamIds or teamId)
+            const norm = normalizeNameForMatch(player);
+            let match = null;
+            if (Array.isArray(group.teamIds) && group.teamIds.length > 0) {
+              match = allTeamUsers.find(tu => tu && tu.team_id && group.teamIds.includes(tu.team_id) && tu.users && normalizeNameForMatch(tu.users.name) === norm);
+            }
+            if (!match && (group.teamId || group.id || group.team_id || group.group_id)) {
+              const tId = group.teamId || group.id || group.team_id || group.group_id;
+              match = allTeamUsers.find(tu => tu && tu.team_id === tId && tu.users && normalizeNameForMatch(tu.users.name) === norm);
+            }
+            // final fallback: any teams_users in this competition matching by name
+            if (!match) {
+              match = allTeamUsers.find(tu => tu && tu.users && normalizeNameForMatch(tu.users.name) === norm && tu.course_handicap != null);
+            }
+            if (match && match.course_handicap != null) {
+              group.handicaps[player] = match.course_handicap;
+            }
+            if (match && match.teebox) {
+              group.teeboxes[player] = match.teebox;
+            }
+          }
+        } catch (e) { /* ignore per-group errors */ }
+      }
+      // Persist enriched groups back to competitions table so GET /api/competitions/:id returns handicaps immediately
+      try {
+        await prisma.competitions.update({ where: { id: Number(compId) }, data: { groups } });
+      } catch (e) { console.warn('Failed to persist enriched groups with handicaps', e && e.message ? e.message : e); }
+    } catch (e) {
+      // ignore enrichment errors
+      try { console.warn('processGroupsForCompetition enrichment warning', e && e.message ? e.message : e); } catch (ee) {}
+    }
+  } catch (e) {
+    console.error('processGroupsForCompetition error', e);
+  }
+}
+
+// Refresh the competitions.groups handicaps/teeboxes from the latest teams_users rows
+// This is a lightweight update used after teams_users rows change (so the UI shows
+// the updated CH immediately without waiting for a manual groups save).
+async function refreshCompetitionGroupsFromTeamsUsers(compId) {
+  if (!compId) return;
+  try {
+    const comp = await prisma.competitions.findUnique({ where: { id: Number(compId) } });
+    if (!comp || !Array.isArray(comp.groups) || comp.groups.length === 0) return;
+    // small normalizer (copied logic to be robust)
+    function normalizeNameForMatch(n) {
+      if (!n && n !== 0) return '';
+      try {
+        return String(n)
+          .normalize('NFKD')
+          .replace(/[“”]/g, '"')
+          .replace(/[‘’]/g, "'")
+          .replace(/''/g, "'")
+          .replace(/["()\[\]{}]/g, '')
+          .replace(/[^\w\s\-']/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+      } catch (e) {
+        return (n || '').toString().trim().toLowerCase();
+      }
+    }
+    const allTeams = await prisma.teams.findMany({ where: { competition_id: Number(compId) } });
+    const teamIds = (allTeams || []).map(t => t.id).filter(Boolean);
+    let allTeamUsers = [];
+    if (teamIds.length > 0) {
+      allTeamUsers = await prisma.teams_users.findMany({ where: { team_id: { in: teamIds } }, include: { users: true } });
+    }
+    const groups = JSON.parse(JSON.stringify(comp.groups || []));
+    for (const group of groups) {
+      try {
+        if (!group || !Array.isArray(group.players)) continue;
+        group.handicaps = group.handicaps || {};
+        group.teeboxes = group.teeboxes || {};
+        for (const player of group.players) {
+          const norm = normalizeNameForMatch(player);
+          let match = null;
+          if (Array.isArray(group.teamIds) && group.teamIds.length > 0) {
+            match = allTeamUsers.find(tu => tu && tu.team_id && group.teamIds.includes(tu.team_id) && tu.users && normalizeNameForMatch(tu.users.name) === norm);
+          }
+          if (!match && (group.teamId || group.id || group.team_id || group.group_id)) {
+            const tId = group.teamId || group.id || group.team_id || group.group_id;
+            match = allTeamUsers.find(tu => tu && tu.team_id === tId && tu.users && normalizeNameForMatch(tu.users.name) === norm);
+          }
+          if (!match) {
+            match = allTeamUsers.find(tu => tu && tu.users && normalizeNameForMatch(tu.users.name) === norm && tu.course_handicap != null);
+          }
+          if (match && match.course_handicap != null) group.handicaps[player] = match.course_handicap;
+          if (match && match.teebox) group.teeboxes[player] = match.teebox;
+        }
+      } catch (e) { /* ignore per-group errors */ }
+    }
+    try {
+      await prisma.competitions.update({ where: { id: Number(compId) }, data: { groups } });
+    } catch (e) { console.warn('refreshCompetitionGroupsFromTeamsUsers: failed to persist groups', e && e.message ? e.message : e); }
+  } catch (e) {
+    console.warn('refreshCompetitionGroupsFromTeamsUsers error', e && e.message ? e.message : e);
+  }
+}
+
 // Simple event id generator
 function makeEventId() {
   return Math.random().toString(36).slice(2, 8) + '-' + Date.now().toString(36);
@@ -53,7 +471,7 @@ app.get('/', (req, res) => {
   res.send('Backend is running!');
 });
 
-// Update groups for a competition
+      
 app.patch('/api/competitions/:id/groups', async (req, res) => {
   const { id } = req.params;
   const { groups } = req.body;
@@ -167,168 +585,14 @@ app.patch('/api/competitions/:id/groups', async (req, res) => {
       data: { groups: groupsToSave },
     });
 
-    // Determine competition type (needed to know whether 4-player groups represent 4BBB teams)
-    const compRow = existingComp || await prisma.competitions.findUnique({ where: { id: compId } });
-    const compTypeLower = (compRow?.type || '').toString().toLowerCase();
-    const isFourBbb = compTypeLower.includes('4bbb') || compTypeLower.includes('fourbbb') || (!!compRow && !!compRow.fourballs);
-
-    // Fetch all existing teams for this competition
-    const existingTeams = await prisma.teams.findMany({ where: { competition_id: Number(id) } });
-    // Map of team key (sorted player names) to team object
-    const teamKey = (players) => players.map(p => p && p.trim && p.trim()).sort().join('|');
-    const existingTeamMap = {};
-    for (const team of existingTeams) {
-      if (Array.isArray(team.players)) {
-        existingTeamMap[teamKey(team.players)] = team;
-      }
+    // Reuse shared helper to process/create teams for the saved groups (keeps behavior consistent with
+    // the logic in other places). This will create teams for 2-player groups and split 4-player
+    // groups into two teams when the competition is a 4BBB/fourball type.
+    try {
+      await processGroupsForCompetition(compId, groupsToSave);
+    } catch (e) {
+      console.error('Error while processing groups after save (processGroupsForCompetition):', e);
     }
-
-    // Create teams for each incoming group. Groups can be either 2-player (team) objects
-    // or 4-player 4-balls. For 4-player groups we create two teams: players[0,1] and players[2,3].
-  for (const [i, group] of (groupsToSave || groups).entries()) {
-      if (!Array.isArray(group.players) || group.players.length === 0) continue;
-      // Helper to process a pair of players and create/find a team for them
-      async function ensureTeamForPair(pairPlayers, pairLabel) {
-        if (!Array.isArray(pairPlayers) || pairPlayers.length !== 2) return null;
-        const key = teamKey(pairPlayers);
-        let foundTeam = existingTeamMap[key];
-        if (foundTeam) return foundTeam;
-        // Find the most similar old team (max overlap)
-        let bestMatch = null;
-        let bestOverlap = 0;
-        for (const oldTeam of existingTeams) {
-          if (!Array.isArray(oldTeam.players)) continue;
-          const overlap = oldTeam.players.filter(p => pairPlayers.includes(p)).length;
-          if (overlap > bestOverlap) {
-            bestOverlap = overlap;
-            bestMatch = oldTeam;
-          }
-        }
-        // Create new team for this pair
-        foundTeam = await prisma.teams.create({
-          data: {
-            competition_id: Number(id),
-            name: group.name ? `${group.name} ${pairLabel}` : `Group ${i + 1} ${pairLabel}`,
-            players: pairPlayers
-          }
-        });
-        // Copy teams_users and scores from bestMatch if applicable
-        if (bestMatch && Array.isArray(bestMatch.players)) {
-          for (const player of pairPlayers) {
-            if (bestMatch.players.includes(player)) {
-              const user = await prisma.users.findFirst({ where: { name: player } });
-              if (user) {
-                const oldTU = await prisma.teams_users.findFirst({ where: { team_id: bestMatch.id, user_id: user.id } });
-                if (oldTU) {
-                  await prisma.teams_users.create({
-                    data: {
-                      team_id: foundTeam.id,
-                      user_id: user.id,
-                      teebox: oldTU.teebox,
-                      course_handicap: oldTU.course_handicap,
-                      waters: oldTU.waters,
-                      dog: oldTU.dog,
-                      two_clubs: oldTU.two_clubs,
-                      fines: oldTU.fines
-                    }
-                  });
-                }
-                const oldScores = await prisma.scores.findMany({ where: { team_id: bestMatch.id, user_id: user.id, competition_id: Number(id) } });
-                for (const score of oldScores) {
-                  await prisma.scores.create({
-                    data: {
-                      competition_id: Number(id),
-                      team_id: foundTeam.id,
-                      user_id: user.id,
-                      hole_id: score.hole_id,
-                      strokes: score.strokes
-                    }
-                  });
-                }
-              }
-            }
-          }
-        }
-        existingTeamMap[key] = foundTeam;
-        return foundTeam;
-      }
-
-      // If this is a 4-player 4-ball and the competition is of 4BBB type, create/update two teams
-      if (isFourBbb && Array.isArray(group.players) && group.players.length === 4) {
-        const pairA = [group.players[0], group.players[1]];
-        const pairB = [group.players[2], group.players[3]];
-        await ensureTeamForPair(pairA, 'A');
-        await ensureTeamForPair(pairB, 'B');
-        continue;
-      }
-
-      // If this is a 2-player team object, preserve old behavior
-      if (Array.isArray(group.players) && group.players.length === 2) {
-        const key = teamKey(group.players);
-        let foundTeam = existingTeamMap[key];
-        if (!foundTeam) {
-          // Find the most similar old team (max overlap)
-          let bestMatch = null;
-          let bestOverlap = 0;
-          for (const oldTeam of existingTeams) {
-            if (!Array.isArray(oldTeam.players)) continue;
-            const overlap = oldTeam.players.filter(p => group.players.includes(p)).length;
-            if (overlap > bestOverlap) {
-              bestOverlap = overlap;
-              bestMatch = oldTeam;
-            }
-          }
-          // Create new team
-          foundTeam = await prisma.teams.create({
-            data: {
-              competition_id: Number(id),
-              name: group.name || `Group ${i + 1}`,
-              players: group.players
-            }
-          });
-          // Copy teams_users and scores from bestMatch if applicable
-          if (bestMatch && Array.isArray(bestMatch.players)) {
-            for (const player of group.players) {
-              if (bestMatch.players.includes(player)) {
-                const user = await prisma.users.findFirst({ where: { name: player } });
-                if (user) {
-                  const oldTU = await prisma.teams_users.findFirst({ where: { team_id: bestMatch.id, user_id: user.id } });
-                  if (oldTU) {
-                    await prisma.teams_users.create({
-                      data: {
-                        team_id: foundTeam.id,
-                        user_id: user.id,
-                        teebox: oldTU.teebox,
-                        course_handicap: oldTU.course_handicap,
-                        waters: oldTU.waters,
-                        dog: oldTU.dog,
-                        two_clubs: oldTU.two_clubs,
-                        fines: oldTU.fines
-                      }
-                    });
-                  }
-                  const oldScores = await prisma.scores.findMany({ where: { team_id: bestMatch.id, user_id: user.id, competition_id: Number(id) } });
-                  for (const score of oldScores) {
-                    await prisma.scores.create({
-                      data: {
-                        competition_id: Number(id),
-                        team_id: foundTeam.id,
-                        user_id: user.id,
-                        hole_id: score.hole_id,
-                        strokes: score.strokes
-                      }
-                    });
-                  }
-                }
-              }
-            }
-          }
-          existingTeamMap[key] = foundTeam;
-        }
-      }
-      // Other sizes: skip
-    }
-    // Do NOT delete or update any existing teams, scores, or player info
     res.json({ success: true, competition: updated });
   } catch (err) {
     console.error('Error updating groups:', err);
@@ -398,6 +662,14 @@ app.post('/api/competitions', async (req, res) => {
     ];
     const holesData = westlake.map(h => ({ ...h, competition_id: comp.id }));
     await prisma.holes.createMany({ data: holesData });
+    // If the client supplied groups on creation, ensure underlying teams are created
+    try {
+      if (data.groups && Array.isArray(data.groups) && data.groups.length > 0) {
+        await processGroupsForCompetition(comp.id, data.groups);
+      }
+    } catch (e) {
+      console.error('Error processing groups for new competition:', e);
+    }
     res.json({ success: true, competition: comp });
   } catch (err) {
     console.error('Error creating competition:', err);
@@ -418,6 +690,60 @@ app.get('/api/competitions/:id', async (req, res) => {
   let compOut = JSON.parse(JSON.stringify(comp));
     let debug = [];
     let users = await prisma.users.findMany();
+  // Helper to robustly match a player display name to a users row.
+  // Use a stronger normalizer (strip punctuation, smart quotes, collapse whitespace)
+  function normalizeNameForMatch(n) {
+    if (!n && n !== 0) return '';
+    try {
+      return String(n)
+        .normalize('NFKD')
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .replace(/''/g, "'")
+        .replace(/["()\[\]{}]/g, '')
+        .replace(/[^\w\s\-']/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+    } catch (e) {
+      return (n || '').toString().trim().toLowerCase();
+    }
+  }
+
+  // Build an index of users by several name candidates for fast in-memory lookup
+  const usersByNorm = {};
+  for (const u of users || []) {
+    if (!u) continue;
+    const candidates = [];
+    if (u.name) candidates.push(u.name);
+    if (u.displayName) candidates.push(u.displayName);
+    if (u.display_name) candidates.push(u.display_name);
+    if (u.displayname) candidates.push(u.displayname);
+    if (u.nick) candidates.push(u.nick);
+    if (u.nickname) candidates.push(u.nickname);
+    // also include raw name
+    if (u.name) candidates.push(u.name);
+    for (const c of candidates) {
+      if (!c) continue;
+      const k = normalizeNameForMatch(c);
+      if (!k) continue;
+      usersByNorm[k] = usersByNorm[k] || u;
+    }
+  }
+
+  function findUserByName(playerName) {
+    if (!playerName) return null;
+    const target = normalizeNameForMatch(playerName);
+    if (!target) return null;
+    if (usersByNorm[target]) return usersByNorm[target];
+    return null;
+  }
+
+  // Pre-fetch teams_users rows for this competition once to allow fallbacks when no user is found
+  let teamsUsersForComp = [];
+  try {
+    teamsUsersForComp = await prisma.teams_users.findMany({ where: { teams: { competition_id: Number(id) } }, include: { users: true } });
+  } catch (e) { /* ignore fetch errors; fallbacks will be best-effort */ }
   // Determine competition type to know whether 4-player groups map to two teams
   const compRow = await prisma.competitions.findUnique({ where: { id: Number(id) } });
   const compTypeLower = (compRow?.type || '').toString().toLowerCase();
@@ -437,21 +763,21 @@ app.get('/api/competitions/:id', async (req, res) => {
             const pairB = [group.players[2], group.players[3]];
             for (const team of allTeams) {
               if (!Array.isArray(team.players)) continue;
-              const tSet = new Set(team.players.map(p => p && p.trim && p.trim()));
-              if (tSet.size === 2 && pairA.every(p => tSet.has(p))) {
+              const tSet = new Set(team.players.map(p => normalizeNameForMatch(p)));
+              if (tSet.size === 2 && pairA.every(p => tSet.has(normalizeNameForMatch(p)))) {
                 group.teamIds = group.teamIds || [];
                 group.teamIds[0] = team.id;
               }
-              if (tSet.size === 2 && pairB.every(p => tSet.has(p))) {
+              if (tSet.size === 2 && pairB.every(p => tSet.has(normalizeNameForMatch(p)))) {
                 group.teamIds = group.teamIds || [];
                 group.teamIds[1] = team.id;
               }
             }
           } else {
-            const groupSet = new Set(group.players.map(p => p && p.trim && p.trim()));
+            const groupSet = new Set(group.players.map(p => normalizeNameForMatch(p)));
             for (const team of allTeams) {
               if (Array.isArray(team.players)) {
-                const teamSet = new Set(team.players.map(p => p && p.trim && p.trim()));
+                const teamSet = new Set(team.players.map(p => normalizeNameForMatch(p)));
                 if (groupSet.size === teamSet.size && groupSet.size > 0 && [...groupSet].every(p => teamSet.has(p))) {
                   foundTeam = team;
                   break;
@@ -463,22 +789,44 @@ app.get('/api/competitions/:id', async (req, res) => {
         groupDebug.foundTeam = foundTeam;
         debug.push(groupDebug);
         // For 4-player groups, we may have stored two teamIds (pairA and pairB)
-        if (group.teamIds && Array.isArray(group.teamIds) && group.teamIds.length > 0) {
+          if (group.teamIds && Array.isArray(group.teamIds) && group.teamIds.length > 0) {
           // Populate handicaps/teeboxes by searching teams_users for each player across assigned teams
           group.handicaps = {};
           group.teeboxes = {};
           for (const playerName of group.players) {
-            const user = users.find(u => u.name === playerName);
-            if (!user) continue;
-            // Try each team id in teamIds to find teams_users
-            for (const tId of group.teamIds) {
-              if (!tId) continue;
-              const tu = await prisma.teams_users.findFirst({ where: { team_id: tId, user_id: user.id } });
-              if (tu) {
-                if (tu.course_handicap !== null && tu.course_handicap !== undefined) group.handicaps[playerName] = tu.course_handicap;
-                if (tu.teebox) group.teeboxes[playerName] = tu.teebox;
-                break;
+            const user = findUserByName(playerName);
+            if (user) {
+              // Try each team id in teamIds to find teams_users
+              for (const tId of group.teamIds) {
+                if (!tId) continue;
+                const tu = await prisma.teams_users.findFirst({ where: { team_id: tId, user_id: user.id } });
+                if (tu) {
+                  if (tu.course_handicap !== null && tu.course_handicap !== undefined) group.handicaps[playerName] = tu.course_handicap;
+                  if (tu.teebox) group.teeboxes[playerName] = tu.teebox;
+                  break;
+                }
               }
+              // Fallback: if we didn't find a teams_users row via the explicit teamIds,
+              // try to find any teams_users for this user within the same competition.
+              if (group.handicaps[playerName] === undefined) {
+                try {
+                  const fallbackTu = await prisma.teams_users.findFirst({ where: { user_id: user.id, teams: { competition_id: Number(id) } }, include: { teams: true } });
+                  if (fallbackTu) {
+                    if (fallbackTu.course_handicap !== null && fallbackTu.course_handicap !== undefined) group.handicaps[playerName] = fallbackTu.course_handicap;
+                    if (fallbackTu.teebox) group.teeboxes[playerName] = fallbackTu.teebox;
+                  }
+                } catch (e) { /* ignore */ }
+              }
+            } else {
+              // No user row matched — try to find a teams_users row by matching the associated user's name
+              try {
+                const normTarget = normalizeNameForMatch(playerName);
+                const tuMatch = teamsUsersForComp.find(tu => tu && tu.users && normalizeNameForMatch(tu.users.name) === normTarget);
+                if (tuMatch) {
+                  if (tuMatch.course_handicap !== null && tuMatch.course_handicap !== undefined) group.handicaps[playerName] = tuMatch.course_handicap;
+                  if (tuMatch.teebox) group.teeboxes[playerName] = tuMatch.teebox;
+                }
+              } catch (e) { /* ignore */ }
             }
           }
         } else {
@@ -488,7 +836,7 @@ app.get('/api/competitions/:id', async (req, res) => {
             group.handicaps = {};
             group.teeboxes = {};
             for (const playerName of group.players) {
-              const user = users.find(u => u.name === playerName);
+              const user = findUserByName(playerName);
               if (user) {
                 const tu = await prisma.teams_users.findFirst({ where: { team_id: foundTeam.id, user_id: user.id } });
                 if (tu) {
@@ -498,17 +846,213 @@ app.get('/api/competitions/:id', async (req, res) => {
                   if (tu.teebox) {
                     group.teeboxes[playerName] = tu.teebox;
                   }
+                } else {
+                  // Fallback: try any teams_users for this user within the same competition
+                  try {
+                    const fallbackTu = await prisma.teams_users.findFirst({ where: { user_id: user.id, teams: { competition_id: Number(id) } }, include: { teams: true } });
+                    if (fallbackTu) {
+                      if (fallbackTu.course_handicap !== null && fallbackTu.course_handicap !== undefined) group.handicaps[playerName] = fallbackTu.course_handicap;
+                      if (fallbackTu.teebox) group.teeboxes[playerName] = fallbackTu.teebox;
+                    }
+                  } catch (e) { /* ignore */ }
                 }
+              } else {
+                // try teams_users fallback by matching associated user name
+                try {
+                  const normTarget = normalizeNameForMatch(playerName);
+                  const tuMatch = teamsUsersForComp.find(tu => tu && tu.users && normalizeNameForMatch(tu.users.name) === normTarget);
+                  if (tuMatch) {
+                    if (tuMatch.course_handicap !== null && tuMatch.course_handicap !== undefined) group.handicaps[playerName] = tuMatch.course_handicap;
+                    if (tuMatch.teebox) group.teeboxes[playerName] = tuMatch.teebox;
+                  }
+                } catch (e) { /* ignore */ }
               }
             }
           }
         }
       }
     }
+    // Final pass: if any group still lacks handicaps, try to find any teams_users rows for those players
+    try {
+      for (const group of (compOut.groups || [])) {
+        if (!group || !Array.isArray(group.players)) continue;
+        if (group.handicaps && Object.keys(group.handicaps).length > 0) continue;
+        group.handicaps = group.handicaps || {};
+        for (const playerName of group.players) {
+          try {
+            const user = findUserByName(playerName);
+            if (user) {
+              const anyTu = await prisma.teams_users.findFirst({ where: { user_id: user.id, course_handicap: { not: null } } });
+              if (anyTu && anyTu.course_handicap != null) {
+                group.handicaps[playerName] = anyTu.course_handicap;
+                try { console.log(`Enriched group.handicaps (final pass) for '${playerName}' from teams_users id ${anyTu.id}`); } catch (e) {}
+                continue;
+              }
+            }
+            // If still not found via users, try the prefetched teams_users rows
+            const normTarget = normalizeNameForMatch(playerName);
+            const tuMatch = teamsUsersForComp.find(tu => tu && tu.users && normalizeNameForMatch(tu.users.name) === normTarget && tu.course_handicap != null);
+            if (tuMatch) {
+              group.handicaps[playerName] = tuMatch.course_handicap;
+              try { console.log(`Enriched group.handicaps (final pass) for '${playerName}' from teams_users id ${tuMatch.id}`); } catch (e) {}
+            }
+          } catch (e) { /* ignore per-player errors */ }
+        }
+      }
+    } catch (e) { /* ignore final pass errors */ }
+
     res.json({ ...compOut, debug, users });
   } catch (err) {
     console.error('Error fetching competition:', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Compute a 4BBB-style leaderboard directly from competitions.groups and teams_users/scores
+// This endpoint is a fast, authoritative server-side computation that uses stored groups (handicaps)
+// and scores to produce team and per-player stats (gross, PH, CH, Net, DTH Net) without relying on
+// the client-side `entries` state. Useful when group.handicaps are partially populated.
+app.get('/api/competitions/:id/leaderboard-4bbb', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const compId = Number(id);
+    if (!compId) return res.status(400).json({ error: 'Invalid competition id' });
+    const comp = await prisma.competitions.findUnique({ where: { id: compId }, include: { holes: { orderBy: { number: 'asc' } } } });
+    if (!comp) return res.status(404).json({ error: 'Competition not found' });
+
+    const holes = Array.isArray(comp.holes) ? comp.holes : [];
+    // fetch teams_users for this competition to map player names -> user_id and CH
+    const teams = await prisma.teams.findMany({ where: { competition_id: compId } });
+    const teamIds = (teams || []).map(t => t.id).filter(Boolean);
+    const allTeamUsers = teamIds.length > 0 ? await prisma.teams_users.findMany({ where: { team_id: { in: teamIds } }, include: { users: true } }) : [];
+    // fetch all scores for this competition (we will map by user_id and hole)
+    const allScores = await prisma.scores.findMany({ where: { competition_id: compId } });
+
+    // helper normalizer (same approach as other helpers)
+    function normalizeName(n) {
+      if (!n && n !== 0) return '';
+      try {
+        return String(n).normalize('NFKD').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/''/g, "'").replace(/["()\[\]{}]/g, '').replace(/[^\w\s\-']/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+      } catch (e) { return (n || '').toString().trim().toLowerCase(); }
+    }
+
+    const allowanceRaw = comp?.handicapallowance ?? comp?.handicapAllowance ?? 100;
+    const allowance = (parseFloat(allowanceRaw) || 100) / 100;
+
+    // Map hole id -> index and stroke_index for receiving strokes
+    const holeIdToIndex = {};
+    const holeIndexToStrokeIndex = {};
+    holes.forEach((h, idx) => { holeIdToIndex[h.id] = idx; holeIndexToStrokeIndex[idx] = (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)); });
+
+    // Build helper to get teams_users row for a player name (prefer matching within provided group teamIds)
+    function findTeamUserForName(name, candidateTeamIds) {
+      const norm = normalizeName(name);
+      // first, prefer explicit teamIds
+      if (Array.isArray(candidateTeamIds) && candidateTeamIds.length > 0) {
+        for (const tu of allTeamUsers) {
+          if (!tu || !tu.users) continue;
+          if (!candidateTeamIds.includes(tu.team_id)) continue;
+          if (normalizeName(tu.users.name) === norm) return tu;
+        }
+      }
+      // fallback: any teams_users in this competition matching by name
+      for (const tu of allTeamUsers) {
+        if (!tu || !tu.users) continue;
+        if (normalizeName(tu.users.name) === norm) return tu;
+      }
+      return null;
+    }
+
+    // helper: compute strokesReceived for a hole given playing handicap (PH) and hole stroke_index
+    function strokesReceivedForHole(ph, strokeIndex) {
+      let strokesReceived = 0;
+      if (!strokeIndex) strokeIndex = 0;
+      if (ph > 0) {
+        if (ph >= 18) {
+          strokesReceived = 1;
+          if ((ph - 18) >= strokeIndex) strokesReceived = 2;
+          else if (strokeIndex <= (ph % 18)) strokesReceived = 2;
+        } else if (strokeIndex <= ph) {
+          strokesReceived = 1;
+        }
+      }
+      return strokesReceived;
+    }
+
+    // stableford points helper
+    function stablefordPoints(net, par) {
+      if (net == null || Number.isNaN(net)) return 0;
+      if (net <= par - 4) return 6;
+      if (net === par - 3) return 5;
+      if (net === par - 2) return 4;
+      if (net === par - 1) return 3;
+      if (net === par) return 2;
+      if (net === par + 1) return 1;
+      return 0;
+    }
+
+    const outTeams = [];
+    const groups = Array.isArray(comp.groups) ? comp.groups : [];
+    for (const group of groups) {
+      if (!group || !Array.isArray(group.players)) continue;
+      // Determine pairs: if 4-player group assume pairA [0,1], pairB [2,3]; if 2-player group treat as single team
+      const isFour = Array.isArray(group.players) && group.players.length === 4;
+      const pairs = isFour ? [[group.players[0], group.players[1]], [group.players[2], group.players[3]]] : [group.players.slice(0,2)];
+      // candidate teamIds for matching (group.teamIds or group.teamId)
+      const candidateTeamIds = Array.isArray(group.teamIds) && group.teamIds.length > 0 ? group.teamIds : (group.teamId ? [group.teamId] : []);
+      for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
+        const pair = pairs[pIdx];
+        // gather per-player computed stats
+        const playerStats = [];
+        for (const playerName of pair) {
+          const tu = findTeamUserForName(playerName, candidateTeamIds);
+          const userId = tu && tu.user_id ? Number(tu.user_id) : null;
+          const chRaw = (group && group.handicaps && group.handicaps[playerName] !== undefined) ? group.handicaps[playerName] : (tu && (tu.course_handicap !== null && tu.course_handicap !== undefined) ? tu.course_handicap : null);
+          const ch = chRaw !== null && chRaw !== undefined && chRaw !== '' ? Number(chRaw) : null;
+          const ph = ch != null ? Math.round((Number(ch) || 0) * allowance) : 0;
+          // assemble per-hole strokes for this player from allScores using userId
+          const perHoleStrokes = Array(18).fill(null);
+          if (userId) {
+            for (const s of allScores) {
+              if (s.user_id === userId) {
+                const idx = holeIdToIndex[s.hole_id];
+                if (idx != null && idx >= 0 && idx < 18) perHoleStrokes[idx] = s.strokes != null ? Number(s.strokes) : null;
+              }
+            }
+          }
+          const gross = perHoleStrokes.reduce((sum, v) => sum + (Number.isFinite(Number(v)) ? Number(v) : 0), 0);
+          const net = gross && ph ? gross - ph : (gross || 0) - (ph || 0);
+          const dthNet = gross - (ch != null ? ch : 0);
+          // compute stableford per hole using PH-derived strokes received
+          const perHolePoints = Array(18).fill(0);
+          for (let hi = 0; hi < 18; hi++) {
+            const strokes = perHoleStrokes[hi];
+            if (strokes == null || strokes === '' || !Number.isFinite(Number(strokes)) || Number(strokes) <= 0) { perHolePoints[hi] = 0; continue; }
+            const strokeIdx = holeIndexToStrokeIndex[hi] || 0;
+            const strokesReceived = strokesReceivedForHole(ph, strokeIdx);
+            const holePar = (holes[hi] && holes[hi].par != null) ? Number(holes[hi].par) : 4;
+            const netStrokes = Number(strokes) - strokesReceived;
+            perHolePoints[hi] = stablefordPoints(netStrokes, holePar);
+          }
+          const points = perHolePoints.reduce((s,v) => s + (v || 0), 0);
+          playerStats.push({ name: playerName, userId, ch: ch != null ? ch : null, ph, gross, net, dthNet, perHoleStrokes, perHolePoints, points });
+        }
+        // compute team best-ball per hole (max of two players' perHolePoints)
+        const teamPerHole = Array(18).fill(0);
+        for (let hi = 0; hi < 18; hi++) {
+          const a = (playerStats[0] && playerStats[0].perHolePoints && Number.isFinite(playerStats[0].perHolePoints[hi]) ? Number(playerStats[0].perHolePoints[hi]) : 0);
+          const b = (playerStats[1] && playerStats[1].perHolePoints && Number.isFinite(playerStats[1].perHolePoints[hi]) ? Number(playerStats[1].perHolePoints[hi]) : 0);
+          teamPerHole[hi] = Math.max(a,b);
+        }
+        const teamPoints = teamPerHole.reduce((s,v) => s + (v || 0), 0);
+        outTeams.push({ groupIndex: groups.indexOf(group), pairIndex: pIdx, players: playerStats, teamPoints, teamPerHole, teamIds: group.teamIds || (group.teamId ? [group.teamId] : []) });
+      }
+    }
+
+    res.json({ competitionId: compId, teams: outTeams });
+  } catch (e) {
+    console.error('leaderboard-4bbb error', e && e.stack ? e.stack : e);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -539,6 +1083,28 @@ app.get('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
     res.json({ scores: result });
   } catch (err) {
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// DEBUG: list teams_users rows for a team or competition (admin/dev helper)
+app.get('/api/debug/teams_users', async (req, res) => {
+  const { teamId, competitionId } = req.query;
+  try {
+    if (teamId) {
+      const rows = await prisma.teams_users.findMany({ where: { team_id: Number(teamId) } });
+      return res.json(rows);
+    }
+    if (competitionId) {
+      const teams = await prisma.teams.findMany({ where: { competition_id: Number(competitionId) } });
+      const ids = (teams || []).map(t => t.id).filter(Boolean);
+      if (ids.length === 0) return res.json([]);
+  const rows = await prisma.teams_users.findMany({ where: { team_id: { in: ids } }, include: { teams: true, users: true } });
+      return res.json(rows);
+    }
+    return res.status(400).json({ error: 'teamId or competitionId required' });
+  } catch (e) {
+    console.error('debug/teams_users error', e);
+    return res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -903,6 +1469,19 @@ app.patch('/api/teams/:teamId/users/:userId', async (req, res) => {
     } catch (e) {
       console.error('Error emitting team-user-updated', e);
     }
+    // If the update included course_handicap or teebox, refresh the competition's groups handicaps
+    try {
+      const wantsRefresh = Object.prototype.hasOwnProperty.call(req.body, 'course_handicap') || Object.prototype.hasOwnProperty.call(req.body, 'teebox');
+      if (wantsRefresh) {
+        // run in background - do not block response
+        (async () => {
+          try {
+            const team = await prisma.teams.findUnique({ where: { id: Number(teamId) } });
+            if (team && team.competition_id) await refreshCompetitionGroupsFromTeamsUsers(team.competition_id);
+          } catch (e) { console.warn('background refreshCompetitionGroupsFromTeamsUsers failed', e && e.message ? e.message : e); }
+        })();
+      }
+    } catch (e) { console.warn('teams_users patch refresh check failed', e && e.message ? e.message : e); }
     res.json(record);
   } catch (err) {
     console.error('Error upserting teams_users:', err);
@@ -1033,6 +1612,36 @@ io.on('connection', (socket) => {
       console.error('Error handling client-medal-saved', e);
     }
   });
+  // Re-broadcast client-sent team/user drafts (course_handicap/teebox/etc) so other viewers
+  // of the competition see the optimistic change immediately. Emit as the canonical
+  // `team-user-updated` event so existing listeners handle it identically to persisted updates.
+  socket.on('client-team-user-updated', (payload) => {
+    try {
+      const compId = Number(payload?.competitionId);
+      if (!compId) return;
+      // Attach origin socket id so recipients can dedupe if they came from the same socket
+      try { payload.originSocketId = socket.id; } catch (e) {}
+      console.log(`Rebroadcasting client-team-user-updated to competition:${compId}`);
+      global.io.to(`competition:${compId}`).emit('team-user-updated', payload);
+    } catch (e) {
+      console.error('Error handling client-team-user-updated', e);
+    }
+  });
+  // Re-broadcast lightweight score drafts so leaderboards and other scorecards can
+  // reflect partial/real-time score edits instantly. Emit as `score-draft-updated`.
+  socket.on('client-score-updated', (payload) => {
+    try {
+      const compId = Number(payload?.competitionId);
+      if (!compId) return;
+      try { payload.originSocketId = socket.id; } catch (e) {}
+      // Minimal logging for diagnostics
+      // payload may include: teamId, userId, playerName, holeIndex, strokes, scores (optional full array)
+      console.log(`Rebroadcasting client-score-updated to competition:${compId}`, { teamId: payload.teamId, userId: payload.userId, holeIndex: payload.holeIndex });
+      global.io.to(`competition:${compId}`).emit('score-draft-updated', payload);
+    } catch (e) {
+      console.error('Error handling client-score-updated', e);
+    }
+  });
   // Clients may show optimistic popups locally. To ensure other viewers see
   // those popups even when the HTTP save didn't change server state (no
   // server-side popup emitted), allow clients to request a server rebroadcast
@@ -1095,6 +1704,14 @@ app.post('/api/competitions', async (req, res) => {
         created_at: new Date()
       }
     });
+    // If groups were supplied at creation, create underlying teams automatically
+    try {
+      if (groups && Array.isArray(groups) && groups.length > 0) {
+        await processGroupsForCompetition(comp.id, groups);
+      }
+    } catch (e) {
+      console.error('Error processing groups for new competition (post-create):', e);
+    }
     res.status(201).json({ success: true, competition: comp });
   } catch (err) {
     console.error('Error creating competition:', err);

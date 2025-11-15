@@ -53,8 +53,8 @@ function getPlayingHandicap(entry, comp) {
       return 0;
     }
 
-    export default function AllianceLeaderboard() {
-      const [comp, setComp] = useState(null);
+    export default function AllianceLeaderboard({ initialComp = null }) {
+      const [comp, setComp] = useState(initialComp);
       const [groups, setGroups] = useState([]);
       const [entries, setEntries] = useState([]);
       const [backendTeamPointsMap, setBackendTeamPointsMap] = useState({});
@@ -65,160 +65,348 @@ function getPlayingHandicap(entry, comp) {
       const [notesDraft, setNotesDraft] = useState('');
   const navigate = useNavigate();
   const [showExtras, setShowExtras] = useState(false);
+  const [showHandicaps, setShowHandicaps] = useState(false);
+
+      // Centralized processing of a competition payload (used both for fresh fetch and for initialComp fallback)
+      async function processCompetitionPayload(data) {
+        if (!data) return;
+        setComp(data);
+        setGroups(Array.isArray(data.groups) ? data.groups : []);
+        const usersList = Array.isArray(data.users) ? data.users : [];
+        const built = [];
+        if (Array.isArray(data.groups)) {
+          data.groups.forEach((group, groupIdx) => {
+                if (Array.isArray(group.players)) {
+              group.players.forEach((name, i) => {
+                const scores = group.scores?.[name] || Array(18).fill('');
+                const handicap = getHandicapFromGroup(group, name) ?? '';
+                const gross = scores.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
+                const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
+                const userId = matchedUser?.id || null;
+                const displayNameFromUser = matchedUser?.displayName || matchedUser?.display_name || matchedUser?.displayname || '';
+                const nickFromUser = matchedUser?.nick || matchedUser?.nickname || '';
+                const waters = group.waters?.[name] ?? '';
+                const dog = group.dog?.[name] ?? false;
+                const twoClubs = group.two_clubs?.[name] ?? group.twoClubs?.[name] ?? '';
+                const fines = group.fines?.[name] ?? '';
+                const teamId = group.teamId || group.id || group.team_id || group.group_id || null;
+                // include any underlying teamIds for 4BBB groups so we can try fetching teams_users rows
+                const groupTeamIds = Array.isArray(group.teamIds) && group.teamIds.length > 0 ? group.teamIds.filter(Boolean) : [];
+                built.push({ name, scores, total: gross || 0, handicap, groupIdx, userId, displayName: displayNameFromUser, nick: nickFromUser, waters, dog, twoClubs, fines, teamId, groupTeamIds });
+              });
+            }
+          });
+        }
+        setEntries(built);
+        // If some entries lack handicaps, attempt to fetch their teams_users rows directly
+        try {
+          const fetchPromises = (built || []).map(async (entry) => {
+            try {
+              if (!entry) return;
+              if (entry.handicap !== undefined && entry.handicap !== '') return;
+              if (!entry.userId) return;
+              // prioritize explicit teamId, then try groupTeamIds (4BBB)
+              const tryTeamIds = [];
+              if (entry.teamId) tryTeamIds.push(entry.teamId);
+              if (Array.isArray(entry.groupTeamIds) && entry.groupTeamIds.length > 0) entry.groupTeamIds.forEach(t => { if (t && !tryTeamIds.includes(t)) tryTeamIds.push(t); });
+              for (const tId of tryTeamIds) {
+                try {
+                  const res = await fetch(apiUrl(`/api/teams/${tId}/users/${entry.userId}`));
+                  if (!res.ok) continue;
+                  const data = await res.json();
+                  const ch = data?.course_handicap ?? data?.handicap ?? data?.courseHandicap ?? data?.course_handicap;
+                  if (ch !== undefined && ch !== null && ch !== '') {
+                    entry.handicap = ch;
+                    break;
+                  }
+                } catch (e) { /* ignore per-team errors */ }
+              }
+            } catch (e) { /* per-entry ignore */ }
+          });
+          await Promise.all(fetchPromises);
+          // push updated entries into state so UI picks up refreshed handicaps
+          setEntries(Array.isArray(built) ? built.slice() : built);
+            // If some entries still lack CH, ask the server to compute an authoritative
+            // leaderboard (this will use competitions.groups + teams_users + scores).
+            // Do this for any competition when we detect missing CH so clients converge on
+            // the authoritative course_handicap on initial load.
+            try {
+              const needsCh = (built || []).some(e => e && (e.handicap === undefined || e.handicap === ''));
+              if (needsCh && data && data.id) {
+              try {
+                const res = await fetch(apiUrl(`/api/competitions/${data.id}/leaderboard-4bbb`));
+                if (res.ok) {
+                  const json = await res.json();
+                  if (json && Array.isArray(json.teams)) {
+                    // map player name -> ch from server result using multiple strategies:
+                    // 1) by userId (most reliable), 2) by normalized name/displayName/nick,
+                    // 3) fallback last-name heuristic
+                    const chMap = {};
+                    const chMapById = {};
+                    const makeKey = (n) => normalizeName(n || '');
+                    json.teams.forEach(t => {
+                      (t.players || []).forEach(p => {
+                        if (!p) return;
+                        const val = (p.ch !== undefined && p.ch !== null) ? String(p.ch) : undefined;
+                        if (p.userId != null) chMapById[String(p.userId)] = val;
+                        const keys = [];
+                        if (p.name) keys.push(makeKey(p.name));
+                        if (p.displayName) keys.push(makeKey(p.displayName));
+                        if (p.nick) keys.push(makeKey(p.nick));
+                        // also try compact display variants
+                        try { const comp = compactDisplayName(p); if (comp) keys.push(makeKey(comp)); } catch (e) {}
+                        keys.forEach(k => { if (k && val !== undefined) chMap[k] = val; });
+                      });
+                    });
+                    let updated = false;
+                    const newEntries = (built || []).map(en => {
+                      if (!en) return en;
+                      // skip entries that already have an explicit handicap
+                      if (en.handicap !== undefined && en.handicap !== '') return en;
+                      // 1) try userId match
+                      if (en.userId != null) {
+                        const byId = chMapById[String(en.userId)];
+                        if (byId !== undefined) { updated = true; return { ...en, handicap: byId }; }
+                      }
+                      // 2) try normalized name/display/nick/compact variants
+                      const tryKeys = [en.name, en.displayName, compactDisplayName(en), en.nick].filter(Boolean).map(k => makeKey(k));
+                      for (const k of tryKeys) {
+                        if (k && chMap[k] !== undefined) {
+                          updated = true;
+                          return { ...en, handicap: chMap[k] };
+                        }
+                      }
+                      // 3) last-name heuristic: try to find any chMap key containing the last token of the entry name
+                      try {
+                        const parts = (en.name || '').split(' ').filter(Boolean);
+                        const last = parts.length > 0 ? makeKey(parts[parts.length - 1]) : '';
+                        if (last) {
+                          for (const k of Object.keys(chMap)) {
+                            if (!k) continue;
+                            if (k.includes(last) || last.includes(k)) {
+                              updated = true;
+                              return { ...en, handicap: chMap[k] };
+                            }
+                          }
+                        }
+                      } catch (e) {}
+                      return en;
+                    });
+                    if (updated) setEntries(newEntries.slice());
+                  }
+                }
+              } catch (e) { /* ignore server errors */ }
+            }
+          } catch (e) {}
+        } catch (e) { /* ignore overall fetch errors */ }
+        try {
+          console.log('AllianceLeaderboard: processCompetitionPayload', { compId: data?.id, groups: data?.groups, built });
+        } catch (e) {}
+
+        // Gather all underlying team ids. For 4BBB groups the API may return group.teamIds (array of two team ids) so
+        // include those as well.
+        const teamIds = Array.from(new Set([].concat(...(data.groups || []).map(g => {
+          if (!g) return [];
+          if (Array.isArray(g.teamIds) && g.teamIds.length > 0) return g.teamIds.filter(Boolean);
+          const t = (g.teamId || g.id || g.team_id || g.group_id);
+          return t ? [t] : [];
+        }))));
+        if (teamIds.length > 0) {
+          // Try fetching all teams for this competition in one request (server exposes /api/teams?competitionId=...)
+          try {
+            const res = await fetch(apiUrl(`/api/teams?competitionId=${data.id}`));
+            const allTeams = res.ok ? await res.json() : null;
+            if (allTeams && Array.isArray(allTeams)) {
+              const map = {};
+              (allTeams || []).forEach(t => {
+                if (t && t.id != null) map[t.id] = t.team_points ?? t.teamPoints ?? null;
+              });
+              setBackendTeamPointsMap(map);
+              try { console.log('AllianceLeaderboard: fetched backend teams', { compId: data?.id, teamIds, backendTeamPointsMap: map }); } catch (e) {}
+            } else {
+              // Fallback: fetch individual team rows
+              const results = await Promise.all(teamIds.map(tid => fetch(apiUrl(`/api/teams/${tid}`)).then(r => r.ok ? r.json() : null).then(t => [tid, t ? (t.team_points ?? (t.team_points === 0 ? t.team_points : (t.team_points || t.teamPoints || null))) : null]).catch(() => [tid, null])));
+              const map = {};
+              results.forEach(([tid, pts]) => { if (tid) map[tid] = pts; });
+              setBackendTeamPointsMap(map);
+              try { console.log('AllianceLeaderboard: fetched individual teams (initial fallback)', { compId: data?.id, teamIds, backendTeamPointsMap: map }); } catch (e) {}
+            }
+          } catch (e) {
+            // Network / other error: best-effort attempt individual fetches
+            try {
+              const results = await Promise.all(teamIds.map(tid => fetch(apiUrl(`/api/teams/${tid}`)).then(r => r.ok ? r.json() : null).then(t => [tid, t ? (t.team_points ?? (t.team_points === 0 ? t.team_points : (t.team_points || t.teamPoints || null))) : null]).catch(() => [tid, null])));
+              const map = {};
+              results.forEach(([tid, pts]) => { if (tid) map[tid] = pts; });
+              setBackendTeamPointsMap(map);
+              try { console.log('AllianceLeaderboard: fetched individual teams (catch fallback)', { compId: data?.id, teamIds, backendTeamPointsMap: map }); } catch (e) {}
+            } catch (_) {}
+          }
+        }
+        setLoading(false);
+      }
 
       useEffect(() => {
         try { const raw = localStorage.getItem('user'); if (raw) setCurrentUser(JSON.parse(raw)); } catch (e) {}
         const id = window.location.pathname.split('/').pop();
+        // If an initialComp prop was supplied by a wrapper (e.g. Leaderboard4BBB), use it and skip fetching
+        if (initialComp) {
+          processCompetitionPayload(initialComp);
+          return;
+        }
         setLoading(true);
         fetch(apiUrl(`/api/competitions/${id}`))
           .then(res => res.ok ? res.json() : null)
           .then(async data => {
             if (!data) return setLoading(false);
-            setComp(data);
-            setGroups(Array.isArray(data.groups) ? data.groups : []);
-            const usersList = Array.isArray(data.users) ? data.users : [];
-            const built = [];
-            if (Array.isArray(data.groups)) {
-              data.groups.forEach((group, groupIdx) => {
-                if (Array.isArray(group.players)) {
-                  group.players.forEach((name, i) => {
-                    const scores = group.scores?.[name] || Array(18).fill('');
-                    const handicap = group.handicaps?.[name] ?? '';
-                    const gross = scores.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
-                    const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
-                    const userId = matchedUser?.id || null;
-                    const displayNameFromUser = matchedUser?.displayName || matchedUser?.display_name || matchedUser?.displayname || '';
-                    const nickFromUser = matchedUser?.nick || matchedUser?.nickname || '';
-                    const waters = group.waters?.[name] ?? '';
-                    const dog = group.dog?.[name] ?? false;
-                    const twoClubs = group.two_clubs?.[name] ?? group.twoClubs?.[name] ?? '';
-                    const fines = group.fines?.[name] ?? '';
-                    const teamId = group.teamId || group.id || group.team_id || group.group_id || null;
-                    built.push({ name, scores, total: gross || 0, handicap, groupIdx, userId, displayName: displayNameFromUser, nick: nickFromUser, waters, dog, twoClubs, fines, teamId });
-                  });
-                }
-              });
-            }
-            setEntries(built);
-
-            // Gather all underlying team ids. For 4BBB groups the API may return group.teamIds (array of two team ids) so
-            // include those as well.
-            const teamIds = Array.from(new Set([].concat(...(data.groups || []).map(g => {
-              if (!g) return [];
-              if (Array.isArray(g.teamIds) && g.teamIds.length > 0) return g.teamIds.filter(Boolean);
-              const t = (g.teamId || g.id || g.team_id || g.group_id);
-              return t ? [t] : [];
-            }))));
-            if (teamIds.length > 0) {
-              // Try fetching all teams for this competition in one request (server exposes /api/teams?competitionId=...)
-              fetch(apiUrl(`/api/teams?competitionId=${data.id}`))
-                .then(res => res.ok ? res.json() : null)
-                .then(allTeams => {
-                  if (allTeams && Array.isArray(allTeams)) {
-                    const map = {};
-                    (allTeams || []).forEach(t => {
-                      if (t && t.id != null) map[t.id] = t.team_points ?? t.teamPoints ?? null;
-                    });
-                    setBackendTeamPointsMap(map);
-                    return;
-                  }
-                  // Fallback: fetch individual team rows (older servers may not support the query)
-                  return Promise.all(teamIds.map(tid => fetch(apiUrl(`/api/teams/${tid}`)).then(r => r.ok ? r.json() : null).then(t => [tid, t ? (t.team_points ?? (t.team_points === 0 ? t.team_points : (t.team_points || t.teamPoints || null))) : null]).catch(() => [tid, null])));
-                })
-                .then(results => {
-                  if (!results) return;
-                  const map = {};
-                  results.forEach(([tid, pts]) => { if (tid) map[tid] = pts; });
-                  setBackendTeamPointsMap(map);
-                })
-                .catch(() => {
-                  // Network error: attempt individual fetches as a last resort
-                  Promise.all(teamIds.map(tid => fetch(apiUrl(`/api/teams/${tid}`)).then(r => r.ok ? r.json() : null).then(t => [tid, t ? (t.team_points ?? (t.team_points === 0 ? t.team_points : (t.team_points || t.teamPoints || null))) : null]).catch(() => [tid, null])))
-                    .then(results => {
-                      const map = {};
-                      results.forEach(([tid, pts]) => { if (tid) map[tid] = pts; });
-                      setBackendTeamPointsMap(map);
-                    })
-                    .catch(() => {});
-                });
-            }
-            setLoading(false);
+            await processCompetitionPayload(data);
           })
           .catch(() => setLoading(false));
-      }, []);
+      }, [initialComp]);
 
       // Real-time: join competition room and refresh leaderboard when relevant socket events arrive
       useEffect(() => {
         if (!comp || !comp.id) return;
         const compId = Number(comp.id);
         try { socket.emit('join', { competitionId: compId }); } catch (e) {}
-        const handler = (msg) => {
+        const handler = async (msg) => {
           try {
             if (!msg || Number(msg.competitionId) !== compId) return;
-            // Re-fetch competition and backend teams
+            // If the server sent a full updated group object, merge it locally first
+            // so clients can update immediately without waiting for a fresh HTTP fetch.
+            if (msg.group && (msg.groupId != null)) {
+              try {
+                // Build a shallow merged competition payload and re-run processing
+                const merged = { ...(comp || {}), groups: Array.isArray(comp?.groups) ? comp.groups.slice() : [] };
+                merged.groups[msg.groupId] = msg.group;
+                // Process the merged payload to update entries and backend maps
+                await processCompetitionPayload(merged);
+                return;
+              } catch (e) {
+                // fall through to fetching the authoritative competition
+              }
+            }
+            // Re-fetch competition and backend teams when no group payload was provided
             fetch(apiUrl(`/api/competitions/${compId}`))
               .then(res => res.ok ? res.json() : null)
               .then(async data => {
                 if (!data) return;
-                setComp(data);
-                setGroups(Array.isArray(data.groups) ? data.groups : []);
-                // rebuild entries
-                const usersList = Array.isArray(data.users) ? data.users : [];
-                const built = [];
-                if (Array.isArray(data.groups)) {
-                  data.groups.forEach((group, groupIdx) => {
-                    if (Array.isArray(group.players)) {
-                      group.players.forEach((name, i) => {
-                        const scores = group.scores?.[name] || Array(18).fill('');
-                        const handicap = group.handicaps?.[name] ?? '';
-                        const gross = scores.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
-                        const matchedUser = usersList.find(u => typeof u.name === 'string' && u.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
-                        const userId = matchedUser?.id || null;
-                        const displayNameFromUser = matchedUser?.displayName || matchedUser?.display_name || matchedUser?.displayname || '';
-                        const nickFromUser = matchedUser?.nick || matchedUser?.nickname || '';
-                        const waters = group.waters?.[name] ?? '';
-                        const dog = group.dog?.[name] ?? false;
-                        const twoClubs = group.two_clubs?.[name] ?? group.twoClubs?.[name] ?? '';
-                        const fines = group.fines?.[name] ?? '';
-                        const teamId = group.teamId || group.id || group.team_id || group.group_id || null;
-                        built.push({ name, scores, total: gross || 0, handicap, groupIdx, userId, displayName: displayNameFromUser, nick: nickFromUser, waters, dog, twoClubs, fines, teamId });
-                      });
-                    }
-                  });
-                }
-                setEntries(built);
-                // Refresh backend team points map
-                const teamIds = Array.from(new Set([].concat(...(data.groups || []).map(g => {
-                  if (!g) return [];
-                  if (Array.isArray(g.teamIds) && g.teamIds.length > 0) return g.teamIds.filter(Boolean);
-                  const t = (g.teamId || g.id || g.team_id || g.group_id);
-                  return t ? [t] : [];
-                }))));
-                if (teamIds.length > 0) {
-                  fetch(apiUrl(`/api/teams?competitionId=${data.id}`))
-                    .then(res => res.ok ? res.json() : null)
-                    .then(allTeams => {
-                      if (allTeams && Array.isArray(allTeams)) {
-                        const map = {};
-                        (allTeams || []).forEach(t => { if (t && t.id != null) map[t.id] = t.team_points ?? t.teamPoints ?? null; });
-                        setBackendTeamPointsMap(map);
-                        return;
-                      }
-                    })
-                    .catch(() => {});
-                }
+                await processCompetitionPayload(data);
               })
               .catch(() => {});
+          } catch (e) {}
+        };
+        const draftHandler = async (msg) => {
+          try {
+            if (!msg || Number(msg.competitionId) !== compId) return;
+            // Update entries state locally so leaderboard reflects CH changes instantly
+            setEntries(prev => {
+              if (!Array.isArray(prev)) return prev;
+              const updated = prev.map(e => {
+                try {
+                  // match by userId primarily
+                  if (msg.userId && e.userId && Number(e.userId) === Number(msg.userId)) {
+                    return { ...e, handicap: (msg.course_handicap ?? msg.handicap ?? e.handicap) };
+                  }
+                  // match by teamId inside groupTeamIds (4BBB split teams)
+                  if (msg.teamId && Array.isArray(e.groupTeamIds) && e.groupTeamIds.includes(msg.teamId) && msg.userId && e.userId && Number(e.userId) === Number(msg.userId)) {
+                    return { ...e, handicap: (msg.course_handicap ?? msg.handicap ?? e.handicap) };
+                  }
+                  // fallback: match by name
+                  if (msg.playerName && e.name && String(e.name) === String(msg.playerName)) {
+                    return { ...e, handicap: (msg.course_handicap ?? msg.handicap ?? e.handicap) };
+                  }
+                } catch (err) { /* ignore per-entry errors */ }
+                return e;
+              });
+              return updated;
+            });
+
+            // If payload lacked an authoritative course_handicap but included user/team ids
+            // attempt to fetch the teams_users row to ensure all clients converge on the
+            // authoritative CH value (helps if some clients missed previous updates).
+            if ((msg.userId || msg.teamId) && (msg.course_handicap === undefined || msg.course_handicap === null)) {
+              try {
+                if (msg.teamId && msg.userId) {
+                  const res = await fetch(apiUrl(`/api/teams/${msg.teamId}/users/${msg.userId}`));
+                  if (res.ok) {
+                    const data = await res.json();
+                    const ch = data?.course_handicap ?? data?.handicap ?? data?.courseHandicap ?? data?.handicap;
+                    if (ch !== undefined && ch !== null) {
+                      setEntries(prev => {
+                        if (!Array.isArray(prev)) return prev;
+                        return prev.map(e => {
+                          try {
+                            if (e.userId != null && msg.userId != null && Number(e.userId) === Number(msg.userId)) {
+                              return { ...e, handicap: String(ch) };
+                            }
+                          } catch (err) {}
+                          return e;
+                        });
+                      });
+                    }
+                  }
+                }
+              } catch (e) {
+                // ignore network errors here; we only attempt to reconcile
+              }
+            }
+          } catch (e) {}
+        };
+        const draftScoreHandler = (msg) => {
+          try {
+            if (!msg || Number(msg.competitionId) !== compId) return;
+            setEntries(prev => {
+              if (!Array.isArray(prev)) return prev;
+              const updated = prev.map(e => {
+                try {
+                  // match by userId primarily
+                  if (msg.userId && e.userId && Number(e.userId) === Number(msg.userId)) {
+                    const newScores = Array.isArray(e.scores) ? e.scores.slice() : Array(18).fill('');
+                    if (msg.holeIndex != null) {
+                      newScores[msg.holeIndex] = msg.strokes == null ? '' : msg.strokes;
+                    } else if (Array.isArray(msg.scores)) {
+                      // adopt any provided full scores array
+                      const incoming = msg.scores.map(v => (v == null ? '' : v));
+                      for (let i = 0; i < Math.min(18, incoming.length); i++) newScores[i] = incoming[i];
+                    }
+                    const gross = newScores.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                    return { ...e, scores: newScores, total: gross };
+                  }
+                  // match by teamId inside groupTeamIds (4BBB split teams)
+                  if (msg.teamId && Array.isArray(e.groupTeamIds) && e.groupTeamIds.includes(msg.teamId) && msg.userId && e.userId && Number(e.userId) === Number(msg.userId)) {
+                    const newScores = Array.isArray(e.scores) ? e.scores.slice() : Array(18).fill('');
+                    if (msg.holeIndex != null) newScores[msg.holeIndex] = msg.strokes == null ? '' : msg.strokes;
+                    const gross = newScores.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                    return { ...e, scores: newScores, total: gross };
+                  }
+                  // fallback: match by name
+                  if (msg.playerName && e.name && String(e.name) === String(msg.playerName)) {
+                    const newScores = Array.isArray(e.scores) ? e.scores.slice() : Array(18).fill('');
+                    if (msg.holeIndex != null) newScores[msg.holeIndex] = msg.strokes == null ? '' : msg.strokes;
+                    else if (Array.isArray(msg.scores)) {
+                      const incoming = msg.scores.map(v => (v == null ? '' : v));
+                      for (let i = 0; i < Math.min(18, incoming.length); i++) newScores[i] = incoming[i];
+                    }
+                    const gross = newScores.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                    return { ...e, scores: newScores, total: gross };
+                  }
+                } catch (err) { /* ignore per-entry errors */ }
+                return e;
+              });
+              return updated;
+            });
           } catch (e) {}
         };
         try {
           socket.on('scores-updated', handler);
           socket.on('medal-player-updated', handler);
           socket.on('team-user-updated', handler);
+          socket.on('client-team-user-updated', draftHandler);
+          socket.on('score-draft-updated', draftScoreHandler);
         } catch (e) {}
         return () => {
           try { socket.emit('leave', { competitionId: compId }); } catch (e) {}
-          try { socket.off('scores-updated', handler); socket.off('medal-player-updated', handler); socket.off('team-user-updated', handler); } catch (e) {}
+          try { socket.off('scores-updated', handler); socket.off('medal-player-updated', handler); socket.off('team-user-updated', handler); socket.off('client-team-user-updated', draftHandler); socket.off('score-draft-updated', draftScoreHandler); } catch (e) {}
         };
       }, [comp]);
 
@@ -300,8 +488,78 @@ function getPlayingHandicap(entry, comp) {
         }
         return { perHole, total };
       }
+  // Normalize a player name for tolerant matching (strip curly quotes, extra punctuation,
+  // collapse whitespace, lower-case). Used when matching `group.handicaps` keys to
+  // group player names which may differ in punctuation/quotes.
+  function normalizeName(s) {
+    if (!s && s !== 0) return '';
+    try {
+      return String(s)
+        .normalize('NFKD')
+        // replace smart quotes
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        // remove double single-quotes used in some exports
+        .replace(/''/g, "'")
+        // remove parentheses and double quotes
+        .replace(/["()\[\]{}]/g, '')
+        // remove any remaining punctuation except letters, numbers, spaces, hyphen and apostrophe
+        .replace(/[^\w\s\-']/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+    } catch (e) {
+      return String(s || '').trim().toLowerCase();
+    }
+  }
 
-      function compactDisplayName(entry) {
+  function getHandicapFromGroup(group, playerName) {
+      if (!group) return undefined;
+      const hand = group.handicaps || {};
+      if (!hand || Object.keys(hand).length === 0) return undefined;
+
+      // 1) exact key
+      if (hand[playerName] != null) return hand[playerName];
+
+      // 2) normalized exact key
+      const normMap = {};
+      Object.keys(hand).forEach(k => { normMap[normalizeName(k)] = hand[k]; });
+      const n = normalizeName(playerName);
+      if (n && normMap[n] != null) return normMap[n];
+
+      // 3) try compact display variants (nick/displayName inside quotes/parentheses)
+      const compact = compactDisplayName({ name: playerName, displayName: '', nick: '' });
+      if (compact) {
+        const nc = normalizeName(compact);
+        if (nc && normMap[nc] != null) return normMap[nc];
+      }
+
+      // 4) fuzzy contains / substring match (both directions) and last-name heuristic
+      for (const key of Object.keys(hand)) {
+        const nk = normalizeName(key);
+        if (!nk) continue;
+        try {
+          if (n && (nk.includes(n) || n.includes(nk))) {
+            console.debug && console.debug('getHandicapFromGroup: matched by contains', { playerName, key, nk, n, handicap: hand[key] });
+            return hand[key];
+          }
+          // last-name heuristic: check if normalized last token of playerName appears in key
+          const parts = (n || '').split(' ').filter(Boolean);
+          const last = parts.length > 0 ? parts[parts.length - 1] : '';
+          if (last && nk.includes(last)) {
+            console.debug && console.debug('getHandicapFromGroup: matched by last-name', { playerName, key, nk, last, handicap: hand[key] });
+            return hand[key];
+          }
+        } catch (e) {
+          // ignore and continue
+        }
+      }
+
+      return undefined;
+  }
+
+
+        function compactDisplayName(entry) {
         if (!entry) return '';
         if (entry.displayName && entry.displayName.trim()) return entry.displayName.trim();
         if (entry.nick && entry.nick.trim()) return entry.nick.trim();
@@ -314,8 +572,8 @@ function getPlayingHandicap(entry, comp) {
           if (s && s[1]) return s[1].trim();
           return '';
         }
-        return '';
-      }
+          return '';
+        }
 
       function isAdmin(user) {
         return user && (user.role === 'admin' || user.isAdmin || user.isadmin || (user.username && ['devon','arno','arno_cap'].includes(user.username.toLowerCase())) );
@@ -382,7 +640,7 @@ function getPlayingHandicap(entry, comp) {
             }
             if (!ent) {
               const scores = group.scores?.[name] || Array(18).fill('');
-              const handicap = group.handicaps?.[name] ?? '';
+              const handicap = getHandicapFromGroup(group, name) ?? '';
               const gross = scores.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
               ent = { name, scores, total: gross, handicap, groupIdx: idx };
             }
@@ -440,6 +698,20 @@ function getPlayingHandicap(entry, comp) {
             const computedA = computeTeamPointsForPlayers(pairA);
             const computedB = computeTeamPointsForPlayers(pairB);
 
+            try {
+              console.log('AllianceLeaderboard: 4BBB compute', {
+                groupIdx: idx,
+                teamIdA,
+                teamIdB,
+                pairA: pairA.map(p => ({ name: p.name, ch: p.ch, scores: p.scores, perHole: p.perHole, points: p.points })),
+                pairB: pairB.map(p => ({ name: p.name, ch: p.ch, scores: p.scores, perHole: p.perHole, points: p.points })),
+                computedA,
+                computedB,
+                backendA,
+                backendB
+              });
+            } catch (e) {}
+
             // Prefer the computed BB score for display when there's a mismatch with DB for 2-player pairs
             const chosenA = (typeof backendA === 'number' && backendA === computedA) ? backendA : computedA;
             const chosenB = (typeof backendB === 'number' && backendB === computedB) ? backendB : computedB;
@@ -462,6 +734,18 @@ function getPlayingHandicap(entry, comp) {
             teams.push({ groupIdx: idx, players: groupPlayers, teamPoints: (typeof backendPoints === 'number' ? backendPoints : teamPoints), computedTeamPoints: teamPoints, teeTime: group.teeTime || '', teamId: (group.teamId || group.id || group.team_id || group.group_id) });
           }
         });
+        try {
+          // Debug: print per-team computed vs backend values and per-player stats (include per-hole arrays)
+          console.log('AllianceLeaderboard: teams pre-sort debug', teams.map(t => ({
+            teamId: t.teamId,
+            teamPoints: t.teamPoints,
+            computedTeamPoints: t.computedTeamPoints,
+            backendTeamPoints: (t.teamId != null ? backendTeamPointsMap[t.teamId] : undefined),
+            perHoleBest: t.debug?.perHoleBest,
+            players: (t.players || []).map(p => ({ name: p.name, ch: p.ch, ph: p.ph, gross: p.gross, points: p.points, perHole: p.perHole }))
+          })));
+        } catch (e) {}
+        try { console.log('AllianceLeaderboard: teams ranked (post-sort)', teams.map(t => ({ teamId: t.teamId, teamPoints: t.teamPoints }))); } catch (e) {}
         teams.sort((a,b) => b.teamPoints - a.teamPoints);
         let lastPoints = null;
         let lastPos = 0;
@@ -697,7 +981,30 @@ function getPlayingHandicap(entry, comp) {
                     >
                       {showExtras ? '- Hide Extras' : '+ View Extras'}
                     </button>
+                    {isAdmin(currentUser) && (
+                      <button
+                        className="handicap-debug ml-2 text-xs px-2 py-0.5 rounded font-semibold"
+                        onClick={() => setShowHandicaps(s => !s)}
+                        title={showHandicaps ? 'Hide group handicaps' : 'Show group handicaps'}
+                        style={{ background: showHandicaps ? '#FFD700' : '#0e3764', color: showHandicaps ? '#002F5F' : '#FFD700', border: '1px solid #FFD700' }}
+                      >
+                        {showHandicaps ? 'Hide Handicaps' : 'Show Handicaps'}
+                      </button>
+                    )}
                   </div>
+                  {showHandicaps && (
+                    <div className="mb-3 p-3 bg-white/5 rounded text-left text-[12px]" style={{ maxHeight: 220, overflow: 'auto' }}>
+                      <div className="font-semibold mb-2">Group handicaps (raw from comp payload)</div>
+                      {(groups || []).map((g, gi) => (
+                        <div key={`gh-${gi}`} style={{ marginBottom: 8 }}>
+                          <div style={{ fontWeight: 700 }}>Group {gi} (teamId: {g?.teamId ?? g?.id ?? '-'})</div>
+                          <pre style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{JSON.stringify(g?.handicaps || {}, null, 2)}</pre>
+                        </div>
+                      ))}
+                      <div className="font-semibold mt-2">Resolved entry handicaps (entries state)</div>
+                      <pre style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{JSON.stringify((entries || []).map(e => ({ name: e.name, handicap: e.handicap })), null, 2)}</pre>
+                    </div>
+                  )}
                   <table className="min-w-full border text-center mb-8 text-[10px] sm:text-base" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
                     <thead>
                       <tr style={{ background: '#00204A' }}>

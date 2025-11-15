@@ -302,6 +302,20 @@ export default function Scorecard(props) {
   const [scores, setScores] = useState(() => groupPlayers.map(() => Array(18).fill('')));
   // Track loading state for scores
   const [scoresLoading, setScoresLoading] = useState(false);
+  // Debounce timers for per-field score updates (keyed by `${teamId}:${userId}:${holeIdx}`)
+  const scoreDebounceTimers = React.useRef({});
+  // Cleanup any pending timers on unmount
+  useEffect(() => {
+    return () => {
+      try {
+        const keys = Object.keys(scoreDebounceTimers.current || {});
+        for (const k of keys) {
+          try { clearTimeout(scoreDebounceTimers.current[k]); } catch (e) {}
+        }
+        scoreDebounceTimers.current = {};
+      } catch (e) {}
+    };
+  }, []);
   const playingHandicap = player && player.handicap ? player.handicap : '';
 
   // Fetch scores for all players on mount or when groupPlayers changes
@@ -338,9 +352,11 @@ export default function Scorecard(props) {
   }, [groupPlayers.length, competition?.id, groupTeamId]);
 
   async function handleScoreChange(holeIdx, value, playerIdx) {
+    let updatedScores;
     setScores(prev => {
-      const updated = prev.map(row => [...row]);
+      const updated = prev.map(row => row.slice());
       updated[playerIdx][holeIdx] = value;
+      updatedScores = updated;
       // Birdie/Eagle/Blowup detection logic
       const gross = parseInt(value, 10);
       const hole = defaultHoles[holeIdx];
@@ -370,19 +386,47 @@ export default function Scorecard(props) {
     if (!userId) {
       return;
     }
-    // Prepare scores array for this player
-    const playerScores = scores[playerIdx].map((v, idx) => idx === holeIdx ? value : v);
-  const patchUrl = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores`);
+  // Prepare scores array for this player (use the freshly-created updatedScores to avoid stale state)
+  const playerScores = (updatedScores && Array.isArray(updatedScores[playerIdx])) ? updatedScores[playerIdx].map(v => v) : (scores[playerIdx] || Array(18).fill('')).map((v, idx) => idx === holeIdx ? value : v);
+    const patchUrl = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores`);
     const patchBody = { competitionId: competition.id, scores: playerScores.map(v => v === '' ? null : Number(v)) };
+    // Debounce per-field to avoid spamming socket/HTTP when user types or clicks rapidly
     try {
-      const res = await fetch(patchUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patchBody)
-      });
-      const result = await res.json();
+      const key = `${groupTeamId}:${userId}:${holeIdx}`;
+      // clear existing timer for this field
+      const existing = scoreDebounceTimers.current[key];
+      if (existing) clearTimeout(existing);
+      scoreDebounceTimers.current[key] = setTimeout(async () => {
+        try {
+          // Emit draft and then persist
+          try {
+            socket.emit('client-score-updated', {
+              competitionId: Number(competition?.id),
+              teamId: groupTeamId,
+              userId: userId,
+              playerName: groupPlayers[playerIdx],
+              holeIndex: holeIdx,
+              strokes: value === '' ? null : (Number.isNaN(Number(value)) ? value : Number(value)),
+              scores: playerScores.map(v => v === '' ? null : (Number.isNaN(Number(v)) ? v : Number(v)))
+            });
+          } catch (e) {}
+          try {
+            const res = await fetch(patchUrl, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(patchBody)
+            });
+            await res.json();
+          } catch (err) {
+            console.error('PATCH error (debounced):', err);
+          }
+        } finally {
+          // cleanup timer reference
+          try { delete scoreDebounceTimers.current[key]; } catch (e) {}
+        }
+      }, 400); // 400ms debounce
     } catch (err) {
-      console.error('PATCH error:', err);
+      console.error('Error scheduling debounced score save', err);
     }
   }
 
@@ -720,6 +764,12 @@ export default function Scorecard(props) {
                                         if (groupForPlayer && groupForPlayer.handicaps) {
                                           groupForPlayer.handicaps[name] = newCH;
                                         }
+                                        try {
+                                          // Inform other connected clients immediately that this user's CH changed
+                                          // so leaderboards can update without waiting for a full comp refetch.
+                                          const ph = (competition && competition.handicapallowance) ? Math.round(Number(newCH || 0) * Number(competition.handicapallowance) / 100) : (Number(newCH) || 0);
+                                          try { socket.emit('client-team-user-updated', { competitionId: Number(competition?.id), teamId: groupTeamId, userId: userId, playerName: name, course_handicap: newCH, playing_handicap: ph }); } catch (e) {}
+                                        } catch (e) {}
                                         // Optionally re-fetch competition data
                                         if (competition && competition.id) {
                                           const res = await fetch(apiUrl(`/api/competitions/${competition.id}`));
