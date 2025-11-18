@@ -1832,9 +1832,10 @@ export default function MedalScorecard(props) {
                   {players.map((name, pIdx) => {
                   const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
                   const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
-                  const resultLabel = (isAlliance || is4bbb) ? 'Points' : 'Net';
-                  // For Alliance and 4BBB we want per-hole stableford points for the player
-                  const stable = (isAlliance || is4bbb) ? computePlayerStablefordTotals(name) : null;
+                  const isIndividual = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('individual')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('individual')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('individual'));
+                  const resultLabel = (isAlliance || is4bbb || isIndividual) ? 'Points' : 'Net';
+                  // For Alliance, 4BBB and Individual Stableford we want per-hole stableford points for the player
+                  const stable = (isAlliance || is4bbb || isIndividual) ? computePlayerStablefordTotals(name) : null;
                   // Return an array: the player's rows, and optionally the pair 'Score' row immediately after player B (pIdx===1) and player D (pIdx===3)
                   return [
                   <React.Fragment key={name + '-rows-front'}>
@@ -1900,7 +1901,7 @@ export default function MedalScorecard(props) {
                           return <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}></td>;
                         }
                         const net = gross - strokesReceived;
-                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance')) || is4bbb) {
+                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance')) || is4bbb || ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('individual')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('individual')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('individual')))) {
                           // For Alliance and 4BBB show stableford points per hole (computed using PH inside computePlayerStablefordTotals)
                           const pts = stable ? (stable.perHole ? stable.perHole[hIdx] : stablefordPoints(net, hole.par)) : stablefordPoints(net, hole.par);
                           return (
@@ -1919,7 +1920,7 @@ export default function MedalScorecard(props) {
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
                           const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                          if (isAlliance || is4bbb) {
+                          if (isAlliance || is4bbb || isIndividual) {
                             // sum stableford points for front 9
                             const pts = computePlayerStablefordTotals(name);
                             return pts.front;
@@ -2042,7 +2043,8 @@ export default function MedalScorecard(props) {
                 {players.map((name, pIdx) => {
                   const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
                   const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
-                  const resultLabel = (isAlliance || is4bbb) ? 'Points' : 'Net';
+                  const isIndividual = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('individual')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('individual')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('individual'));
+                  const resultLabel = (isAlliance || is4bbb || isIndividual) ? 'Points' : 'Net';
                   const stable = isAlliance ? computePlayerStablefordTotals(name) : null;
 
                   // Return an array: the player's rows, and optionally the pair 'Score' row immediately after player B (pIdx===1) and player D (pIdx===3)
@@ -2134,7 +2136,7 @@ export default function MedalScorecard(props) {
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
                           const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                          if (isAlliance || is4bbb) {
+                          if (isAlliance || is4bbb || isIndividual) {
                             const pts = stable ? stable.back : computePlayerStablefordTotals(name).back;
                             return pts;
                           }
@@ -2161,7 +2163,7 @@ export default function MedalScorecard(props) {
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
                           const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                          if (isAlliance || is4bbb) {
+                          if (isAlliance || is4bbb || isIndividual) {
                             const pts = stable ? stable.total : computePlayerStablefordTotals(name).total;
                             return pts;
                           }

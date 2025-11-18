@@ -18,6 +18,8 @@ import MedalScorecard from './MedalScorecard';
 import MedalLeaderboard from './MedalLeaderboard';
 import AllianceScorecard from './AllianceScorecard';
 import AllianceLeaderboard from './AllianceLeaderboard';
+import IndividualScorecard from './IndividualScorecard';
+import IndividualLeaderboard from './IndividualLeaderboard';
 import FourballAssignment from './FourballAssignment';
 import FourballScorecard from './FourballScorecard';
 import FourballLeaderboard from './FourballLeaderboard';
@@ -64,6 +66,8 @@ function AppRoutes({ user, setUser }) {
           <Route path="/scorecard-medal/:id" element={<MedalScorecard user={user} onSignOut={handleSignOut} />} />
           <Route path="/leaderboard-medal/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/medal-leaderboard/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
+          <Route path="/scorecard-individual/:id" element={<IndividualScorecard user={user} onSignOut={handleSignOut} />} />
+          <Route path="/leaderboard-individual/:id" element={<IndividualLeaderboard user={user} onSignOut={handleSignOut} />} />
           {/* Alliance routes: reuse Medal assignment UI, but separate scorecard/leaderboard wrappers */}
           <Route path="/assign-alliance" element={<MedalAssignment user={user} onSignOut={handleSignOut} />} />
           <Route path="/scorecard-alliance/:id" element={<AllianceScorecard user={user} onSignOut={handleSignOut} />} />

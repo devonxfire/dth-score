@@ -4,6 +4,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import Scorecard from './Scorecard';
 import MedalScorecard from './MedalScorecard';
 import AllianceScorecard from './AllianceScorecard';
+import IndividualScorecard from './IndividualScorecard';
 import { apiUrl } from './api';
 
 // This router fetches the competition if not provided, then renders the correct scorecard
@@ -53,6 +54,12 @@ export default function ScorecardRouter(props) {
     return <AllianceScorecard {...props} competition={competition} overrideTitle="4BBB Stableford" />;
   }
   const isAlliance = compTypeLower.includes('alliance');
+  const isIndividual = (compTypeLower.includes('individual') && compTypeLower.includes('stableford')) || ((competition?.name || '').toString().toLowerCase().includes('individual') && (competition?.name || '').toString().toLowerCase().includes('stableford'));
+  if (isIndividual) {
+    // Use the Individual wrapper which reuses the Alliance UI but enforces
+    // individual-specific defaults (e.g. 95% allowance).
+    return <IndividualScorecard {...props} competition={competition} />;
+  }
   if (isAlliance) {
     return <AllianceScorecard {...props} competition={competition} />;
   }

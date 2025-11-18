@@ -631,6 +631,65 @@ function getPlayingHandicap(entry, comp) {
         );
 
         const teams = [];
+        const compTypeStrLocal = (comp && String(comp.type || '').toLowerCase()) || '';
+        const compNameStrLocal = (comp && String(comp.name || comp.title || '').toLowerCase()) || '';
+        const isIndividualComp = comp && ((compTypeStrLocal.includes('individual') && compTypeStrLocal.includes('stableford')) || (compNameStrLocal.includes('individual') && compNameStrLocal.includes('stableford')));
+
+        // If this is an Individual Stableford competition, treat each player as their
+        // own team so they are ranked by their individual Stableford points.
+        if (isIndividualComp) {
+          (groups || []).forEach((group, idx) => {
+            (group.players || []).forEach((name, i) => {
+              let ent = entries.find(e => (e.name || '').trim().toLowerCase() === (name || '').trim().toLowerCase());
+              if (!ent && Array.isArray(group.displayNames) && group.displayNames[i]) {
+                const guestName = group.displayNames[i].trim().toLowerCase();
+                ent = entries.find(e => (e.name || '').trim().toLowerCase() === guestName);
+              }
+              if (!ent) {
+                const scores = group.scores?.[name] || Array(18).fill('');
+                const handicap = getHandicapFromGroup(group, name) ?? '';
+                const gross = scores.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
+                ent = { name, scores, total: gross, handicap, groupIdx: idx };
+              }
+              const stable = playerStableford(ent);
+              const playerObj = {
+                name: ent.name,
+                displayName: ent.displayName || '',
+                userId: ent.userId || null,
+                teamId: ent.teamId || null,
+                waters: ent.waters || '',
+                dog: ent.dog || false,
+                twoClubs: ent.twoClubs || '',
+                fines: ent.fines || '',
+                scores: ent.scores || Array(18).fill(''),
+                gross: ent.total || 0,
+                // preserve the original handicap field for correctness in helpers
+                handicap: ent.handicap !== undefined ? ent.handicap : '',
+                ph: getPlayingHandicap(ent, comp),
+                ch: ent.handicap !== '' ? parseFloat(ent.handicap) || 0 : 0,
+                net: (ent.total || 0) - getPlayingHandicap(ent, comp),
+                dthNet: (ent.total || 0) - (ent.handicap !== '' ? parseFloat(ent.handicap) || 0 : 0),
+                points: stable.total,
+                perHole: stable.perHole
+              };
+              teams.push({ groupIdx: idx, players: [playerObj], teamPoints: Number(stable.total || 0), computedTeamPoints: Number(stable.total || 0), teeTime: group.teeTime || '', teamId: ent.teamId || null });
+            });
+          });
+          // sort/assign positions and return early for Individual Stableford comps
+          try {
+            console.log('AllianceLeaderboard: teams pre-sort debug (individual)', teams.map(t => ({ teamId: t.teamId, teamPoints: t.teamPoints, players: (t.players || []).map(p => ({ name: p.name, points: p.points, perHole: p.perHole })) })));
+          } catch (e) {}
+          teams.sort((a,b) => b.teamPoints - a.teamPoints);
+          let lastPoints = null;
+          let lastPos = 0;
+          const rankedInd = teams.map((t, i) => {
+            if (i === 0) { lastPos = 1; lastPoints = t.teamPoints; return { ...t, pos: 1 }; }
+            if (t.teamPoints === lastPoints) return { ...t, pos: lastPos };
+            lastPos = lastPos + 1; lastPoints = t.teamPoints; return { ...t, pos: lastPos };
+          });
+          return rankedInd;
+        }
+
         (groups || []).forEach((group, idx) => {
           const groupPlayers = (group.players || []).map((name, i) => {
             let ent = entries.find(e => (e.name || '').trim().toLowerCase() === (name || '').trim().toLowerCase());
@@ -759,7 +818,10 @@ function getPlayingHandicap(entry, comp) {
 
       if (loading) return <PageBackground><TopMenu userComp={comp} competitionList={comp ? [comp] : []} /><div className="p-8 text-white">Loading leaderboard...</div></PageBackground>;
 
-      const teams = buildTeams();
+  const teams = buildTeams();
+  const compTypeStrRender = (comp && String(comp.type || '').toLowerCase()) || '';
+  const compNameStrRender = (comp && String(comp.name || comp.title || '').toLowerCase()) || '';
+  const isIndividualRender = comp && ((compTypeStrRender.includes('individual') && compTypeStrRender.includes('stableford')) || (compNameStrRender.includes('individual') && compNameStrRender.includes('stableford')));
       // DEBUG: expose the teams array the UI is rendering and backend team points map so we can inspect them in the browser console.
       // Remove this after verification.
       try {
@@ -828,7 +890,8 @@ function getPlayingHandicap(entry, comp) {
         if (goodScores && goodScores.length > 0) { goodScores.forEach(p => { if (y > pageHeight - margin - lineHeight) { pdf.addPage(); y = margin; } const displayName = (p.displayName || p.name || '').toUpperCase(); pdf.text(`${displayName}: Net ${p.dthNet}`, margin, y); y += lineHeight; }); } else { pdf.text('No one. Everyone shit.', margin, y); y += lineHeight; }
         y += lineHeight * 0.5;
 
-        const headers = ['Pos','Name','Thru','Score','Gross','Net','DTH Net','Dog','Waters','2Clubs','Fines'];
+  const scoreLabel = (comp && ((String(comp.type || '').toLowerCase().includes('individual') && String(comp.type || '').toLowerCase().includes('stableford')) || (String(comp.name || comp.title || '').toLowerCase().includes('individual') && String(comp.name || comp.title || '').toLowerCase().includes('stableford')))) ? 'Points' : 'Score';
+  const headers = ['Pos','Name','Thru',scoreLabel,'Gross','Net','DTH Net','Dog','Waters','2Clubs','Fines'];
         const colWidths = [12,60,12,18,18,18,18,10,18,18,18];
         let x = margin; pdf.setFont(undefined,'bold'); headers.forEach((h,i)=>{ pdf.text(h, x, y); x += colWidths[i] || 20; }); pdf.setFont(undefined,'normal'); y += lineHeight;
 
@@ -1011,7 +1074,7 @@ function getPlayingHandicap(entry, comp) {
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Pos</th>
                         <th className="border px-0.5 sm:px-2 py-0.5 text-left" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Thru</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Score</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>{isIndividualRender ? 'Points' : 'Score'}</th>
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>

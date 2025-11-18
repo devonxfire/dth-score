@@ -4,6 +4,7 @@ import Leaderboard from './Leaderboard';
 import Leaderboard4BBB from './Leaderboard4BBB';
 import AllianceLeaderboard from './AllianceLeaderboard';
 import MedalLeaderboard from './MedalLeaderboard';
+import IndividualLeaderboard from './IndividualLeaderboard';
 import { apiUrl } from './api';
 
 export default function LeaderboardRouter(props) {
@@ -97,6 +98,10 @@ export default function LeaderboardRouter(props) {
   const is4BBB = compType.includes('4bbb') || compType.includes('fourbbb');
   if (is4BBB) {
     return <Leaderboard4BBB {...props} competition={competition} />;
+  }
+  const isIndividual = (compType.includes('individual') && compType.includes('stableford')) || ((competition?.name || '').toString().toLowerCase().includes('individual') && (competition?.name || '').toString().toLowerCase().includes('stableford'));
+  if (isIndividual) {
+    return <IndividualLeaderboard {...props} competition={competition} />;
   }
   const isMedal = compType.includes('medal') || compType.includes('stroke');
   const isAlliance = compType.includes('alliance');

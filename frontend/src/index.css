@@ -112,6 +112,8 @@ button:focus-visible {
 }
 
 /* By default, the extras-toggle is hidden on larger screens. */
+
+/* By default, the extras-toggle is hidden on larger screens. */
 .extras-toggle { display: none; }
 
 /* When applied to the table container, show the hidden extras even in portrait. */
