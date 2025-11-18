@@ -1410,17 +1410,23 @@ export default function MedalScorecard(props) {
               const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
               const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
               const isMedalMobile = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('medal')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('medal'));
-              if (isAlliance || is4bbb) {
+              const isIndividual = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('individual')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('individual')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('individual'));
+              // Treat Individual Stableford as the same mobile entry mode as Alliance/4BBB
+              if (isAlliance || is4bbb || isIndividual) {
                 const group = groups[groupIdx] || { players: [] };
                 const best = computeGroupBestTwoTotals(group);
                 const hole = holesArr[mobileSelectedHole - 1];
 
                 const PairHeader = () => {
-                  if (!is4bbb) return (
+                  // For Alliance comps show the Alliance Score header. For 4BBB show team AB/CD BB scores.
+                  if (isAlliance && !is4bbb) return (
                     <div className="w-full p-3 rounded border-2 text-center mb-3" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
                       <div className="font-extrabold text-2xl text-white">Alliance Score: <span style={{ color: '#FFD700' }}>{best.total}</span></div>
                     </div>
                   );
+
+                  // For Individual stableford we don't show the Alliance header; fall through to per-player cards.
+                  if (isIndividual && !is4bbb && !isAlliance) return null;
 
                   const pairTotals = (start) => {
                     const nameA = (players && players[start]) || '';
