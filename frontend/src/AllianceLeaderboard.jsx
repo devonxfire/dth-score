@@ -271,6 +271,8 @@ function getPlayingHandicap(entry, comp) {
         const handler = async (msg) => {
           try {
             if (!msg || Number(msg.competitionId) !== compId) return;
+            // Ignore rebroadcasts that originated from this client to prevent double-processing
+            if (msg.originSocketId && socket && socket.id && msg.originSocketId === socket.id) return;
             // If the server sent a full updated group object, merge it locally first
             // so clients can update immediately without waiting for a fresh HTTP fetch.
             if (msg.group && (msg.groupId != null)) {
@@ -298,6 +300,8 @@ function getPlayingHandicap(entry, comp) {
         const draftHandler = async (msg) => {
           try {
             if (!msg || Number(msg.competitionId) !== compId) return;
+            // Ignore rebroadcasts that originated from this client to prevent double-processing
+            if (msg.originSocketId && socket && socket.id && msg.originSocketId === socket.id) return;
             // Update entries state locally so leaderboard reflects CH changes instantly
             setEntries(prev => {
               if (!Array.isArray(prev)) return prev;
@@ -355,6 +359,8 @@ function getPlayingHandicap(entry, comp) {
         const draftScoreHandler = (msg) => {
           try {
             if (!msg || Number(msg.competitionId) !== compId) return;
+            // Ignore rebroadcasts that originated from this client to prevent double-processing
+            if (msg.originSocketId && socket && socket.id && msg.originSocketId === socket.id) return;
             setEntries(prev => {
               if (!Array.isArray(prev)) return prev;
               const updated = prev.map(e => {
