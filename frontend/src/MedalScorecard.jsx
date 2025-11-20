@@ -1510,6 +1510,32 @@ export default function MedalScorecard(props) {
 
                                 <div className="absolute right-3 top-3 flex items-center gap-3">
                                   {(() => {
+                                    // Individual Stableford: use dropdown select on mobile to avoid increment/decrement bugs
+                                    if (isIndividual) {
+                                      const selectVal = curVal !== '' ? String(curVal) : String(hole?.par ?? '');
+                                      return (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs font-semibold text-white/70">ENTER SCORE</span>
+                                          <select
+                                            aria-label={`score-select-${pName}`}
+                                            className="px-3 py-2 rounded text-lg font-bold text-center"
+                                            style={{ background: '#6B7280', color: '#ffffff', minWidth: '70px' }}
+                                            value={selectVal}
+                                            onChange={(e) => {
+                                              if (!canEdit(pName)) return;
+                                              handleScoreChange(pName, mobileSelectedHole - 1, e.target.value);
+                                            }}
+                                            disabled={!canEdit(pName)}
+                                          >
+                                            {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
+                                              <option key={num} value={num}>{num}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      );
+                                    }
+                                    
+                                    // Alliance/4BBB: keep original +/- buttons
                                     const displayVal = (curVal !== '' ? String(curVal) : String(hole?.par ?? '-'));
                                     const isPlaceholder = (curVal === '');
                                     return (
