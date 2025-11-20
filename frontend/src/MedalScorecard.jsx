@@ -1512,14 +1512,63 @@ export default function MedalScorecard(props) {
                                   {(() => {
                                     // Individual Stableford: use dropdown select on mobile to avoid increment/decrement bugs
                                     if (isIndividual) {
-                                      const selectVal = curVal !== '' ? String(curVal) : String(hole?.par ?? '');
+                                      const selectVal = curVal !== '' ? String(curVal) : '';
+                                      const hasScore = curVal !== '';
+                                      const displayPar = hole?.par ?? '';
+                                      
+                                      // Color coding based on score relative to par
+                                      let labelColor = '#ffffff';
+                                      let bgColor = '#6B7280';
+                                      let textColor = '#ffffff';
+                                      let borderColor = 'none';
+                                      
+                                      if (hasScore) {
+                                        const scoreNum = parseInt(curVal, 10);
+                                        const par = hole?.par || 0;
+                                        if (scoreNum <= par - 2) {
+                                          // Eagle or better - pink
+                                          labelColor = '#FFC0CB';
+                                          bgColor = '#1B3A6B';
+                                          textColor = '#FFC0CB';
+                                          borderColor = '2px solid #FFC0CB';
+                                        } else if (scoreNum === par - 1) {
+                                          // Birdie - green
+                                          labelColor = '#16a34a';
+                                          bgColor = '#1B3A6B';
+                                          textColor = '#16a34a';
+                                          borderColor = '2px solid #16a34a';
+                                        } else if (scoreNum >= par + 3) {
+                                          // Triple bogey or worse - red
+                                          labelColor = '#ef4444';
+                                          bgColor = '#1B3A6B';
+                                          textColor = '#ef4444';
+                                          borderColor = '2px solid #ef4444';
+                                        } else {
+                                          // Par through double bogey - gold
+                                          labelColor = '#FFD700';
+                                          bgColor = '#1B3A6B';
+                                          textColor = '#FFD700';
+                                          borderColor = '2px solid #FFD700';
+                                        }
+                                      }
+                                      
                                       return (
                                         <div className="flex items-center gap-2">
-                                          <span className="text-xs font-semibold text-white/70">ENTER SCORE</span>
+                                          <span 
+                                            className="text-xs font-semibold"
+                                            style={{ color: labelColor }}
+                                          >
+                                            {hasScore ? 'SCORE ENTERED' : 'ENTER SCORE'}
+                                          </span>
                                           <select
                                             aria-label={`score-select-${pName}`}
                                             className="px-3 py-2 rounded text-lg font-bold text-center"
-                                            style={{ background: '#6B7280', color: '#ffffff', minWidth: '70px' }}
+                                            style={{ 
+                                              background: hasScore ? bgColor : '#6B7280',
+                                              color: textColor,
+                                              border: borderColor,
+                                              minWidth: '70px' 
+                                            }}
                                             value={selectVal}
                                             onChange={(e) => {
                                               if (!canEdit(pName)) return;
@@ -1527,6 +1576,7 @@ export default function MedalScorecard(props) {
                                             }}
                                             disabled={!canEdit(pName)}
                                           >
+                                            <option value="" disabled>{displayPar}</option>
                                             {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
                                               <option key={num} value={num}>{num}</option>
                                             ))}
@@ -1535,57 +1585,77 @@ export default function MedalScorecard(props) {
                                       );
                                     }
                                     
-                                    // Alliance/4BBB: keep original +/- buttons
-                                    const displayVal = (curVal !== '' ? String(curVal) : String(hole?.par ?? '-'));
-                                    const isPlaceholder = (curVal === '');
+                                    // Alliance/4BBB: use dropdown select (same as Individual Stableford)
+                                    const selectVal = curVal !== '' ? String(curVal) : '';
+                                    const hasScore = curVal !== '';
+                                    const displayPar = hole?.par ?? '';
+                                    
+                                    // Color coding based on score relative to par
+                                    let labelColor = '#ffffff';
+                                    let bgColor = '#6B7280';
+                                    let textColor = '#ffffff';
+                                    let borderColor = 'none';
+                                    
+                                    if (hasScore) {
+                                      const scoreNum = parseInt(curVal, 10);
+                                      const par = hole?.par || 0;
+                                      if (scoreNum <= par - 2) {
+                                        // Eagle or better - pink
+                                        labelColor = '#FFC0CB';
+                                        bgColor = '#1B3A6B';
+                                        textColor = '#FFC0CB';
+                                        borderColor = '2px solid #FFC0CB';
+                                      } else if (scoreNum === par - 1) {
+                                        // Birdie - green
+                                        labelColor = '#16a34a';
+                                        bgColor = '#1B3A6B';
+                                        textColor = '#16a34a';
+                                        borderColor = '2px solid #16a34a';
+                                      } else if (scoreNum >= par + 3) {
+                                        // Triple bogey or worse - red
+                                        labelColor = '#ef4444';
+                                        bgColor = '#1B3A6B';
+                                        textColor = '#ef4444';
+                                        borderColor = '2px solid #ef4444';
+                                      } else {
+                                        // Par through double bogey - gold
+                                        labelColor = '#FFD700';
+                                        bgColor = '#1B3A6B';
+                                        textColor = '#FFD700';
+                                        borderColor = '2px solid #FFD700';
+                                      }
+                                    }
+                                    
                                     return (
-                                      <>
-                                        <button
-                                          aria-label={`big-dec-${pName}`}
-                                          className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-                                          style={{ background: '#6B7280', color: '#ffffff' }}
-                                          onClick={() => {
-                                              if (!canEdit(pName)) return;
-                                              const key = `${pName}:${mobileSelectedHole - 1}`;
-                                              const last = placeholderActivateRef.current[key];
-                                              if (last && (Date.now() - last) < 400) return; // ignore immediate duplicate events
-                                              const parsed = Number.isFinite(parseInt(curVal, 10)) ? parseInt(curVal, 10) : null;
-                                              const base = (parsed !== null) ? parsed : (hole?.par || 0);
-                                              if (parsed === null) {
-                                                // first activation: set to par (no movement)
-                                                placeholderActivateRef.current[key] = Date.now();
-                                                setTimeout(() => { try { delete placeholderActivateRef.current[key]; } catch (e) {} }, 500);
-                                                handleScoreChange(pName, mobileSelectedHole - 1, String(base));
-                                              } else {
-                                                const next = Math.max(0, base - 1);
-                                                handleScoreChange(pName, mobileSelectedHole - 1, String(next));
-                                              }
-                                            }}
-                                        >−</button>
-                                        <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center', color: isPlaceholder ? '#9CA3AF' : '#ffffff' }}>{displayVal}</div>
-                                        <button
-                                          aria-label={`big-inc-${pName}`}
-                                          className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-                                          style={{ background: '#6B7280', color: '#ffffff' }}
-                                          onClick={() => {
-                                            if (!canEdit(pName)) return;
-                                            const key = `${pName}:${mobileSelectedHole - 1}`;
-                                            const last = placeholderActivateRef.current[key];
-                                            if (last && (Date.now() - last) < 400) return; // ignore immediate duplicate events
-                                            const parsed = Number.isFinite(parseInt(curVal, 10)) ? parseInt(curVal, 10) : null;
-                                            const base = (parsed !== null) ? parsed : (hole?.par || 0);
-                                            if (parsed === null) {
-                                              // first activation: set to par (no movement)
-                                              placeholderActivateRef.current[key] = Date.now();
-                                              setTimeout(() => { try { delete placeholderActivateRef.current[key]; } catch (e) {} }, 500);
-                                              handleScoreChange(pName, mobileSelectedHole - 1, String(base));
-                                            } else {
-                                              const next = base + 1;
-                                              handleScoreChange(pName, mobileSelectedHole - 1, String(next));
-                                            }
+                                      <div className="flex items-center gap-2">
+                                        <span 
+                                          className="text-xs font-semibold"
+                                          style={{ color: labelColor }}
+                                        >
+                                          {hasScore ? 'SCORE ENTERED' : 'ENTER SCORE'}
+                                        </span>
+                                        <select
+                                          aria-label={`score-select-${pName}`}
+                                          className="px-3 py-2 rounded text-lg font-bold text-center"
+                                          style={{ 
+                                            background: hasScore ? bgColor : '#6B7280',
+                                            color: textColor,
+                                            border: borderColor,
+                                            minWidth: '70px' 
                                           }}
-                                        >+</button>
-                                      </>
+                                          value={selectVal}
+                                          onChange={(e) => {
+                                            if (!canEdit(pName)) return;
+                                            handleScoreChange(pName, mobileSelectedHole - 1, e.target.value);
+                                          }}
+                                          disabled={!canEdit(pName)}
+                                        >
+                                          <option value="" disabled>{displayPar}</option>
+                                          {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
+                                            <option key={num} value={num}>{num}</option>
+                                          ))}
+                                        </select>
+                                      </div>
                                     );
                                   })()}
                                 </div>
@@ -1707,24 +1777,77 @@ export default function MedalScorecard(props) {
 
                             <div className="absolute right-3 top-3 flex items-center gap-3">
                               {(() => {
-                                const displayVal = (curVal !== '' ? String(curVal) : String(hole?.par ?? '-'));
-                                const isPlaceholder = (curVal === '');
+                                // Medal: use dropdown select (same as Individual Stableford)
+                                const selectVal = curVal !== '' ? String(curVal) : '';
+                                const hasScore = curVal !== '';
+                                const displayPar = hole?.par ?? '';
+                                
+                                // Color coding based on score relative to par
+                                let labelColor = '#ffffff';
+                                let bgColor = '#6B7280';
+                                let textColor = '#ffffff';
+                                let borderColor = 'none';
+                                
+                                if (hasScore) {
+                                  const scoreNum = parseInt(curVal, 10);
+                                  const par = hole?.par || 0;
+                                  if (scoreNum <= par - 2) {
+                                    // Eagle or better - pink
+                                    labelColor = '#FFC0CB';
+                                    bgColor = '#1B3A6B';
+                                    textColor = '#FFC0CB';
+                                    borderColor = '2px solid #FFC0CB';
+                                  } else if (scoreNum === par - 1) {
+                                    // Birdie - green
+                                    labelColor = '#16a34a';
+                                    bgColor = '#1B3A6B';
+                                    textColor = '#16a34a';
+                                    borderColor = '2px solid #16a34a';
+                                  } else if (scoreNum >= par + 3) {
+                                    // Triple bogey or worse - red
+                                    labelColor = '#ef4444';
+                                    bgColor = '#1B3A6B';
+                                    textColor = '#ef4444';
+                                    borderColor = '2px solid #ef4444';
+                                  } else {
+                                    // Par through double bogey - gold
+                                    labelColor = '#FFD700';
+                                    bgColor = '#1B3A6B';
+                                    textColor = '#FFD700';
+                                    borderColor = '2px solid #FFD700';
+                                  }
+                                }
+                                
                                 return (
-                                  <>
-                                    <button
-                                      aria-label={`big-dec-medal-${pName}`}
-                                      className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-                                      style={{ background: '#6B7280', color: '#ffffff' }}
-                                      onClick={() => { applyDeltaToHole(pName, mobileSelectedHole - 1, -1); }}
-                                    >−</button>
-                                    <div className="mx-1 text-lg font-extrabold" style={{ minWidth: 28, textAlign: 'center', color: isPlaceholder ? '#9CA3AF' : '#ffffff' }}>{displayVal}</div>
-                                    <button
-                                      aria-label={`big-inc-medal-${pName}`}
-                                      className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-                                      style={{ background: '#6B7280', color: '#ffffff' }}
-                                      onClick={() => { applyDeltaToHole(pName, mobileSelectedHole - 1, +1); }}
-                                    >+</button>
-                                  </>
+                                  <div className="flex items-center gap-2">
+                                    <span 
+                                      className="text-xs font-semibold"
+                                      style={{ color: labelColor }}
+                                    >
+                                      {hasScore ? 'SCORE ENTERED' : 'ENTER SCORE'}
+                                    </span>
+                                    <select
+                                      aria-label={`score-select-${pName}`}
+                                      className="px-3 py-2 rounded text-lg font-bold text-center"
+                                      style={{ 
+                                        background: hasScore ? bgColor : '#6B7280',
+                                        color: textColor,
+                                        border: borderColor,
+                                        minWidth: '70px' 
+                                      }}
+                                      value={selectVal}
+                                      onChange={(e) => {
+                                        if (!canEdit(pName)) return;
+                                        handleScoreChange(pName, mobileSelectedHole - 1, e.target.value);
+                                      }}
+                                      disabled={!canEdit(pName)}
+                                    >
+                                      <option value="" disabled>{displayPar}</option>
+                                      {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
+                                        <option key={num} value={num}>{num}</option>
+                                      ))}
+                                    </select>
+                                  </div>
                                 );
                               })()}
                             </div>
