@@ -1471,7 +1471,7 @@ export default function MedalScorecard(props) {
                         <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 18 ? 1 : h + 1))}>▶</button>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {players.map((pName, idx) => {
                           const stable = computePlayerStablefordTotals(pName);
                           const grossArr = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
@@ -1486,13 +1486,13 @@ export default function MedalScorecard(props) {
 
                           return (
                             <div key={`mob-wrap-${pName}`}>
-                              <div key={`mob-${pName}`} className="p-2 rounded border border-white/10 relative">
-                                <div className="flex items-center justify-between">
-                                  <div className="font-semibold">{initialLabel}</div>
+                              <div key={`mob-${pName}`} className="p-4 rounded border border-white/10 relative" style={{ minHeight: '180px' }}>
+                                <div className="flex items-center justify-between mb-2 pr-32">
+                                  <div className="font-semibold text-base">{initialLabel}</div>
                                 </div>
-                                <div className="text-xs font-semibold mt-1" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
+                                <div className="text-xs font-semibold" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
 
-                                <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                                <div className="grid grid-cols-2 gap-2 text-sm mt-16">
                                   {(() => {
                                     const grossArrLocal = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
                                     const grossFront = grossArrLocal.slice(0,9).reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
@@ -1508,7 +1508,7 @@ export default function MedalScorecard(props) {
                                   })()}
                                 </div>
 
-                                <div className="absolute right-3 top-3 flex items-center gap-3">
+                                <div className="absolute right-3 top-10 flex flex-col items-end gap-1">
                                   {(() => {
                                     // Individual Stableford: use dropdown select on mobile to avoid increment/decrement bugs
                                     if (isIndividual) {
@@ -1553,21 +1553,22 @@ export default function MedalScorecard(props) {
                                       }
                                       
                                       return (
-                                        <div className="flex items-center gap-2">
+                                        <>
                                           <span 
-                                            className="text-xs font-semibold"
+                                            className="text-xs font-semibold whitespace-nowrap"
                                             style={{ color: labelColor }}
                                           >
                                             {hasScore ? 'SCORE ENTERED' : 'ENTER SCORE'}
                                           </span>
                                           <select
                                             aria-label={`score-select-${pName}`}
-                                            className="px-3 py-2 rounded text-lg font-bold text-center"
+                                            className="px-3 py-2 rounded text-xl font-bold text-center mt-1"
                                             style={{ 
                                               background: hasScore ? bgColor : '#6B7280',
                                               color: textColor,
                                               border: borderColor,
-                                              minWidth: '70px' 
+                                              minWidth: '75px',
+                                              width: '75px'
                                             }}
                                             value={selectVal}
                                             onChange={(e) => {
@@ -1581,7 +1582,7 @@ export default function MedalScorecard(props) {
                                               <option key={num} value={num}>{num}</option>
                                             ))}
                                           </select>
-                                        </div>
+                                        </>
                                       );
                                     }
                                     
@@ -1627,21 +1628,22 @@ export default function MedalScorecard(props) {
                                     }
                                     
                                     return (
-                                      <div className="flex items-center gap-2">
+                                      <>
                                         <span 
-                                          className="text-xs font-semibold"
+                                          className="text-xs font-semibold whitespace-nowrap"
                                           style={{ color: labelColor }}
                                         >
                                           {hasScore ? 'SCORE ENTERED' : 'ENTER SCORE'}
                                         </span>
                                         <select
                                           aria-label={`score-select-${pName}`}
-                                          className="px-3 py-2 rounded text-lg font-bold text-center"
+                                          className="px-3 py-2 rounded text-xl font-bold text-center mt-1"
                                           style={{ 
                                             background: hasScore ? bgColor : '#6B7280',
                                             color: textColor,
                                             border: borderColor,
-                                            minWidth: '70px' 
+                                            minWidth: '75px',
+                                            width: '75px'
                                           }}
                                           value={selectVal}
                                           onChange={(e) => {
@@ -1655,7 +1657,7 @@ export default function MedalScorecard(props) {
                                             <option key={num} value={num}>{num}</option>
                                           ))}
                                         </select>
-                                      </div>
+                                      </>
                                     );
                                   })()}
                                 </div>
