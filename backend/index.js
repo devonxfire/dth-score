@@ -1606,7 +1606,6 @@ io.on('connection', (socket) => {
       if (!compId) return;
       // Echo the payload as a server-originated `medal-player-updated` event so
       // clients receive the same shape they expect from server-side saves.
-      console.log(`Rebroadcasting client-medal-saved to competition:${compId}`);
       global.io.to(`competition:${compId}`).emit('medal-player-updated', payload);
     } catch (e) {
       console.error('Error handling client-medal-saved', e);
@@ -1723,7 +1722,6 @@ app.post('/api/competitions', async (req, res) => {
 app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req, res) => {
   const { id, groupId, playerName } = req.params;
   const { teebox, handicap, scores, waters, dog, two_clubs } = req.body; // scores: array of 18 numbers/nulls
-  console.log('PATCH Medal player:', { id, groupId, playerName, teebox, handicap, scores, waters, dog, two_clubs });
   try {
     const comp = await prisma.competitions.findUnique({ where: { id: Number(id) } });
     if (!comp || !Array.isArray(comp.groups)) {
@@ -1776,7 +1774,6 @@ app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req
   const computedTwoClubs = Math.min(twoOnPar3, par3Count);
   // Only update if a meaningful value (0 allowed) — set to 0 if none
   group.two_clubs[playerName] = computedTwoClubs;
-  console.log(`two_clubs debug: competition=${id} player=${playerName} par3Count=${par3Count} twoOnPar3=${twoOnPar3} computedTwoClubs=${computedTwoClubs}`);
         // Persist to teams_users when possible
         try {
           // Find the user by name (case-sensitive name match as elsewhere in code)
@@ -1799,23 +1796,16 @@ app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req
                 }
                 if (team) break;
               }
-              if (team) console.log(`two_clubs: matched team via normalized player name for player='${playerName}' -> team.id=${team.id}`);
             }
             if (team) {
               // Upsert teams_users record with computed two_clubs
               let tu = await prisma.teams_users.findFirst({ where: { team_id: team.id, user_id: user.id } });
               if (tu) {
-                const updatedTu = await prisma.teams_users.update({ where: { id: tu.id }, data: { two_clubs: computedTwoClubs } });
-                console.log(`two_clubs persisted: updated teams_users id=${updatedTu.id} team_id=${team.id} user_id=${user.id} two_clubs=${updatedTu.two_clubs}`);
+                await prisma.teams_users.update({ where: { id: tu.id }, data: { two_clubs: computedTwoClubs } });
               } else {
-                const createdTu = await prisma.teams_users.create({ data: { team_id: team.id, user_id: user.id, two_clubs: computedTwoClubs } });
-                console.log(`two_clubs persisted: created teams_users id=${createdTu.id} team_id=${team.id} user_id=${user.id} two_clubs=${createdTu.two_clubs}`);
+                await prisma.teams_users.create({ data: { team_id: team.id, user_id: user.id, two_clubs: computedTwoClubs } });
               }
-            } else {
-              console.log(`two_clubs persistence: team not found for competition=${id} player=${playerName}`);
             }
-          } else {
-            console.log(`two_clubs persistence: user not found for playerName='${playerName}'`);
           }
         } catch (errTu) {
           console.error('Error persisting two_clubs to teams_users:', errTu);
@@ -1829,7 +1819,6 @@ app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req
       where: { id: Number(id) },
       data: { groups: comp.groups }
     });
-    console.log('Updated groups:', JSON.stringify(comp.groups));
     try {
         if (global.io) {
         // Emit the updated group object so clients can merge locally without a full refetch
@@ -1916,7 +1905,6 @@ app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req
 // Medal: Fetch player data in a group
 app.get('/api/competitions/:id/groups/:groupId/player/:playerName', async (req, res) => {
   const { id, groupId, playerName } = req.params;
-  console.log('GET Medal player:', { id, groupId, playerName });
   try {
     const comp = await prisma.competitions.findUnique({ where: { id: Number(id) } });
     if (!comp || !Array.isArray(comp.groups)) {
@@ -1940,7 +1928,6 @@ app.get('/api/competitions/:id/groups/:groupId/player/:playerName', async (req, 
     const waters = group.waters?.[playerName] ?? '';
     const dog = group.dog?.[playerName] ?? false;
     const two_clubs = group.two_clubs?.[playerName] ?? '';
-    console.log('GET Medal response:', { teebox, handicap, scores, waters, dog, two_clubs });
     res.json({ teebox, handicap, scores, waters, dog, two_clubs });
   } catch (err) {
     console.error('Error fetching Medal player data:', err);
