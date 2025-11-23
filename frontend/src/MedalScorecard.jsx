@@ -270,6 +270,10 @@ export default function MedalScorecard(props) {
 
   // Ref to the mobile hole entry container so we can scroll it into view when returning
   const mobileHoleRef = useRef(null);
+  
+  // Track which holes have already triggered auto-navigation (per competition)
+  const autoNavigatedHolesRef = useRef(new Set());
+  const autoNavTimerRef = useRef(null);
 
   // Keep localStorage in sync when compId changes (switching competitions) — load saved hole for new comp.
   useEffect(() => {
@@ -363,6 +367,53 @@ export default function MedalScorecard(props) {
       return () => { cancelled = true; clearTimeout(initial); };
     } catch (e) {}
   }, [mobileSelectedHole]);
+
+  // Auto-navigate to next hole when all players have entered scores on mobile
+  useEffect(() => {
+    try {
+      // Only auto-navigate on mobile viewports
+      if (typeof window === 'undefined') return;
+      const isMobile = window.matchMedia('(max-width: 640px)').matches;
+      if (!isMobile) return;
+      
+      // Check if all players have a score for the current hole
+      const currentHoleIdx = mobileSelectedHole - 1;
+      if (currentHoleIdx < 0 || currentHoleIdx >= 18) return;
+      
+      const holeKey = `${compId}:${currentHoleIdx}`;
+      
+      const allPlayersHaveScore = players.every(pName => {
+        const scores = playerData?.[pName]?.scores;
+        if (!Array.isArray(scores)) return false;
+        const score = scores[currentHoleIdx];
+        return score !== '' && score != null;
+      });
+      
+      // Only auto-navigate if all players have scores AND we haven't done it for this hole yet
+      if (allPlayersHaveScore && players.length > 0 && !autoNavigatedHolesRef.current.has(holeKey)) {
+        // Mark this hole as having triggered auto-navigation
+        autoNavigatedHolesRef.current.add(holeKey);
+        
+        // Clear any existing timer
+        if (autoNavTimerRef.current) {
+          clearTimeout(autoNavTimerRef.current);
+        }
+        
+        // Show "Saving Scores..." on the button
+        setSaveStatus('saving');
+        
+        // Wait 3 seconds then navigate to next hole
+        autoNavTimerRef.current = setTimeout(() => {
+          if (mobileSelectedHole < 18) {
+            setMobileSelectedHole(mobileSelectedHole + 1);
+          }
+          // Reset button status after navigation
+          setSaveStatus('idle');
+          autoNavTimerRef.current = null;
+        }, 3000);
+      }
+    } catch (e) {}
+  }, [mobileSelectedHole, playerData, players, compId]);
 
   // Use holes from the competition payload when available (map stroke_index -> index),
   // otherwise fall back to the defaultHoles constant.
@@ -1067,6 +1118,27 @@ export default function MedalScorecard(props) {
     } catch (err) {
       setError('Failed to flush saves: ' + (err.message || err));
     }
+    
+    // Auto-navigate to next hole on mobile after saving if all players have scores
+    try {
+      if (typeof window === 'undefined') return;
+      const isMobile = window.matchMedia('(max-width: 640px)').matches;
+      if (!isMobile) return;
+      
+      const currentHoleIdx = mobileSelectedHole - 1;
+      if (currentHoleIdx < 0 || currentHoleIdx >= 18) return;
+      
+      const allPlayersHaveScore = players.every(pName => {
+        const scores = playerData?.[pName]?.scores;
+        if (!Array.isArray(scores)) return false;
+        const score = scores[currentHoleIdx];
+        return score !== '' && score != null;
+      });
+      
+      if (allPlayersHaveScore && mobileSelectedHole < 18) {
+        setMobileSelectedHole(mobileSelectedHole + 1);
+      }
+    } catch (e) {}
   }
 
   // ...existing code...
