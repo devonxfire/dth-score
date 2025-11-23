@@ -9,7 +9,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 const COMP_TYPE_DISPLAY = {
-  fourBbbStableford: '4BBB Stableford',
+  fourBbbStableford: '4 Ball Better Ball',
   alliance: 'Alliance',
   medalStrokeplay: 'Medal Strokeplay',
   individualStableford: 'Individual Stableford',
@@ -481,7 +481,7 @@ function MedalLeaderboard() {
       // Use html2canvas to render the element
       const canvas = await html2canvas(element, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdf = new jsPDF('l', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
@@ -514,7 +514,7 @@ function MedalLeaderboard() {
 
   // Fallback: generate a simple text PDF using jsPDF (no images/styles)
   function exportPlainPDF() {
-    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdf = new jsPDF('l', 'mm', 'a4');
     const margin = 10;
     const lineHeight = 7;
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -522,7 +522,8 @@ function MedalLeaderboard() {
     let y = margin;
     pdf.setFontSize(12);
     pdf.setTextColor(0, 0, 0);
-    pdf.text(`${(comp?.name) || 'Competition'} - Leaderboard`, margin, y);
+    const titleCompType = COMP_TYPE_DISPLAY[comp?.type] || comp?.type || 'Competition';
+    pdf.text(`${(comp?.name) || 'Competition'} - ${titleCompType}`, margin, y);
     y += lineHeight;
     pdf.setFontSize(10);
     // Robust date formatting to DD/MM/YYYY
@@ -542,9 +543,9 @@ function MedalLeaderboard() {
     }
     pdf.text(`Date: ${formattedDate}`, margin, y);
     // Include competition type (friendly display if available)
-    const compTypeDisplay = COMP_TYPE_DISPLAY[comp?.type] || comp?.type || '';
-    if (compTypeDisplay) {
-      pdf.text(`Type: ${compTypeDisplay}`, margin + 80, y);
+    const typeDisplay = COMP_TYPE_DISPLAY[comp?.type] || comp?.type || '';
+    if (typeDisplay) {
+      pdf.text(`Type: ${typeDisplay}`, margin + 80, y);
     }
     y += lineHeight * 1.2;
 
@@ -582,12 +583,16 @@ function MedalLeaderboard() {
     y += lineHeight * 0.5;
 
     // Table header
-    const headers = ['Pos', 'Name', 'Thru', 'Gross', 'Net', 'DTH Net', 'Dog', 'Waters', '2Clubs', 'Fines'];
-    const colWidths = [12, 60, 12, 18, 18, 18, 10, 18, 18, 18];
+    const headers = ['Pos', 'Name', 'Thru', 'Gross', 'Net', 'DTH Net', 'Full H/Cap', 'Dog', 'Waters', '2Clubs', 'Fines'];
+    const colWidths = [12, 48, 12, 18, 18, 18, 22, 10, 18, 18, 18];
     let x = margin;
     pdf.setFont(undefined, 'bold');
     headers.forEach((h, i) => {
-      pdf.text(h, x, y);
+      if (i === 1) {
+        pdf.text(h, x, y);
+      } else {
+        pdf.text(h, x + (colWidths[i] || 20) / 2, y, { align: 'center' });
+      }
       x += colWidths[i] || 20;
     });
     pdf.setFont(undefined, 'normal');
@@ -601,12 +606,16 @@ function MedalLeaderboard() {
       }
       let x = margin;
       const display = (compactDisplayName(r) || r.name || '');
-      const rowValues = [r.position, display, String(r.thru), String(r.total), String(r.net), String(r.dthNet), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
+      const rowValues = [r.position, display, String(r.thru), String(r.total), String(r.net), String(r.dthNet), String(r.handicap ?? ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
       rowValues.forEach((val, i) => {
         // truncate long names
         let text = String(val || '');
-        if (i === 1 && text.length > 24) text = text.slice(0, 21) + '...';
-        pdf.text(text, x, y);
+        if (i === 1 && text.length > 20) text = text.slice(0, 17) + '...';
+        if (i === 1) {
+          pdf.text(text, x, y);
+        } else {
+          pdf.text(text, x + (colWidths[i] || 20) / 2, y, { align: 'center' });
+        }
         x += colWidths[i] || 20;
       });
       y += lineHeight;

@@ -9,7 +9,10 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 const COMP_TYPE_DISPLAY = {
+  fourBbbStableford: '4 Ball Better Ball',
   alliance: 'Alliance',
+  medalStrokeplay: 'Medal Strokeplay',
+  individualStableford: 'Individual Stableford',
 };
 
 const defaultHoles = [
@@ -724,6 +727,7 @@ function getPlayingHandicap(entry, comp) {
               fines: ent.fines || '',
               scores: ent.scores || Array(18).fill(''),
               gross: ent.total || 0,
+              handicap: ent.handicap !== undefined ? ent.handicap : '',
               ph,
               ch,
               net: (ent.total || 0) - ph,
@@ -845,7 +849,7 @@ function getPlayingHandicap(entry, comp) {
           if (!element) { alert('Export area not found'); return; }
           const canvas = await html2canvas(element, { scale: 2, useCORS: true });
           const imgData = canvas.toDataURL('image/png');
-          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pdf = new jsPDF('l', 'mm', 'a4');
           const pdfWidth = pdf.internal.pageSize.getWidth();
           const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
           pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
@@ -870,13 +874,14 @@ function getPlayingHandicap(entry, comp) {
       }
 
       function exportPlainPDF() {
-        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdf = new jsPDF('l', 'mm', 'a4');
         const margin = 10; const lineHeight = 7;
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();
         let y = margin;
         pdf.setFontSize(12); pdf.setTextColor(0,0,0);
-        pdf.text(`${(comp?.name) || 'Competition'} - Leaderboard`, margin, y); y += lineHeight;
+        const titleCompType = COMP_TYPE_DISPLAY[comp?.type] || comp?.type || 'Competition';
+        pdf.text(`${(comp?.name) || 'Competition'} - ${titleCompType}`, margin, y); y += lineHeight;
         pdf.setFontSize(10);
         let formattedDate = '-';
         if (comp?.date) {
@@ -889,7 +894,7 @@ function getPlayingHandicap(entry, comp) {
         pdf.text(`Notes: ${comp?.notes || '-'}`, margin, y); y += lineHeight * 1.2;
 
   const rows = [];
-  teams.forEach(team => { team.players.forEach(p => { const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0; const thru = holesPlayed === 18 ? 'F' : holesPlayed; rows.push({ pos: team.pos, teamPoints: team.teamPoints, teeTime: team.teeTime, name: p.name, displayName: p.displayName || '', userId: p.userId || null, teamId: team.teamId || null, dog: p.dog || false, waters: p.waters || '', twoClubs: p.twoClubs || '', fines: p.fines || '', gross: p.gross, net: p.net, dthNet: p.dthNet, points: p.points, thru }); }); });
+  teams.forEach(team => { team.players.forEach(p => { const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0; const thru = holesPlayed === 18 ? 'F' : holesPlayed; rows.push({ pos: team.pos, teamPoints: team.teamPoints, teeTime: team.teeTime, name: p.name, displayName: p.displayName || '', userId: p.userId || null, teamId: team.teamId || null, handicap: p.handicap ?? '', dog: p.dog || false, waters: p.waters || '', twoClubs: p.twoClubs || '', fines: p.fines || '', gross: p.gross, net: p.net, dthNet: p.dthNet, points: p.points, thru }); }); });
 
         const goodScores = rows.filter(r => typeof r.dthNet === 'number' && r.dthNet < 70 && r.thru === 'F');
         pdf.setFont(undefined, 'bold'); pdf.text('Good Scores', margin, y); y += lineHeight; pdf.setFont(undefined, 'normal');
@@ -897,11 +902,11 @@ function getPlayingHandicap(entry, comp) {
         y += lineHeight * 0.5;
 
   const scoreLabel = (comp && ((String(comp.type || '').toLowerCase().includes('individual') && String(comp.type || '').toLowerCase().includes('stableford')) || (String(comp.name || comp.title || '').toLowerCase().includes('individual') && String(comp.name || comp.title || '').toLowerCase().includes('stableford')))) ? 'Points' : 'Score';
-  const headers = ['Pos','Name','Thru',scoreLabel,'Gross','Net','DTH Net','Dog','Waters','2Clubs','Fines'];
-        const colWidths = [12,60,12,18,18,18,18,10,18,18,18];
-        let x = margin; pdf.setFont(undefined,'bold'); headers.forEach((h,i)=>{ pdf.text(h, x, y); x += colWidths[i] || 20; }); pdf.setFont(undefined,'normal'); y += lineHeight;
+  const headers = ['Pos','Name','Thru',scoreLabel,'Gross','Net','DTH Net','Full H/Cap','Dog','Waters','2Clubs','Fines'];
+        const colWidths = [12,48,12,18,18,18,18,22,10,18,18,18];
+        let x = margin; pdf.setFont(undefined,'bold'); headers.forEach((h,i)=>{ if (i === 1) { pdf.text(h, x, y); } else { pdf.text(h, x + (colWidths[i] || 20) / 2, y, { align: 'center' }); } x += colWidths[i] || 20; }); pdf.setFont(undefined,'normal'); y += lineHeight;
 
-        rows.forEach(r => { if (y > pageHeight - margin - lineHeight) { pdf.addPage(); y = margin; } let x = margin; const display = (r.displayName || r.name || '').toUpperCase(); const rowValues = [r.pos, display, String(r.thru), String(r.teamPoints), String(r.gross || ''), String(r.net || ''), String(r.dthNet || ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || '']; rowValues.forEach((val,i)=>{ let text = String(val || ''); if (i === 1 && text.length > 24) text = text.slice(0,21) + '...'; pdf.text(text, x, y); x += colWidths[i] || 20; }); y += lineHeight; });
+        rows.forEach(r => { if (y > pageHeight - margin - lineHeight) { pdf.addPage(); y = margin; } let x = margin; const display = (r.displayName || r.name || '').toUpperCase(); const rowValues = [r.pos, display, String(r.thru), String(r.teamPoints), String(r.gross || ''), String(r.net || ''), String(r.dthNet || ''), String(r.handicap ?? ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || '']; rowValues.forEach((val,i)=>{ let text = String(val || ''); if (i === 1 && text.length > 20) text = text.slice(0,17) + '...'; if (i === 1) { pdf.text(text, x, y); } else { pdf.text(text, x + (colWidths[i] || 20) / 2, y, { align: 'center' }); } x += colWidths[i] || 20; }); y += lineHeight; });
 
         try {
           const d = comp?.date ? new Date(comp.date) : new Date();

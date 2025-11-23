@@ -179,6 +179,7 @@ export default function MedalScorecard(props) {
   const resolvedName = (resolvedUser && (resolvedUser.name || resolvedUser.displayName || (resolvedUser.firstName ? `${resolvedUser.firstName} ${resolvedUser.lastName || ''}` : null))) || null;
   const isAdmin = !!(resolvedUser && (resolvedUser.role === 'admin' || resolvedUser.isAdmin || resolvedUser.isadmin));
   const isCaptain = !!(resolvedUser && (resolvedUser.role === 'captain' || resolvedUser.isCaptain || resolvedUser.iscaptain));
+  
   // Allow edits when:
   // - viewer is admin
   // - OR viewer is a member of the current 4-ball (they can edit any player's data)
@@ -519,7 +520,13 @@ export default function MedalScorecard(props) {
       setGroupIdx(foundIdx);
     }
     autoSetGroupIdxDone.current = true;
-  }, [groups, resolvedName, isAdmin]);
+  }, [groups, resolvedName, isAdmin, groupIdx]);
+
+  // Reset auto-select flag when competition changes so user's group is re-selected
+  useEffect(() => {
+    console.log('[Group Auto-Select] Resetting flag for compId:', compId);
+    autoSetGroupIdxDone.current = false;
+  }, [compId]);
 
   // Real-time: join competition room and listen for updates
   useEffect(() => {
@@ -1438,13 +1445,19 @@ export default function MedalScorecard(props) {
                           </span>
                         </td>
                         <td className="border px-2 py-1 text-center">
-                          <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none' }} value={miniTableStats[name]?.waters || ''} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'waters', e.target.value); }} disabled={!canEdit(name)} />
+                          <select className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold" style={{ border: 'none', background: '#002F5F' }} value={miniTableStats[name]?.waters || ''} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'waters', e.target.value); }} disabled={!canEdit(name)}>
+                            <option value="">0</option>
+                            {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
                         </td>
                         <td className="border px-2 py-1 text-center">
                           <input type="checkbox" checked={!!miniTableStats[name]?.dog} onChange={e => handleMiniTableChange(name, 'dog', e.target.checked)} />
                         </td>
                         <td className="border px-2 py-1 text-center">
-                          <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none' }} value={miniTableStats[name]?.twoClubs || ''} onChange={e => handleMiniTableChange(name, 'twoClubs', e.target.value)} />
+                          <select className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold" style={{ border: 'none', background: '#002F5F' }} value={miniTableStats[name]?.twoClubs || ''} onChange={e => handleMiniTableChange(name, 'twoClubs', e.target.value)}>
+                            <option value="">0</option>
+                            {[1,2,3,4].map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
                         </td>
                       </tr>
                     ))}
