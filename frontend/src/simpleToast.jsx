@@ -20,7 +20,10 @@ export function SimpleToastContainer() {
     try { if (typeof window !== 'undefined') window.__simpleToastMounted = true; } catch (e) {}
     const sub = (t) => {
       const id = t.opts && t.opts.toastId ? t.opts.toastId : `${Date.now()}-${Math.random()}`;
-      setToasts(prev => { if (prev.some(x => x.id === id)) return prev; return [...prev, { id, ...t }]; });
+      setToasts(prev => { 
+        if (prev.some(x => x.id === id)) return prev; 
+        return [...prev, { id, ...t }]; 
+      });
 
       // autoClose default: 60000ms (60 seconds). If opts.autoClose === false, do not auto remove.
       if (t.opts?.autoClose !== false) {
