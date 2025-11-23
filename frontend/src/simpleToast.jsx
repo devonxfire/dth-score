@@ -22,9 +22,9 @@ export function SimpleToastContainer() {
       const id = t.opts && t.opts.toastId ? t.opts.toastId : `${Date.now()}-${Math.random()}`;
       setToasts(prev => { if (prev.some(x => x.id === id)) return prev; return [...prev, { id, ...t }]; });
 
-      // autoClose default: 5000ms (5 seconds). If opts.autoClose === false, do not auto remove.
+      // autoClose default: 60000ms (60 seconds). If opts.autoClose === false, do not auto remove.
       if (t.opts?.autoClose !== false) {
-        const ms = typeof t.opts?.autoClose === 'number' ? t.opts.autoClose : 5000;
+        const ms = typeof t.opts?.autoClose === 'number' ? t.opts.autoClose : 60000;
         setTimeout(() => setToasts(prev => prev.filter(x => x.id !== id)), ms);
       }
     };
@@ -39,15 +39,73 @@ export function SimpleToastContainer() {
   if (typeof document === 'undefined') return null;
 
   // Use a very large z-index to ensure toast is above app overlays.
+  // Stack popups behind each other with slight offset for card-stack effect
   const nodes = (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2147483647, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-      <div style={{ width: 'auto', maxWidth: 'min(90vw, 760px)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        {toasts.map(t => (
-          <div key={t.id} style={{ pointerEvents: 'auto', marginBottom: 12, background: '#002F5F', color: 'white', borderRadius: 16, padding: '1rem 1.25rem', boxShadow: '0 10px 30px rgba(0,0,0,0.30)', border: '4px solid #FFD700', display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: 'Lato, Arial, sans-serif', position: 'relative', textAlign: 'center', minWidth: 360, maxWidth: 'min(90vw, 760px)' }} className="popup-jiggle">
-            <button aria-label="Dismiss" onClick={() => dismiss(t.id)} style={{ position: 'absolute', right: 12, top: 12, background: 'transparent', border: 'none', color: 'white', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>{typeof t.content === 'string' ? <div style={{ textAlign: 'center', fontSize: '1.25rem' }}>{t.content}</div> : t.content}</div>
-          </div>
-        ))}
+      <div style={{ position: 'relative', width: 'min(70vw, 350px)', minWidth: 'min(280px, 90vw)' }}>
+        {toasts.slice().reverse().map((t, reverseIndex) => {
+          // Reverse the array so newest toasts render first (on top)
+          const index = toasts.length - 1 - reverseIndex;
+          // First toast (index 0, newest) is fully visible at front
+          // Subsequent toasts stack behind with slight offset and reduced opacity/scale
+          const offset = reverseIndex * 16; // 16px offset per toast
+          const scale = 1 - (reverseIndex * 0.05); // Slightly smaller for each stacked toast
+          const opacity = reverseIndex === 0 ? 1 : 0.8; // Dimmer for stacked toasts
+          const zIndex = toasts.length - reverseIndex; // Front toast has highest z-index
+          
+          return (
+            <div 
+              key={t.id} 
+              style={{ 
+                pointerEvents: reverseIndex === 0 ? 'auto' : 'none', // Only front toast is interactive
+                position: 'absolute',
+                top: offset,
+                left: 0,
+                right: 0,
+                margin: '0 auto',
+                transform: `scale(${scale})`,
+                transformOrigin: 'center top',
+                background: '#002F5F', 
+                color: 'white', 
+                borderRadius: 16, 
+                padding: '1rem 1.25rem', 
+                boxShadow: '0 10px 30px rgba(0,0,0,0.30)', 
+                border: '4px solid #FFD700', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                fontFamily: 'Lato, Arial, sans-serif', 
+                textAlign: 'center', 
+                width: '100%',
+                boxSizing: 'border-box',
+                opacity,
+                zIndex,
+                transition: 'all 0.3s ease-out'
+              }} 
+              className="popup-jiggle"
+            >
+              <button 
+                aria-label="Dismiss" 
+                onClick={() => dismiss(t.id)} 
+                style={{ 
+                  position: 'absolute', 
+                  right: 12, 
+                  top: 12, 
+                  background: 'transparent', 
+                  border: 'none', 
+                  color: 'white', 
+                  fontSize: 20, 
+                  cursor: 'pointer', 
+                  lineHeight: 1,
+                  pointerEvents: reverseIndex === 0 ? 'auto' : 'none'
+                }}
+              >✕</button>
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {typeof t.content === 'string' ? <div style={{ textAlign: 'center', fontSize: '1.25rem' }}>{t.content}</div> : t.content}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

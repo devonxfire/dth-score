@@ -251,9 +251,9 @@ export default function GlobalPopups() {
               const sig = `${type}:${name}:${holeNumber}:${compId ?? 'x'}`;
               if (checkAndMark(sig)) {
                 // trigger UI and schedule hide like local scorecard
-                if (type === 'eagle') { setEaglePlayer(name); setEagleHole(holeNumber); setShowEagle(true); if (navigator.vibrate) navigator.vibrate([200,100,200,100,200]); scheduleHide(eagleTimeout, setShowEagle, 30000); }
-                if (type === 'birdie') { setBirdiePlayer(name); setBirdieHole(holeNumber); setShowBirdie(true); if (navigator.vibrate) navigator.vibrate([100,50,100]); scheduleHide(birdieTimeout, setShowBirdie, 30000); }
-                if (type === 'blowup') { setBlowupPlayer(name); setBlowupHole(holeNumber); setShowBlowup(true); if (navigator.vibrate) navigator.vibrate([400,100,400]); scheduleHide(blowupTimeout, setShowBlowup, 30000); }
+                if (type === 'eagle') { setEaglePlayer(name); setEagleHole(holeNumber); setShowEagle(true); if (navigator.vibrate) navigator.vibrate([200,100,200,100,200]); scheduleHide(eagleTimeout, setShowEagle, 60000); }
+                if (type === 'birdie') { setBirdiePlayer(name); setBirdieHole(holeNumber); setShowBirdie(true); if (navigator.vibrate) navigator.vibrate([100,50,100]); scheduleHide(birdieTimeout, setShowBirdie, 60000); }
+                if (type === 'blowup') { setBlowupPlayer(name); setBlowupHole(holeNumber); setShowBlowup(true); if (navigator.vibrate) navigator.vibrate([400,100,400]); scheduleHide(blowupTimeout, setShowBlowup, 60000); }
               }
             } else {
               // verification failed for saved score; ignoring
@@ -356,8 +356,8 @@ export default function GlobalPopups() {
           let emoji = '🎉';
           let title = 'Nice!';
           let body = playerName || '';
-          // default 5s autoClose for global popups
-          let autoClose = 5000;
+          // default 60s autoClose for global popups
+          let autoClose = 60000;
           if (type === 'eagle') { emoji = '🦅'; title = 'Eagle!'; body = `For ${playerName || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([200,100,200]); }
           else if (type === 'birdie') { emoji = '🕊️'; title = 'Birdie!'; body = `For ${playerName || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([100,50,100]); }
           else if (type === 'blowup') { emoji = '💥'; title = "How Embarrassing!"; body = `${playerName || ''} just blew up on Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([400,100,400]); }

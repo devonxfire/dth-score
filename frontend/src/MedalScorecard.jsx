@@ -89,8 +89,8 @@ export default function MedalScorecard(props) {
   let emoji = '🎉';
   let title = 'Nice!';
   let body = name || '';
-  // Use 5s autoClose for all toasts unless explicitly disabled
-  let autoClose = 5000;
+  // Use 60s autoClose for all toasts unless explicitly disabled
+  let autoClose = 60000;
   if (type === 'eagle') { emoji = '🦅'; title = 'Eagle!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([200,100,200]); }
   else if (type === 'birdie') { emoji = '🕊️'; title = 'Birdie!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([100,50,100]); }
   else if (type === 'blowup') { emoji = '💥'; title = 'How Embarrassing!'; body = `${name || ''} just blew up on Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([400,100,400]); }
@@ -403,7 +403,7 @@ export default function MedalScorecard(props) {
         // Show "Saving Scores..." on the button
         setSaveStatus('saving');
         
-        // Wait 3 seconds then navigate to next hole
+        // Wait 2 seconds then navigate to next hole
         autoNavTimerRef.current = setTimeout(() => {
           if (mobileSelectedHole < 18) {
             setMobileSelectedHole(mobileSelectedHole + 1);
@@ -411,7 +411,7 @@ export default function MedalScorecard(props) {
           // Reset button status after navigation
           setSaveStatus('idle');
           autoNavTimerRef.current = null;
-        }, 3000);
+        }, 2000);
       }
     } catch (e) {}
   }, [mobileSelectedHole, playerData, players, compId]);

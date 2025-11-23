@@ -83,8 +83,8 @@ export default function Scorecard(props) {
   let emoji = '🎉';
   let title = 'Nice!';
   let body = name || '';
-  // 5s default for all toast popups
-  let autoClose = 5000;
+  // 60s default for all toast popups
+  let autoClose = 60000;
   if (type === 'eagle') { emoji = '🦅'; title = 'Eagle!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([200,100,200]); }
   else if (type === 'birdie') { emoji = '🕊️'; title = 'Birdie!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([100,50,100]); }
   else if (type === 'blowup') { emoji = '💥'; title = 'How Embarrassing!'; body = `${name || ''} just blew up on Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([400,100,400]); }
