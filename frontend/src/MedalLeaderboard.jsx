@@ -623,7 +623,8 @@ function MedalLeaderboard() {
       }
       let x = margin;
       const display = (compactDisplayName(r) || r.name || '');
-      const rowValues = [r.position, display, String(r.thru), String(r.total), String(r.handicap ?? ''), String(r.dthNet), String(r.net), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
+      const displayWithCH = display + (r.handicap ? ` (${r.handicap})` : '');
+      const rowValues = [r.position, displayWithCH, String(r.thru), String(r.total), String(r.handicap ?? ''), String(r.dthNet), String(r.net), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
       rowValues.forEach((val, i) => {
         pdf.rect(x, y - lineHeight + 2, colWidths[i], lineHeight);
         // truncate long names
@@ -871,7 +872,7 @@ function MedalLeaderboard() {
                     <tr key={entry.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
                       <td className="border px-0.5 sm:px-2 py-0.5 font-bold">{entry.position}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>
-                        <div className="max-w-none truncate">{(compactDisplayName(entry) || entry.name).toUpperCase()}</div>
+                        <div className="max-w-none truncate">{(compactDisplayName(entry) || entry.name).toUpperCase()}{entry.handicap ? ` (${entry.handicap})` : ''}</div>
                       </td>
                       <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5">{entry.total}</td>

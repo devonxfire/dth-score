@@ -682,7 +682,9 @@ function getPlayingHandicap(entry, comp) {
                 points: stable.total,
                 perHole: stable.perHole
               };
-              teams.push({ groupIdx: idx, players: [playerObj], teamPoints: Number(stable.total || 0), computedTeamPoints: Number(stable.total || 0), teeTime: group.teeTime || '', teamId: ent.teamId || null });
+              // Calculate back 9 points (holes 10-18, indices 9-17)
+              const back9Points = (stable.perHole || []).slice(9, 18).reduce((sum, val) => sum + (val || 0), 0);
+              teams.push({ groupIdx: idx, players: [playerObj], teamPoints: Number(stable.total || 0), computedTeamPoints: Number(stable.total || 0), back9Points, teeTime: group.teeTime || '', teamId: ent.teamId || null });
             });
           });
           // sort/assign positions and return early for Individual Stableford comps
@@ -945,8 +947,9 @@ function getPlayingHandicap(entry, comp) {
             y += lineHeight;
           } 
           let x = margin; 
-          const display = (r.displayName || r.name || '').toUpperCase(); 
-          const rowValues = [r.pos, display, String(r.thru), String(r.teamPoints), String(r.gross || ''), String(r.handicap ?? ''), String(r.dthNet || ''), String(r.net || ''), String(r.back9Points || ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || '']; 
+          const display = (r.displayName || r.name || '').toUpperCase();
+          const displayWithCH = display + (r.handicap ? ` (${r.handicap})` : '');
+          const rowValues = [r.pos, displayWithCH, String(r.thru), String(r.teamPoints), String(r.gross || ''), String(r.handicap ?? ''), String(r.dthNet || ''), String(r.net || ''), String(r.back9Points || ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || '']; 
           rowValues.forEach((val,i)=>{ 
             pdf.rect(x, y - lineHeight + 2, colWidths[i], lineHeight);
             let text = String(val || ''); 
@@ -998,6 +1001,7 @@ function getPlayingHandicap(entry, comp) {
         waters: p.waters || '',
         twoClubs: p.twoClubs || '',
         fines: p.fines || '',
+        handicap: p.handicap || p.ch || '',
         gross: p.gross,
         net: p.net,
         dthNet: p.dthNet,
@@ -1190,7 +1194,7 @@ function getPlayingHandicap(entry, comp) {
                               {isFirstInTeam && !isExpanded && teamPlayers.length > 1 ? (
                                 `${(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}'S TEAM`
                               ) : (
-                                (compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()
+                                `${(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}${entry.handicap ? ` (${entry.handicap})` : ''}`
                               )}
                             </div>
                           </td>
