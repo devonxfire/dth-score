@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import FourballAssignment from './FourballAssignment';
+import UnifiedFourballAssignment from './UnifiedFourballAssignment';
 import { apiUrl } from './api';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
@@ -146,10 +146,11 @@ export default function AssignFourballsPage({ user }) {
           {loading && <div className="text-white">Loading groups...</div>}
           {!loading && (
             <div className="w-full p-6">
-              <FourballAssignment
+              <UnifiedFourballAssignment
                 fourballs={(initialGroups && initialGroups.length) || 1}
                 initialGroups={initialGroups}
                 onAssign={handleAssign}
+                competitionType="fourball"
               />
             </div>
           )}

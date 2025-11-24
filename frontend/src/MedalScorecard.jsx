@@ -283,6 +283,9 @@ export default function MedalScorecard(props) {
   // Ref to the mobile hole entry container so we can scroll it into view when returning
   const mobileHoleRef = useRef(null);
   
+  // Flag to suppress mobile hole auto-advance during batch operations (like Generate Data)
+  const suppressMobileAdvanceRef = useRef(false);
+  
   // Track which holes have already triggered auto-navigation (per competition)
   const autoNavigatedHolesRef = useRef(new Set());
   const autoNavTimerRef = useRef(null);
@@ -316,6 +319,9 @@ export default function MedalScorecard(props) {
       toast.error('No competition loaded');
       return;
     }
+    
+    // Suppress mobile hole auto-advance during batch generation
+    suppressMobileAdvanceRef.current = true;
     
     const newPlayerData = { ...playerDataRef.current };
     const newMiniTableStats = { ...miniTableStats };
@@ -396,6 +402,9 @@ export default function MedalScorecard(props) {
       }
     } catch (err) {
       console.error('Failed to save dummy data:', err);
+    } finally {
+      // Re-enable mobile hole auto-advance after batch operation completes
+      suppressMobileAdvanceRef.current = false;
     }
   };
 
@@ -1023,10 +1032,13 @@ export default function MedalScorecard(props) {
     } catch (e) {}
   };
 
-  async function handleScoreChange(name, idx, value) {
+  async function handleScoreChange(name, idx, value, skipMobileAdvance = false) {
     if (!canEdit(name)) return;
     // remember last-edited hole for this competition (so refresh/navigation returns here)
-    try { setMobileSelectedHole(idx + 1); localStorage.setItem(`dth:mobileSelectedHole:${compId}`, String(idx + 1)); } catch (e) {}
+    // BUT skip auto-advance if skipMobileAdvance flag is set OR if suppressMobileAdvanceRef is true (batch operations)
+    if (!skipMobileAdvance && !suppressMobileAdvanceRef.current) {
+      try { setMobileSelectedHole(idx + 1); localStorage.setItem(`dth:mobileSelectedHole:${compId}`, String(idx + 1)); } catch (e) {}
+    }
     // mark this hole as a recent local save so we can ignore immediate server echoes
     try {
       const key = `${name}:${idx}`;

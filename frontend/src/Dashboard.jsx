@@ -107,7 +107,7 @@ export default function Dashboard({ user, onSignOut }) {
       </div>
       <div className="relative z-10 flex flex-col items-center px-4 mt-2">
         <div className="w-full max-w-md rounded-2xl shadow-lg p-8 flex flex-col gap-6" style={{ background: 'none' }}>
-          {userComp && (
+          {userComp && userComp.status === 'Open' && (
             <button
               className="w-full py-3 px-4 text-white font-semibold rounded-2xl text-lg flex items-center justify-center gap-2 scorecard-pulse"
               style={{ boxShadow: '0 2px 8px 0 rgba(255,0,0,0.10)' }}

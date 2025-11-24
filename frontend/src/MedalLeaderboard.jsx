@@ -93,7 +93,7 @@ function MedalLeaderboard() {
             if (Array.isArray(data.groups)) {
           data.groups.forEach((group, groupIdx) => {
             if (Array.isArray(group.players)) {
-              group.players.forEach(name => {
+              group.players.forEach((name, playerIdx) => {
                 const scores = group.scores?.[name] || Array(18).fill('');
                 const handicap = group.handicaps?.[name] ?? '';
                 const teebox = group.teeboxes?.[name] ?? '';
@@ -108,6 +108,13 @@ function MedalLeaderboard() {
     const displayNameFromUser = matchedUser?.displayName || matchedUser?.display_name || matchedUser?.displayname || '';
     const nickFromUser = matchedUser?.nick || matchedUser?.nickname || '';
     const teamId = group.teamId || group.id || group.team_id || group.group_id || null;
+    
+    // Check for custom guest display name from group.displayNames array
+    let customDisplayName = '';
+    if (name && name.startsWith('Guest') && Array.isArray(group.displayNames) && group.displayNames[playerIdx]) {
+      customDisplayName = group.displayNames[playerIdx];
+    }
+    
                 entries.push({
                   name,
                   scores,
@@ -120,7 +127,7 @@ function MedalLeaderboard() {
                   teebox,
       teamId,
       userId,
-      displayName: displayNameFromUser,
+      displayName: customDisplayName || displayNameFromUser,
       nick: nickFromUser,
                   groupIdx
                 });

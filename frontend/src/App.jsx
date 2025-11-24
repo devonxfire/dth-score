@@ -12,15 +12,13 @@ import LeaderboardRouter from './LeaderboardRouter';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import ResultsMedal from './ResultsMedal';
-import MedalAssignment from './MedalAssignment';
-import AllianceAssignment from './AllianceAssignment';
+import UnifiedFourballAssignment from './UnifiedFourballAssignment';
 import MedalScorecard from './MedalScorecard';
 import MedalLeaderboard from './MedalLeaderboard';
 import AllianceScorecard from './AllianceScorecard';
 import AllianceLeaderboard from './AllianceLeaderboard';
 import IndividualScorecard from './IndividualScorecard';
 import IndividualLeaderboard from './IndividualLeaderboard';
-import FourballAssignment from './FourballAssignment';
 import FourballScorecard from './FourballScorecard';
 import FourballLeaderboard from './FourballLeaderboard';
 import AssignFourballsPage from './AssignFourballsPage';
@@ -61,15 +59,16 @@ function AppRoutes({ user, setUser }) {
           <Route path="/leaderboard/:id" element={<LeaderboardRouter user={user} />} />
           <Route path="/results/:id" element={<ResultsMedal />} />
           <Route path="/profile" element={<div className="p-8">User Profile (coming soon)</div>} />
-          <Route path="/assign-medal" element={<MedalAssignment user={user} onSignOut={handleSignOut} />} />
-          <Route path="/assign-alliance" element={<AllianceAssignment user={user} onSignOut={handleSignOut} />} />
+          <Route path="/assign-medal" element={<UnifiedFourballAssignment user={user} onSignOut={handleSignOut} competitionType="medal" />} />
+          <Route path="/assign-medal/:id" element={<UnifiedFourballAssignment user={user} onSignOut={handleSignOut} competitionType="medal" />} />
+          <Route path="/assign-alliance" element={<UnifiedFourballAssignment user={user} onSignOut={handleSignOut} competitionType="alliance" />} />
+          <Route path="/assign-alliance/:id" element={<UnifiedFourballAssignment user={user} onSignOut={handleSignOut} competitionType="alliance" />} />
           <Route path="/scorecard-medal/:id" element={<MedalScorecard user={user} onSignOut={handleSignOut} />} />
           <Route path="/leaderboard-medal/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/medal-leaderboard/:id" element={<MedalLeaderboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/scorecard-individual/:id" element={<IndividualScorecard user={user} onSignOut={handleSignOut} />} />
           <Route path="/leaderboard-individual/:id" element={<IndividualLeaderboard user={user} onSignOut={handleSignOut} />} />
-          {/* Alliance routes: reuse Medal assignment UI, but separate scorecard/leaderboard wrappers */}
-          <Route path="/assign-alliance" element={<MedalAssignment user={user} onSignOut={handleSignOut} />} />
+          {/* Alliance routes: unified assignment component, separate scorecard/leaderboard wrappers */}
           <Route path="/scorecard-alliance/:id" element={<AllianceScorecard user={user} onSignOut={handleSignOut} />} />
           <Route path="/leaderboard-alliance/:id" element={<AllianceLeaderboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/alliance-leaderboard/:id" element={<AllianceLeaderboard user={user} onSignOut={handleSignOut} />} />

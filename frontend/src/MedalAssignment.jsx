@@ -21,6 +21,18 @@ export default function MedalAssignment(props) {
   const [availablePlayers, setAvailablePlayers] = useState([]); // Will be fetched
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  
+  // Track guest display names for each group/player slot
+  const [guestNames, setGuestNames] = useState(() => {
+    if (props.initialGroups && props.initialGroups.length > 0) {
+      return props.initialGroups.map(g =>
+        Array.isArray(g.displayNames)
+          ? g.displayNames.slice(0, 4).concat(Array(4).fill('')).slice(0, 4)
+          : Array(4).fill('')
+      );
+    }
+    return [Array(4).fill('')];
+  });
 
   // Fetch comp info on mount
   useEffect(() => {
@@ -54,6 +66,7 @@ export default function MedalAssignment(props) {
   // Helper: add a new group
   function addGroup() {
     setGroups(prev => [...prev, { players: [], teeTime: '', displayNames: ['', '', '', ''] }]);
+    setGuestNames(prev => [...prev, Array(4).fill('')]);
   }
 
   // Helper: update a group
@@ -63,12 +76,38 @@ export default function MedalAssignment(props) {
 
   // Helper: assign player to group
   function assignPlayer(groupIdx, playerIdx, playerName) {
+    // If switching away from GUEST, clear guest name
+    const currentPlayer = groups[groupIdx]?.players[playerIdx];
+    if (currentPlayer && currentPlayer.startsWith('Guest') && !playerName.startsWith('Guest')) {
+      setGuestNames(prev => {
+        const updated = prev.map(arr => arr.slice());
+        if (updated[groupIdx]) updated[groupIdx][playerIdx] = '';
+        return updated;
+      });
+    }
+    // If selecting GUEST, assign Guest 1/2/3 based on first available
+    let assignedValue = playerName;
+    if (['GUEST', 'GUEST - Burt Reds'].includes(playerName)) {
+      const allAssigned = groups.flatMap(g => g.players);
+      const guestOptions = ['Guest 1', 'Guest 2', 'Guest 3'];
+      assignedValue = guestOptions.find(g => !allAssigned.includes(g)) || 'Guest 1';
+    }
     setGroups(prev => prev.map((g, i) => {
       if (i !== groupIdx) return g;
-      const newPlayers = [...g.players];
-      newPlayers[playerIdx] = playerName;
+      const newPlayers = [...(g.players || [])];
+      while (newPlayers.length < 4) newPlayers.push('');
+      newPlayers[playerIdx] = assignedValue;
       return { ...g, players: newPlayers };
     }));
+  }
+  
+  function handleGuestNameChange(groupIdx, playerIdx, value) {
+    setGuestNames(prev => {
+      const updated = prev.map(arr => arr.slice());
+      if (!updated[groupIdx]) updated[groupIdx] = Array(4).fill('');
+      updated[groupIdx][playerIdx] = value;
+      return updated;
+    });
   }
 
   // Helper: set tee time
@@ -79,6 +118,7 @@ export default function MedalAssignment(props) {
   // Helper: remove group
   function removeGroup(idx) {
     setGroups(prev => prev.filter((_, i) => i !== idx));
+    setGuestNames(prev => prev.filter((_, i) => i !== idx));
   }
 
   // Helper: random tee time between 07:00 and 16:50 in 10-minute steps
@@ -107,6 +147,7 @@ export default function MedalAssignment(props) {
       while (chosen.length < 4) chosen.push('');
       const newGroups = groups.map((g, i) => i === idx ? { ...g, players: chosen, teeTime: getRandomTeeTime() } : g);
       setGroups(newGroups);
+      setGuestNames(prev => prev.map((arr, i) => i === idx ? Array(4).fill('') : arr));
       const selected = newGroups.flatMap(g => g.players).filter(Boolean);
       setAvailablePlayers(allNames.filter(n => !selected.includes(n)));
     } catch (e) {
@@ -121,6 +162,7 @@ export default function MedalAssignment(props) {
         const chosen = pool.slice(0, 4);
         const newGroups = groups.map((g, i) => i === idx ? { ...g, players: chosen, teeTime: getRandomTeeTime() } : g);
         setGroups(newGroups);
+        setGuestNames(prev => prev.map((arr, i) => i === idx ? Array(4).fill('') : arr));
         const selected = newGroups.flatMap(g => g.players).filter(Boolean);
         setAvailablePlayers(prev => prev.filter(n => !selected.includes(n)));
       } catch (err) {}
@@ -151,10 +193,10 @@ export default function MedalAssignment(props) {
       return;
     }
     try {
-  const res = await fetch(apiUrl(`/api/competitions/${compIdInt}/groups`), {
+      const res = await fetch(apiUrl(`/api/competitions/${compIdInt}/groups`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groups })
+        body: JSON.stringify({ groups: groupsWithDisplay })
       });
       if (!res.ok) {
         const errText = await res.text();
@@ -203,21 +245,36 @@ export default function MedalAssignment(props) {
                 </div>
               </div>
               <div className="flex flex-col gap-2 mt-2">
-                {Array.from({ length: 4 }).map((_, pIdx) => (
-                  <select
-                    key={pIdx}
-                    className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
-                    style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700 }}
-                    value={group.players[pIdx] || ''}
-                    onChange={e => assignPlayer(idx, pIdx, e.target.value)}
-                    required
-                  >
-                    <option value="" style={{ color: '#1B3A6B', fontWeight: 700 }}>Select player</option>
-                    {getUnassignedPlayers().concat(group.players[pIdx] ? [group.players[pIdx]] : []).filter((v, i, arr) => arr.indexOf(v) === i).map(p => (
-                      <option key={p} value={p} style={{ color: '#1B3A6B', fontWeight: 700 }}>{p}</option>
-                    ))}
-                  </select>
-                ))}
+                {Array.from({ length: 4 }).map((_, pIdx) => {
+                  const player = group.players[pIdx] || '';
+                  return (
+                    <div key={pIdx} className="flex flex-col gap-1">
+                      <select
+                        className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
+                        style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700 }}
+                        value={player}
+                        onChange={e => assignPlayer(idx, pIdx, e.target.value)}
+                        required
+                      >
+                        <option value="" style={{ color: '#1B3A6B', fontWeight: 700 }}>Select player</option>
+                        <option value="GUEST" style={{ color: '#1B3A6B', fontWeight: 700 }}>Guest</option>
+                        {getUnassignedPlayers().concat(player ? [player] : []).filter((v, i, arr) => arr.indexOf(v) === i).map(p => (
+                          <option key={p} value={p} style={{ color: '#1B3A6B', fontWeight: 700 }}>{p}</option>
+                        ))}
+                      </select>
+                      {player && player.startsWith('Guest') && (
+                        <input
+                          type="text"
+                          placeholder="Enter guest name"
+                          value={guestNames[idx]?.[pIdx] || ''}
+                          onChange={e => handleGuestNameChange(idx, pIdx, e.target.value)}
+                          className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
+                          style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 400, fontSize: '0.9rem' }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <button
                 className="mt-2 px-4 py-2 rounded bg-red-700 text-white font-bold"

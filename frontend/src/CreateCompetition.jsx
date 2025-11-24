@@ -10,9 +10,7 @@ import PageBackground from './PageBackground';
 import OpenCompModal from './OpenCompModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import TopMenu from './TopMenu';
-import FourballAssignment from './FourballAssignment';
-import MedalAssignment from './MedalAssignment';
-import AllianceAssignment from './AllianceAssignment';
+import UnifiedFourballAssignment from './UnifiedFourballAssignment';
 
 // Display mapping for all comp types
 const COMP_TYPE_DISPLAY = {
@@ -296,27 +294,30 @@ function CreateCompetition({ user, onSignOut }) {
                 <div className="w-full p-6">
               {((form.type && ['medalStrokeplay', 'medal strokeplay', 'stroke', 'alliance'].includes((form.type || '').replace(/\s+/g, ''))) ? (
                 ((form.type || '').toString().toLowerCase().includes('alliance')) ? (
-                  <AllianceAssignment
+                  <UnifiedFourballAssignment
                     compId={compId}
                     initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
                     user={user}
                     onSignOut={onSignOut}
                     onAssign={handleAssign}
+                    competitionType="alliance"
                   />
                 ) : (
-                  <MedalAssignment
+                  <UnifiedFourballAssignment
                     compId={compId}
                     initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
                     user={user}
                     onSignOut={onSignOut}
                     onAssign={handleAssign}
+                    competitionType="medal"
                   />
                 )
               ) : (
-                <FourballAssignment
+                <UnifiedFourballAssignment
                   fourballs={1}
                   onAssign={handleAssign}
                   initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
+                  competitionType="fourball"
                 />
               ))}
             </div>
