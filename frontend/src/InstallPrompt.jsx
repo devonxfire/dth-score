@@ -46,13 +46,16 @@ export default function InstallPrompt() {
   return (
     <div style={{
       position: 'fixed',
-      bottom: 0,
-      left: 0,
-      right: 0,
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: '90%',
+      maxWidth: '400px',
       backgroundColor: '#0e3764',
       color: '#FFD700',
-      padding: '16px',
-      boxShadow: '0 -2px 10px rgba(0,0,0,0.3)',
+      padding: '20px',
+      borderRadius: '12px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
       zIndex: 9999,
       fontFamily: 'Lato, Arial, sans-serif'
     }}>
@@ -60,12 +63,12 @@ export default function InstallPrompt() {
         onClick={() => handleDismiss(false)}
         style={{
           position: 'absolute',
-          top: '8px',
-          right: '8px',
+          top: '12px',
+          right: '12px',
           background: 'transparent',
           border: 'none',
           color: '#FFD700',
-          fontSize: '24px',
+          fontSize: '28px',
           cursor: 'pointer',
           padding: '0',
           width: '30px',
@@ -76,12 +79,15 @@ export default function InstallPrompt() {
         ×
       </button>
 
-      <div style={{ marginBottom: '12px' }}>
-        <strong style={{ fontSize: '16px', display: 'block', marginBottom: '8px' }}>
-          📱 Install DTH Score
+      <div style={{ marginBottom: '16px' }}>
+        <strong style={{ fontSize: '18px', display: 'block', marginBottom: '10px' }}>
+          📱 Please follow these quick installation instructions first
         </strong>
-        <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#ffffff' }}>
-          Add to your home screen for quick access!
+        <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#ffffff', lineHeight: '1.5' }}>
+          Follow these steps to add a shortcut to your home screen.
+        </p>
+        <p style={{ margin: '0', fontSize: '15px', color: '#FFD700', fontWeight: 'bold', lineHeight: '1.5' }}>
+          It will work just like a mobile app!
         </p>
       </div>
 
@@ -94,7 +100,7 @@ export default function InstallPrompt() {
           fontSize: '14px',
           color: '#ffffff'
         }}>
-          <strong>How to install on iPhone:</strong>
+          <strong>How to add shortcut on iPhone:</strong>
           <ol style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
             <li>Tap the <strong>Share</strong> icon <span style={{ fontSize: '20px' }}>⎙</span> in the address bar (top right)</li>
             <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
@@ -112,7 +118,7 @@ export default function InstallPrompt() {
           fontSize: '14px',
           color: '#ffffff'
         }}>
-          <strong>How to install on Android:</strong>
+          <strong>How to add shortcut on Android:</strong>
           <ol style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
             <li>Tap the <strong>menu</strong> button <span style={{ fontSize: '18px' }}>⋮</span> (top right)</li>
             <li>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></li>
