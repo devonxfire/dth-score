@@ -135,7 +135,9 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
     const openComps = localCompetitionList.filter(comp => {
       if (!comp.date || !Array.isArray(comp.groups)) return false;
       const compDate = new Date(comp.date);
-      const isOpen = compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const isFutureOrToday = compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      // Check both status field AND date to determine if comp is truly open
+      const isOpen = comp.status === 'Open' || (comp.status !== 'Closed' && isFutureOrToday);
       function nameMatch(a, b) {
         if (!a || !b) return false;
         const normA = a.trim().toLowerCase();
@@ -163,7 +165,13 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
   let openCompId = null;
   if (Array.isArray(localCompetitionList) && localCompetitionList.length > 0) {
     const today = new Date();
-    const openCompsAll = localCompetitionList.filter(c => c && (c.status === 'Open' || (c.date && new Date(c.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))));
+    const openCompsAll = localCompetitionList.filter(c => {
+      if (!c) return false;
+      const compDate = c.date ? new Date(c.date) : null;
+      const isFutureOrToday = compDate && compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      // Check both status field AND date to determine if comp is truly open
+      return c.status === 'Open' || (c.status !== 'Closed' && isFutureOrToday);
+    });
     if (openCompsAll.length > 0) {
       openCompsAll.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
       openComp = openCompsAll[0];
@@ -293,7 +301,12 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                       if (!listRes.ok) return;
                       const all = await listRes.json();
                       const today = new Date();
-                      const open = (all || []).filter(c => c && (c.status === 'Open' || (c.date && new Date(c.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))));
+                      const open = (all || []).filter(c => {
+                        if (!c) return false;
+                        const compDate = c.date ? new Date(c.date) : null;
+                        const isFutureOrToday = compDate && compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                        return c.status === 'Open' || (c.status !== 'Closed' && isFutureOrToday);
+                      });
                       if (!open || open.length === 0) return;
                       open.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
                       const pick = open[0];
@@ -421,7 +434,12 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                       if (listRes.ok) {
                         const all = await listRes.json();
                         const today = new Date();
-                        const open = (all || []).filter(c => c && (c.status === 'Open' || (c.date && new Date(c.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))));
+                        const open = (all || []).filter(c => {
+                          if (!c) return false;
+                          const compDate = c.date ? new Date(c.date) : null;
+                          const isFutureOrToday = compDate && compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                          return c.status === 'Open' || (c.status !== 'Closed' && isFutureOrToday);
+                        });
                         if (open.length > 0) {
                           open.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
                           const pick = open[0];

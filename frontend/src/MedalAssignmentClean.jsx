@@ -59,7 +59,7 @@ export default function MedalAssignment(props) {
 
   return (
     <PageBackground hideFooter>
-      <div className="max-w-4xl w-full h-screen flex flex-col justify-start p-0 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', boxSizing: 'border-box' }}>
+      <div className="max-w-4xl w-full min-h-screen flex flex-col justify-start p-0 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', boxSizing: 'border-box' }}>
         <div className="w-full h-full flex flex-col justify-start p-0 text-white" style={{ boxSizing: 'border-box', display: 'flex', justifyContent: 'center' }}>
           {/* Yellow rounded wrapper (1px padding) with inner rounded blue panel to avoid corner artifacts */}
           <div style={{ background: '#FFD700', borderRadius: 9, padding: 1, boxSizing: 'border-box', width: '100%' }}>

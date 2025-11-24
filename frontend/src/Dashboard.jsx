@@ -66,11 +66,13 @@ export default function Dashboard({ user, onSignOut }) {
     });
     let scorecardComp = null;
     if (compsWithUser.length > 0) {
-      // Prefer open comps, then most recent
+      // Prefer open comps (status === 'Open' OR date >= today), then most recent
       const openComps = compsWithUser.filter(comp => {
         if (!comp.date) return false;
         const compDate = new Date(comp.date);
-        return compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const isFutureOrToday = compDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        // Check both status field AND date to determine if comp is truly open
+        return comp.status === 'Open' || (comp.status !== 'Closed' && isFutureOrToday);
       });
       if (openComps.length > 0) {
         openComps.sort((a, b) => (b.date || '').localeCompare(a.date || ''));

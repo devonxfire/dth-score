@@ -158,7 +158,7 @@ export default function AllianceAssignment(props) {
 
   return (
     <PageBackground hideFooter>
-      <div className="max-w-4xl w-full h-screen flex flex-col justify-start bg-[#002F5F] p-8 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+      <div className="max-w-4xl w-full min-h-screen flex flex-col justify-start bg-[#002F5F] p-8 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
         <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
           Alliance Competition: 4 Ball Assignment
         </h1>

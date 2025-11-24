@@ -1037,7 +1037,7 @@ function getPlayingHandicap(entry, comp) {
                   )}
                   <div className="mt-4 mb-2 text-white text-base font-semibold" style={{maxWidth: '100%', textAlign: 'left'}}>
                     <div style={{marginBottom: 4, marginLeft: 0, textDecoration: 'underline', textUnderlineOffset: 3}}>Good Scores</div>
-                    {goodScores.length === 0 ? <div style={{marginLeft: 0}}>No one. Everyone shit.</div> : goodScores.map(p => (<div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{(p.displayName || p.name).toUpperCase()}: Net {p.dthNet}</div>))}
+                    {goodScores.length === 0 ? <div style={{marginLeft: 0}}>No one.</div> : goodScores.map(p => (<div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{(p.displayName || p.name).toUpperCase()}: Net {p.dthNet}</div>))}
                   </div>
                 </div>
               )}
