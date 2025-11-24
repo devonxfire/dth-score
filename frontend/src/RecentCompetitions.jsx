@@ -360,7 +360,30 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 <tr>
                   <td colSpan={5} className="border px-2 py-4 text-white/80">No competitions found.</td>
                 </tr>
-              ) : competitionList.map((comp, idx) => {
+              ) : (() => {
+                // Sort for desktop: Open competitions first, then by date descending
+                const sorted = [...competitionList].sort((a, b) => {
+                  const getStatus = (comp) => {
+                    if (comp.status) return comp.status;
+                    if (comp._forceClosed) return 'Closed';
+                    if (comp.date) {
+                      const today = new Date();
+                      const compDate = new Date(comp.date);
+                      if (compDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+                        return 'Closed';
+                      }
+                    }
+                    return 'Open';
+                  };
+                  const statusA = getStatus(a);
+                  const statusB = getStatus(b);
+                  // Open competitions come first
+                  if (statusA === 'Open' && statusB !== 'Open') return -1;
+                  if (statusA !== 'Open' && statusB === 'Open') return 1;
+                  // Within same status, sort by date descending
+                  return (b.date || '').localeCompare(a.date || '');
+                });
+                return sorted.map((comp, idx) => {
                 const keyBase = comp.id || comp.joinCode || comp.joincode || idx;
                 // Use status from DB if present, otherwise fallback to old logic
                 let status = comp.status;
@@ -498,7 +521,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                     </td>
                   </tr>
                 );
-              })}
+              });
+              })()}
             </tbody>
             </table>
             </div>
