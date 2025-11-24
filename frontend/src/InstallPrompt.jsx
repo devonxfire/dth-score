@@ -88,7 +88,7 @@ export default function InstallPrompt() {
             You're all set!
           </strong>
           <p style={{ margin: '0 0 16px 0', fontSize: '15px', color: '#ffffff', lineHeight: '1.5' }}>
-            DTH Score is now installed as an app. If you have a browser tab open, you can close it and use the app from your home screen.
+            You can close it and use this app from your app launcher.
           </p>
           <button
             onClick={() => {
@@ -196,7 +196,11 @@ export default function InstallPrompt() {
             <li>Tap the <strong>Share</strong> icon <span style={{ fontSize: '20px' }}>⎙</span> in the address bar (top right)</li>
             <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
             <li>Tap <strong>"Add"</strong></li>
+            <li>Launch the app from your Home Screen by clicking the DTH Score icon</li>
           </ol>
+          <p style={{ margin: '12px 0 0 0', fontSize: '13px', color: '#FFD700', fontWeight: 'bold' }}>
+            Close this browser window and use the app launcher for the best user experience!
+          </p>
         </div>
       )}
 
@@ -214,7 +218,11 @@ export default function InstallPrompt() {
             <li>Tap the <strong>menu</strong> button <span style={{ fontSize: '18px' }}>⋮</span> (top right)</li>
             <li>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></li>
             <li>Tap <strong>"Install"</strong></li>
+            <li>Launch the app from your Home Screen by clicking the DTH Score icon</li>
           </ol>
+          <p style={{ margin: '12px 0 0 0', fontSize: '13px', color: '#FFD700', fontWeight: 'bold' }}>
+            Close this browser window and use the app launcher for the best user experience!
+          </p>
         </div>
       )}
 
