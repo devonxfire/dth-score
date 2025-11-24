@@ -907,9 +907,59 @@ function getPlayingHandicap(entry, comp) {
   const scoreLabel = (comp && ((String(comp.type || '').toLowerCase().includes('individual') && String(comp.type || '').toLowerCase().includes('stableford')) || (String(comp.name || comp.title || '').toLowerCase().includes('individual') && String(comp.name || comp.title || '').toLowerCase().includes('stableford')))) ? 'Points' : 'Score';
   const headers = ['Pos','Name','Thru',scoreLabel,'Gross','Full H/Cap','CH Net','PH Net','Back 9','Dog','Waters','2Clubs','Fines'];
         const colWidths = [12,48,12,18,18,22,18,18,18,10,18,18,18];
-        let x = margin; pdf.setFont(undefined,'bold'); headers.forEach((h,i)=>{ if (i === 1) { pdf.text(h, x, y); } else { pdf.text(h, x + (colWidths[i] || 20) / 2, y, { align: 'center' }); } x += colWidths[i] || 20; }); pdf.setFont(undefined,'normal'); y += lineHeight;
+        const tableStartY = y;
+        // Draw header row with grid
+        let x = margin; 
+        pdf.setFont(undefined,'bold'); 
+        pdf.setDrawColor(0);
+        pdf.setLineWidth(0.1);
+        headers.forEach((h,i)=>{ 
+          pdf.rect(x, y - lineHeight + 2, colWidths[i], lineHeight);
+          if (i === 1) { 
+            pdf.text(h, x + 1, y); 
+          } else { 
+            pdf.text(h, x + (colWidths[i] || 20) / 2, y, { align: 'center' }); 
+          } 
+          x += colWidths[i] || 20; 
+        }); 
+        pdf.setFont(undefined,'normal'); 
+        y += lineHeight;
 
-        rows.forEach(r => { if (y > pageHeight - margin - lineHeight) { pdf.addPage(); y = margin; } let x = margin; const display = (r.displayName || r.name || '').toUpperCase(); const rowValues = [r.pos, display, String(r.thru), String(r.teamPoints), String(r.gross || ''), String(r.handicap ?? ''), String(r.dthNet || ''), String(r.net || ''), String(r.back9Points || ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || '']; rowValues.forEach((val,i)=>{ let text = String(val || ''); if (i === 1 && text.length > 20) text = text.slice(0,17) + '...'; if (i === 1) { pdf.text(text, x, y); } else { pdf.text(text, x + (colWidths[i] || 20) / 2, y, { align: 'center' }); } x += colWidths[i] || 20; }); y += lineHeight; });
+        rows.forEach(r => { 
+          if (y > pageHeight - margin - lineHeight) { 
+            pdf.addPage(); 
+            y = margin;
+            // Redraw header on new page
+            x = margin;
+            pdf.setFont(undefined,'bold');
+            headers.forEach((h,i)=>{ 
+              pdf.rect(x, y - lineHeight + 2, colWidths[i], lineHeight);
+              if (i === 1) { 
+                pdf.text(h, x + 1, y); 
+              } else { 
+                pdf.text(h, x + (colWidths[i] || 20) / 2, y, { align: 'center' }); 
+              } 
+              x += colWidths[i] || 20; 
+            }); 
+            pdf.setFont(undefined,'normal');
+            y += lineHeight;
+          } 
+          let x = margin; 
+          const display = (r.displayName || r.name || '').toUpperCase(); 
+          const rowValues = [r.pos, display, String(r.thru), String(r.teamPoints), String(r.gross || ''), String(r.handicap ?? ''), String(r.dthNet || ''), String(r.net || ''), String(r.back9Points || ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || '']; 
+          rowValues.forEach((val,i)=>{ 
+            pdf.rect(x, y - lineHeight + 2, colWidths[i], lineHeight);
+            let text = String(val || ''); 
+            if (i === 1 && text.length > 20) text = text.slice(0,17) + '...'; 
+            if (i === 1) { 
+              pdf.text(text, x + 1, y); 
+            } else { 
+              pdf.text(text, x + (colWidths[i] || 20) / 2, y, { align: 'center' }); 
+            } 
+            x += colWidths[i] || 20; 
+          }); 
+          y += lineHeight; 
+        });
 
         try {
           const d = comp?.date ? new Date(comp.date) : new Date();

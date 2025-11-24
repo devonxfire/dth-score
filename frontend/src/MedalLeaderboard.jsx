@@ -587,9 +587,12 @@ function MedalLeaderboard() {
     const colWidths = [12, 48, 12, 18, 22, 18, 18, 10, 18, 18, 18];
     let x = margin;
     pdf.setFont(undefined, 'bold');
+    pdf.setDrawColor(0);
+    pdf.setLineWidth(0.1);
     headers.forEach((h, i) => {
+      pdf.rect(x, y - lineHeight + 2, colWidths[i], lineHeight);
       if (i === 1) {
-        pdf.text(h, x, y);
+        pdf.text(h, x + 1, y);
       } else {
         pdf.text(h, x + (colWidths[i] || 20) / 2, y, { align: 'center' });
       }
@@ -603,16 +606,31 @@ function MedalLeaderboard() {
       if (y > pageHeight - margin - lineHeight) {
         pdf.addPage();
         y = margin;
+        // Redraw header on new page
+        x = margin;
+        pdf.setFont(undefined, 'bold');
+        headers.forEach((h, i) => {
+          pdf.rect(x, y - lineHeight + 2, colWidths[i], lineHeight);
+          if (i === 1) {
+            pdf.text(h, x + 1, y);
+          } else {
+            pdf.text(h, x + (colWidths[i] || 20) / 2, y, { align: 'center' });
+          }
+          x += colWidths[i] || 20;
+        });
+        pdf.setFont(undefined, 'normal');
+        y += lineHeight;
       }
       let x = margin;
       const display = (compactDisplayName(r) || r.name || '');
       const rowValues = [r.position, display, String(r.thru), String(r.total), String(r.handicap ?? ''), String(r.dthNet), String(r.net), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
       rowValues.forEach((val, i) => {
+        pdf.rect(x, y - lineHeight + 2, colWidths[i], lineHeight);
         // truncate long names
         let text = String(val || '');
         if (i === 1 && text.length > 20) text = text.slice(0, 17) + '...';
         if (i === 1) {
-          pdf.text(text, x, y);
+          pdf.text(text, x + 1, y);
         } else {
           pdf.text(text, x + (colWidths[i] || 20) / 2, y, { align: 'center' });
         }

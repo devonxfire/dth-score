@@ -32,6 +32,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
   const [deleting, setDeleting] = useState(false);
   const [openComps, setOpenComps] = useState([]);
   const [showOpenCompModal, setShowOpenCompModal] = useState(false);
+  const [expandedComps, setExpandedComps] = useState({});
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -192,7 +193,30 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                   <tr><td className="px-3 py-4 text-white/80">Loading competition data...</td></tr>
                 ) : competitionList.length === 0 ? (
                   <tr><td className="px-3 py-4 text-white/80">No competitions found.</td></tr>
-                ) : competitionList.map((comp, idx) => {
+                ) : (() => {
+                  // Sort for mobile: Open competitions first, then by date descending
+                  const sorted = [...competitionList].sort((a, b) => {
+                    const getStatus = (comp) => {
+                      if (comp.status) return comp.status;
+                      if (comp._forceClosed) return 'Closed';
+                      if (comp.date) {
+                        const today = new Date();
+                        const compDate = new Date(comp.date);
+                        if (compDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+                          return 'Closed';
+                        }
+                      }
+                      return 'Open';
+                    };
+                    const statusA = getStatus(a);
+                    const statusB = getStatus(b);
+                    // Open competitions come first
+                    if (statusA === 'Open' && statusB !== 'Open') return -1;
+                    if (statusA !== 'Open' && statusB === 'Open') return 1;
+                    // Within same status, sort by date descending
+                    return (b.date || '').localeCompare(a.date || '');
+                  });
+                  return sorted.map((comp, idx) => {
                   const keyBase = comp.id || comp.joinCode || comp.joincode || idx;
                   let status = comp.status;
                   if (!status) {
@@ -207,8 +231,44 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                       }
                     }
                   }
+                  const isExpanded = expandedComps[keyBase];
+                  const isClosed = status === 'Closed';
+                  
+                  // Closed competitions: show collapsed with just date + expand button
+                  if (isClosed && !isExpanded) {
+                    return (
+                      <React.Fragment key={keyBase + '-mobile'}>
+                        <tr 
+                          className="border-b border-white/20 bg-gray-800/60 cursor-pointer hover:bg-gray-800/80"
+                          onClick={() => setExpandedComps(prev => ({ ...prev, [keyBase]: true }))}
+                        >
+                          <td className="px-3 py-3 flex items-center justify-between">
+                            <div>
+                              <span className="text-gray-300">{formatDate(comp.date)}</span>
+                              <span className="ml-2 text-xs text-gray-400">({COMP_TYPE_DISPLAY[comp.type] || comp.type || ''})</span>
+                            </div>
+                            <button className="text-[#FFD700] text-xl font-bold">+</button>
+                          </td>
+                        </tr>
+                      </React.Fragment>
+                    );
+                  }
+                  
+                  // Open competitions or expanded closed competitions: show full card
                   return (
                     <React.Fragment key={keyBase + '-mobile'}>
+                      {isClosed && isExpanded && (
+                        <tr className="border-b border-white/20 bg-gray-800/60">
+                          <td className="px-3 py-2 text-right">
+                            <button 
+                              onClick={() => setExpandedComps(prev => ({ ...prev, [keyBase]: false }))}
+                              className="text-[#FFD700] text-xl font-bold"
+                            >
+                              −
+                            </button>
+                          </td>
+                        </tr>
+                      )}
                       <tr className={`border-b border-white/20 ${status === 'Closed' ? 'bg-gray-800/60' : ''}`}>
                         <td className="px-3 py-3"><strong className="text-[#FFD700]">Date:</strong> <span className={`${status === 'Closed' ? 'text-gray-300' : 'text-white'}`}>{formatDate(comp.date)}</span></td>
                       </tr>
@@ -274,7 +334,8 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                       </tr>
                     </React.Fragment>
                   );
-                })}
+                });
+                })()}
               </tbody>
             </table>
 
