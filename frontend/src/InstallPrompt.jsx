@@ -85,10 +85,10 @@ export default function InstallPrompt() {
         }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
           <strong style={{ fontSize: '18px', display: 'block', marginBottom: '12px', color: '#FFD700' }}>
-            You're all set!
+            You're all set! You're on the correct version of the app.
           </strong>
           <p style={{ margin: '0 0 16px 0', fontSize: '15px', color: '#ffffff', lineHeight: '1.5' }}>
-            You can close it and use this app from your app launcher.
+            Remember to close any other browser tabs with the DTH Score link and rather use the shortcut on your phone for the best experience.
           </p>
           <button
             onClick={() => {
