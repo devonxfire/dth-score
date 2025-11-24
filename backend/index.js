@@ -180,13 +180,7 @@ async function processGroupsForCompetition(compId, groups) {
             // try any teams_users within this comp prefetched earlier
             const fallbackTu = teamsUsersForComp.find(tu => tu && tu.user_id === user.id && tu.course_handicap != null);
             if (fallbackTu && fallbackTu.course_handicap != null) ch = Number(fallbackTu.course_handicap);
-            else {
-              // final fallback: search across all competitions for the most recent teams_users with a course_handicap
-              try {
-                const anyTu = await prisma.teams_users.findFirst({ where: { user_id: user.id, course_handicap: { not: null } }, orderBy: { id: 'desc' } });
-                if (anyTu && anyTu.course_handicap != null) ch = Number(anyTu.course_handicap);
-              } catch (e) {}
-            }
+            // Removed cross-competition fallback: handicap should default to undefined if not explicitly set
           }
           try {
             await prisma.teams_users.create({
@@ -872,7 +866,7 @@ app.get('/api/competitions/:id', async (req, res) => {
         }
       }
     }
-    // Final pass: if any group still lacks handicaps, try to find any teams_users rows for those players
+    // Final pass: if any group still lacks handicaps, try to find any teams_users rows for those players within this competition
     try {
       for (const group of (compOut.groups || [])) {
         if (!group || !Array.isArray(group.players)) continue;
@@ -882,7 +876,8 @@ app.get('/api/competitions/:id', async (req, res) => {
           try {
             const user = findUserByName(playerName);
             if (user) {
-              const anyTu = await prisma.teams_users.findFirst({ where: { user_id: user.id, course_handicap: { not: null } } });
+              // Only search within the current competition (not across all competitions)
+              const anyTu = await prisma.teams_users.findFirst({ where: { user_id: user.id, teams: { competition_id: Number(id) }, course_handicap: { not: null } } });
               if (anyTu && anyTu.course_handicap != null) {
                 group.handicaps[playerName] = anyTu.course_handicap;
                 try { console.log(`Enriched group.handicaps (final pass) for '${playerName}' from teams_users id ${anyTu.id}`); } catch (e) {}

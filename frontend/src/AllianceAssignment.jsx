@@ -158,7 +158,7 @@ export default function AllianceAssignment(props) {
 
   return (
     <PageBackground hideFooter>
-      <div className="max-w-4xl w-full min-h-screen flex flex-col justify-start bg-[#002F5F] p-8 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+      <div className="max-w-4xl w-full min-h-screen flex flex-col justify-start p-8 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764' }}>
         <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
           Alliance Competition: 4 Ball Assignment
         </h1>
@@ -166,7 +166,7 @@ export default function AllianceAssignment(props) {
 
         {error && <div className="text-red-300 mb-2 font-semibold">{error}</div>}
         {groups.map((group, idx) => (
-          <div key={idx} className="mb-6 border-b border-white/30 pb-4">
+          <div key={idx} className="mb-6 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.3)', background: '#0e3764' }}>
             <div className="mb-2 font-extrabold" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.2rem' }}>4 Ball {idx + 1}</div>
             <div className="mb-2">
               <label className="block mb-1 font-bold" htmlFor={`teeTime-${idx}`} style={{ color: '#FFD700', fontFamily: 'Lato, Arial, sans-serif' }}>Tee Time</label>
@@ -186,15 +186,15 @@ export default function AllianceAssignment(props) {
               {Array.from({ length: 4 }).map((_, pIdx) => (
                 <select
                   key={pIdx}
-                  className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
-                  style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700 }}
+                  className="border border-white text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
+                  style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700, background: '#0e3764' }}
                   value={group.players[pIdx] || ''}
                   onChange={e => assignPlayer(idx, pIdx, e.target.value)}
                   required
                 >
-                  <option value="" style={{ color: '#1B3A6B', fontWeight: 700 }}>Select player</option>
+                  <option value="" style={{ color: '#1B3A6B', fontWeight: 700, background: '#fff' }}>Select player</option>
                   {getUnassignedPlayers().concat(group.players[pIdx] ? [group.players[pIdx]] : []).filter((v, i, arr) => arr.indexOf(v) === i).map(p => (
-                    <option key={p} value={p} style={{ color: '#1B3A6B', fontWeight: 700 }}>{p}</option>
+                    <option key={p} value={p} style={{ color: '#1B3A6B', fontWeight: 700, background: '#fff' }}>{p}</option>
                   ))}
                 </select>
               ))}

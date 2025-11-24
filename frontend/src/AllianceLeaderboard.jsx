@@ -69,6 +69,7 @@ function getPlayingHandicap(entry, comp) {
   const navigate = useNavigate();
   const [showExtras, setShowExtras] = useState(false);
   const [showHandicaps, setShowHandicaps] = useState(false);
+  const [expandedTeams, setExpandedTeams] = useState({});
 
       // Centralized processing of a competition payload (used both for fresh fetch and for initialComp fallback)
       async function processCompetitionPayload(data) {
@@ -898,7 +899,7 @@ function getPlayingHandicap(entry, comp) {
 
         const goodScores = rows.filter(r => typeof r.dthNet === 'number' && r.dthNet < 70 && r.thru === 'F');
         pdf.setFont(undefined, 'bold'); pdf.text('Good Scores', margin, y); y += lineHeight; pdf.setFont(undefined, 'normal');
-        if (goodScores && goodScores.length > 0) { goodScores.forEach(p => { if (y > pageHeight - margin - lineHeight) { pdf.addPage(); y = margin; } const displayName = (p.displayName || p.name || '').toUpperCase(); pdf.text(`${displayName}: Net ${p.dthNet}`, margin, y); y += lineHeight; }); } else { pdf.text('No one. Everyone shit.', margin, y); y += lineHeight; }
+        if (goodScores && goodScores.length > 0) { goodScores.forEach(p => { if (y > pageHeight - margin - lineHeight) { pdf.addPage(); y = margin; } const displayName = (p.displayName || p.name || '').toUpperCase(); pdf.text(`${displayName}: Net ${p.dthNet}`, margin, y); y += lineHeight; }); } else { pdf.text('No one.', margin, y); y += lineHeight; }
         y += lineHeight * 0.5;
 
   const scoreLabel = (comp && ((String(comp.type || '').toLowerCase().includes('individual') && String(comp.type || '').toLowerCase().includes('stableford')) || (String(comp.name || comp.title || '').toLowerCase().includes('individual') && String(comp.name || comp.title || '').toLowerCase().includes('stableford')))) ? 'Points' : 'Score';
@@ -925,7 +926,7 @@ function getPlayingHandicap(entry, comp) {
 
   const rowsForUI = [];
   // Build per-player rows, but for team competitions (4BBB) show the team's BB score in the Score column
-  teams.forEach(team => {
+  teams.forEach((team, teamIndex) => {
     (team.players || []).forEach(p => {
       const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0;
       const thru = holesPlayed === 18 ? 'F' : holesPlayed;
@@ -939,6 +940,7 @@ function getPlayingHandicap(entry, comp) {
         displayName: p.displayName || '',
         userId: p.userId || null,
         teamId: team.teamId || null,
+        teamIndex: teamIndex,
         dog: p.dog || false,
         waters: p.waters || '',
         twoClubs: p.twoClubs || '',
@@ -1096,11 +1098,47 @@ function getPlayingHandicap(entry, comp) {
                       </tr>
                     </thead>
                     <tbody>
-                      {rowsForUI.map((entry, idx) => (
-                        <tr key={`${entry.name}-${idx}`} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
-                          <td className="border px-0.5 sm:px-2 py-0.5 font-bold">{entry.pos}</td>
+                      {rowsForUI.map((entry, idx) => {
+                        // Cycle through 5 very distinct colors alternating blues, grays, and teals
+                        const colorShades = [
+                          'rgba(20, 60, 110, 0.85)',   // deep navy blue
+                          'rgba(70, 80, 90, 0.8)',     // dark slate gray
+                          'rgba(30, 100, 140, 0.8)',   // ocean blue
+                          'rgba(90, 100, 110, 0.75)',  // lighter blue-gray
+                          'rgba(40, 80, 100, 0.85)'    // dark teal-blue
+                        ];
+                        const bgColor = colorShades[entry.teamIndex % 5];
+                        
+                        // Find all players in this team
+                        const teamPlayers = rowsForUI.filter(r => r.teamIndex === entry.teamIndex);
+                        const isFirstInTeam = teamPlayers[0] === entry;
+                        const isExpanded = expandedTeams[entry.teamIndex];
+                        
+                        // Only show first player, or all if expanded
+                        if (!isFirstInTeam && !isExpanded) return null;
+                        
+                        return (
+                        <tr key={`${entry.name}-${idx}`} style={{ background: bgColor }}>
+                          <td className="border px-0.5 sm:px-2 py-0.5 font-bold">
+                            {isFirstInTeam && teamPlayers.length > 1 && (
+                              <button
+                                onClick={() => setExpandedTeams(prev => ({ ...prev, [entry.teamIndex]: !prev[entry.teamIndex] }))}
+                                className="mr-1 text-[#FFD700] hover:text-white transition"
+                                style={{ fontSize: '14px', fontWeight: 'bold' }}
+                              >
+                                {isExpanded ? '−' : '+'}
+                              </button>
+                            )}
+                            {entry.pos}
+                          </td>
                           <td className="border px-0.5 sm:px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>
-                            <div className="max-w-none truncate">{(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}</div>
+                            <div className="max-w-none truncate">
+                              {isFirstInTeam && !isExpanded && teamPlayers.length > 1 ? (
+                                `${(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}'S TEAM`
+                              ) : (
+                                (compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()
+                              )}
+                            </div>
                           </td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.teamPoints}{(entry.backendTeamPoints !== undefined && entry.backendTeamPoints !== entry.teamPoints) ? ` (db ${entry.backendTeamPoints})` : (entry.computedTeamPoints != null && entry.computedTeamPoints !== entry.teamPoints ? ` (calc ${entry.computedTeamPoints})` : '')}</td>
@@ -1129,7 +1167,8 @@ function getPlayingHandicap(entry, comp) {
                             )}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
