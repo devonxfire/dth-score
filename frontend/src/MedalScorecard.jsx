@@ -298,6 +298,97 @@ export default function MedalScorecard(props) {
     } catch (e) {}
   }, [compId, mobileSelectedHole]);
 
+  // Generate dummy test data (admin only)
+  const generateDummyData = async () => {
+    if (!isAdmin) return;
+    if (!compId || !groups.length) {
+      toast.error('No competition loaded');
+      return;
+    }
+    
+    const newPlayerData = { ...playerDataRef.current };
+    const newMiniTableStats = { ...miniTableStats };
+    
+    players.forEach(playerName => {
+      if (!newPlayerData[playerName]) {
+        newPlayerData[playerName] = { scores: Array(18).fill(''), handicap: '' };
+      }
+      
+      // Generate random course handicap (0-36)
+      newPlayerData[playerName].handicap = String(Math.floor(Math.random() * 37));
+      
+      // Generate random scores for each hole (par -2 to par +4)
+      newPlayerData[playerName].scores = holesArr.map(hole => {
+        const par = hole.par || 4;
+        const variance = Math.floor(Math.random() * 7) - 2; // -2 to +4
+        return String(Math.max(1, par + variance));
+      });
+      
+      // Random extras (stored separately in miniTableStats)
+      newMiniTableStats[playerName] = {
+        waters: String(Math.floor(Math.random() * 4)), // 0-3
+        dog: Math.random() < 0.1, // 10% chance
+        twoClubs: String(Math.floor(Math.random() * 3)) // 0-2
+      };
+    });
+    
+    setPlayerData(newPlayerData);
+    playerDataRef.current = newPlayerData;
+    setMiniTableStats(newMiniTableStats);
+    
+    // Auto-save the dummy data
+    try {
+      console.log('Saving all dummy data for', players.length, 'players...');
+      
+      // Save sequentially to avoid race conditions on the backend
+      // (backend saves entire groups array, concurrent requests overwrite each other)
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (const name of players) {
+        const patchBody = {
+          scores: newPlayerData[name].scores,
+          handicap: newPlayerData[name].handicap,
+          waters: newMiniTableStats[name].waters,
+          dog: newMiniTableStats[name].dog,
+          two_clubs: newMiniTableStats[name].twoClubs
+        };
+        console.log('Saving for', name, ':', patchBody);
+        
+        try {
+          const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody);
+          console.log('Response for', name, ':', res.status);
+          if (res.ok) {
+            successCount++;
+          } else {
+            failCount++;
+            console.error('Failed to save', name, ':', res.status, res.statusText);
+          }
+        } catch (err) {
+          failCount++;
+          console.error('Error saving for', name, ':', err);
+        }
+      }
+      
+      console.log('Dummy data save complete:', successCount, 'success,', failCount, 'failed');
+      
+      // Re-fetch to sync server state
+      try {
+        const res = await fetch(apiUrl(`/api/competitions/${compId}`));
+        if (res.ok) {
+          const data = await res.json();
+          setComp(data);
+          setGroups(Array.isArray(data.groups) ? data.groups : []);
+        }
+      } catch (e) {
+        console.error('Error re-fetching competition:', e);
+      }
+    } catch (err) {
+      console.error('Failed to save dummy data:', err);
+    }
+  };
+
+
   // When mobileSelectedHole changes (or on initial mount when restored from localStorage)
   // and we're on a mobile viewport, scroll the hole entry container into view so the user
   // sees the active hole rather than the top of the page.
@@ -1471,18 +1562,32 @@ export default function MedalScorecard(props) {
                 const viewerInGroup = resolvedName && Array.isArray(players) && players.some(p => normalize(p) === normalize(resolvedName));
                 const disabled = !(isAdmin || viewerInGroup);
                 return (
-                  <button
-                    className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
-                    style={{ backgroundColor: disabled ? '#666' : '#FFD700', color: disabled ? '#ddd' : '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                    onMouseOver={e => { if (!disabled) e.currentTarget.style.backgroundColor = '#ffe066'; }}
-                    onMouseOut={e => { if (!disabled) e.currentTarget.style.backgroundColor = '#FFD700'; }}
-                    onClick={() => { if (!disabled) setShowResetModal(true); }}
-                    disabled={disabled}
-                    aria-disabled={disabled}
-                    title={disabled ? 'You cannot reset this scorecard' : 'Reset Scores'}
-                  >
-                    Reset Scores
-                  </button>
+                  <>
+                    <button
+                      className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
+                      style={{ backgroundColor: disabled ? '#666' : '#FFD700', color: disabled ? '#ddd' : '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                      onMouseOver={e => { if (!disabled) e.currentTarget.style.backgroundColor = '#ffe066'; }}
+                      onMouseOut={e => { if (!disabled) e.currentTarget.style.backgroundColor = '#FFD700'; }}
+                      onClick={() => { if (!disabled) setShowResetModal(true); }}
+                      disabled={disabled}
+                      aria-disabled={disabled}
+                      title={disabled ? 'You cannot reset this scorecard' : 'Reset Scores'}
+                    >
+                      Reset Scores
+                    </button>
+                    {isAdmin && (
+                      <button
+                        className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white sm:ml-2 mt-2 sm:mt-0"
+                        style={{ backgroundColor: '#4A90E2', color: 'white', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+                        onMouseOver={e => { e.currentTarget.style.backgroundColor = '#357ABD'; }}
+                        onMouseOut={e => { e.currentTarget.style.backgroundColor = '#4A90E2'; }}
+                        onClick={generateDummyData}
+                        title="Generate random test data for all players"
+                      >
+                        Generate Test Data
+                      </button>
+                    )}
+                  </>
                 );
               })()}
             </div>

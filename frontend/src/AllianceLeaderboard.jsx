@@ -789,8 +789,10 @@ function getPlayingHandicap(entry, comp) {
             // Build debug per-hole arrays (max per-hole for pair)
             const perHoleBestA = Array(18).fill(0).map((_, i) => Math.max((pairA[0].perHole?.[i] || 0), (pairA[1].perHole?.[i] || 0)));
             const perHoleBestB = Array(18).fill(0).map((_, i) => Math.max((pairB[0].perHole?.[i] || 0), (pairB[1].perHole?.[i] || 0)));
-            teams.push({ groupIdx: idx, players: pairA, teamPoints: chosenA, computedTeamPoints: computedA, backendTeamPoints: (typeof backendA === 'number' ? backendA : undefined), teeTime: group.teeTime || '', teamId: teamIdA, debug: { perHoleBest: perHoleBestA, playersPerHole: [(pairA[0].perHole || []), (pairA[1].perHole || [])] } });
-            teams.push({ groupIdx: idx, players: pairB, teamPoints: chosenB, computedTeamPoints: computedB, backendTeamPoints: (typeof backendB === 'number' ? backendB : undefined), teeTime: group.teeTime || '', teamId: teamIdB, debug: { perHoleBest: perHoleBestB, playersPerHole: [(pairB[0].perHole || []), (pairB[1].perHole || [])] } });
+            const back9A = perHoleBestA.slice(9, 18).reduce((s, v) => s + (v || 0), 0);
+            const back9B = perHoleBestB.slice(9, 18).reduce((s, v) => s + (v || 0), 0);
+            teams.push({ groupIdx: idx, players: pairA, teamPoints: chosenA, computedTeamPoints: computedA, backendTeamPoints: (typeof backendA === 'number' ? backendA : undefined), back9Points: back9A, teeTime: group.teeTime || '', teamId: teamIdA, debug: { perHoleBest: perHoleBestA, playersPerHole: [(pairA[0].perHole || []), (pairA[1].perHole || [])] } });
+            teams.push({ groupIdx: idx, players: pairB, teamPoints: chosenB, computedTeamPoints: computedB, backendTeamPoints: (typeof backendB === 'number' ? backendB : undefined), back9Points: back9B, teeTime: group.teeTime || '', teamId: teamIdB, debug: { perHoleBest: perHoleBestB, playersPerHole: [(pairB[0].perHole || []), (pairB[1].perHole || [])] } });
           } else {
             const perHoleBestTwo = Array(18).fill(0).map((_, hIdx) => {
               const vals = groupPlayers.map(p => (p.perHole && Number.isFinite(p.perHole[hIdx]) ? p.perHole[hIdx] : 0));
@@ -801,7 +803,7 @@ function getPlayingHandicap(entry, comp) {
             const back = perHoleBestTwo.slice(9,18).reduce((s, v) => s + (v || 0), 0);
             const teamPoints = front + back;
             const backendPoints = (group && (group.teamId || group.id || group.team_id || group.group_id)) ? backendTeamPointsMap[(group.teamId || group.id || group.team_id || group.group_id)] : null;
-            teams.push({ groupIdx: idx, players: groupPlayers, teamPoints: (typeof backendPoints === 'number' ? backendPoints : teamPoints), computedTeamPoints: teamPoints, teeTime: group.teeTime || '', teamId: (group.teamId || group.id || group.team_id || group.group_id) });
+            teams.push({ groupIdx: idx, players: groupPlayers, teamPoints: (typeof backendPoints === 'number' ? backendPoints : teamPoints), computedTeamPoints: teamPoints, back9Points: back, teeTime: group.teeTime || '', teamId: (group.teamId || group.id || group.team_id || group.group_id) });
           }
         });
         try {
@@ -895,7 +897,7 @@ function getPlayingHandicap(entry, comp) {
         pdf.text(`Notes: ${comp?.notes || '-'}`, margin, y); y += lineHeight * 1.2;
 
   const rows = [];
-  teams.forEach(team => { team.players.forEach(p => { const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0; const thru = holesPlayed === 18 ? 'F' : holesPlayed; rows.push({ pos: team.pos, teamPoints: team.teamPoints, teeTime: team.teeTime, name: p.name, displayName: p.displayName || '', userId: p.userId || null, teamId: team.teamId || null, handicap: p.handicap ?? '', dog: p.dog || false, waters: p.waters || '', twoClubs: p.twoClubs || '', fines: p.fines || '', gross: p.gross, net: p.net, dthNet: p.dthNet, points: p.points, thru }); }); });
+  teams.forEach(team => { team.players.forEach(p => { const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0; const thru = holesPlayed === 18 ? 'F' : holesPlayed; rows.push({ pos: team.pos, teamPoints: team.teamPoints, back9Points: team.back9Points ?? 0, teeTime: team.teeTime, name: p.name, displayName: p.displayName || '', userId: p.userId || null, teamId: team.teamId || null, handicap: p.handicap ?? '', dog: p.dog || false, waters: p.waters || '', twoClubs: p.twoClubs || '', fines: p.fines || '', gross: p.gross, net: p.net, dthNet: p.dthNet, points: p.points, thru }); }); });
 
         const goodScores = rows.filter(r => typeof r.dthNet === 'number' && r.dthNet < 70 && r.thru === 'F');
         pdf.setFont(undefined, 'bold'); pdf.text('Good Scores', margin, y); y += lineHeight; pdf.setFont(undefined, 'normal');
@@ -903,11 +905,11 @@ function getPlayingHandicap(entry, comp) {
         y += lineHeight * 0.5;
 
   const scoreLabel = (comp && ((String(comp.type || '').toLowerCase().includes('individual') && String(comp.type || '').toLowerCase().includes('stableford')) || (String(comp.name || comp.title || '').toLowerCase().includes('individual') && String(comp.name || comp.title || '').toLowerCase().includes('stableford')))) ? 'Points' : 'Score';
-  const headers = ['Pos','Name','Thru',scoreLabel,'Gross','Net','DTH Net','Full H/Cap','Dog','Waters','2Clubs','Fines'];
-        const colWidths = [12,48,12,18,18,18,18,22,10,18,18,18];
+  const headers = ['Pos','Name','Thru',scoreLabel,'Gross','Full H/Cap','CH Net','PH Net','Back 9','Dog','Waters','2Clubs','Fines'];
+        const colWidths = [12,48,12,18,18,22,18,18,18,10,18,18,18];
         let x = margin; pdf.setFont(undefined,'bold'); headers.forEach((h,i)=>{ if (i === 1) { pdf.text(h, x, y); } else { pdf.text(h, x + (colWidths[i] || 20) / 2, y, { align: 'center' }); } x += colWidths[i] || 20; }); pdf.setFont(undefined,'normal'); y += lineHeight;
 
-        rows.forEach(r => { if (y > pageHeight - margin - lineHeight) { pdf.addPage(); y = margin; } let x = margin; const display = (r.displayName || r.name || '').toUpperCase(); const rowValues = [r.pos, display, String(r.thru), String(r.teamPoints), String(r.gross || ''), String(r.net || ''), String(r.dthNet || ''), String(r.handicap ?? ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || '']; rowValues.forEach((val,i)=>{ let text = String(val || ''); if (i === 1 && text.length > 20) text = text.slice(0,17) + '...'; if (i === 1) { pdf.text(text, x, y); } else { pdf.text(text, x + (colWidths[i] || 20) / 2, y, { align: 'center' }); } x += colWidths[i] || 20; }); y += lineHeight; });
+        rows.forEach(r => { if (y > pageHeight - margin - lineHeight) { pdf.addPage(); y = margin; } let x = margin; const display = (r.displayName || r.name || '').toUpperCase(); const rowValues = [r.pos, display, String(r.thru), String(r.teamPoints), String(r.gross || ''), String(r.handicap ?? ''), String(r.dthNet || ''), String(r.net || ''), String(r.back9Points || ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || '']; rowValues.forEach((val,i)=>{ let text = String(val || ''); if (i === 1 && text.length > 20) text = text.slice(0,17) + '...'; if (i === 1) { pdf.text(text, x, y); } else { pdf.text(text, x + (colWidths[i] || 20) / 2, y, { align: 'center' }); } x += colWidths[i] || 20; }); y += lineHeight; });
 
         try {
           const d = comp?.date ? new Date(comp.date) : new Date();
@@ -935,6 +937,7 @@ function getPlayingHandicap(entry, comp) {
         pos: team.pos,
         teamPoints: team.teamPoints,
         computedTeamPoints: team.computedTeamPoints ?? null,
+        back9Points: team.back9Points ?? 0,
         teeTime: team.teeTime,
         name: p.name,
         displayName: p.displayName || '',
@@ -1091,6 +1094,7 @@ function getPlayingHandicap(entry, comp) {
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
+                        <th className={"border px-0.5 sm:px-2 py-0.5 hide-on-portrait" + (showExtras ? ' show-extras' : '')} style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Back 9</th>
                         <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
                         <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
                         <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
@@ -1145,6 +1149,7 @@ function getPlayingHandicap(entry, comp) {
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.gross}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
                           <td className={"border px-0.5 sm:px-2 py-0.5" + (showExtras ? ' show-extras' : '')}>{entry.dthNet}</td>
+                          <td className={"border px-0.5 sm:px-2 py-0.5 hide-on-portrait" + (showExtras ? ' show-extras' : '')}>{entry.back9Points}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.dog ? '🐶' : ''}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.waters || ''}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.twoClubs || ''}</td>

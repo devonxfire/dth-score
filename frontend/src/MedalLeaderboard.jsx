@@ -577,14 +577,14 @@ function MedalLeaderboard() {
         y += lineHeight;
       });
     } else {
-      pdf.text('No one. Everyone shit.', margin, y);
+      pdf.text('No one.', margin, y);
       y += lineHeight;
     }
     y += lineHeight * 0.5;
 
     // Table header
-    const headers = ['Pos', 'Name', 'Thru', 'Gross', 'Net', 'DTH Net', 'Full H/Cap', 'Dog', 'Waters', '2Clubs', 'Fines'];
-    const colWidths = [12, 48, 12, 18, 18, 18, 22, 10, 18, 18, 18];
+    const headers = ['Pos', 'Name', 'Thru', 'Gross', 'Full H/Cap', 'CH Net', 'PH Net', 'Dog', 'Waters', '2Clubs', 'Fines'];
+    const colWidths = [12, 48, 12, 18, 22, 18, 18, 10, 18, 18, 18];
     let x = margin;
     pdf.setFont(undefined, 'bold');
     headers.forEach((h, i) => {
@@ -606,7 +606,7 @@ function MedalLeaderboard() {
       }
       let x = margin;
       const display = (compactDisplayName(r) || r.name || '');
-      const rowValues = [r.position, display, String(r.thru), String(r.total), String(r.net), String(r.dthNet), String(r.handicap ?? ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
+      const rowValues = [r.position, display, String(r.thru), String(r.total), String(r.handicap ?? ''), String(r.dthNet), String(r.net), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || ''];
       rowValues.forEach((val, i) => {
         // truncate long names
         let text = String(val || '');
