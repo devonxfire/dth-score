@@ -165,7 +165,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
             </h1>
             <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
           </div>
-          <div className="w-full max-w-4xl bg-transparent text-white mb-8 px-8" style={{ backdropFilter: 'none' }}>
+          <div className="w-full max-w-4xl bg-transparent text-white mb-8 px-4 lg:px-8" style={{ backdropFilter: 'none' }}>
             {isAdmin(user) && (
               <div className="mb-8 sm:mb-4 flex justify-center sm:justify-start">
                 <button
@@ -184,8 +184,9 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 </button>
               </div>
             )}
+            <div className="overflow-x-auto -mx-4 lg:mx-0">
             {/* Mobile: stacked table rows for better responsiveness (keeps table feel) */}
-            <table className="w-full sm:hidden border-collapse text-base shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700', borderRadius: 8, border: '2px solid #FFD700' }}>
+            <table className="w-full lg:hidden border-collapse text-base shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700', borderRadius: 8, border: '2px solid #FFD700' }}>
               <tbody>
                 {loading ? (
                   <tr><td className="px-3 py-4 text-white/80">Loading competition data...</td></tr>
@@ -278,15 +279,15 @@ function RecentCompetitions({ user = {}, comps = [] }) {
             </table>
 
             {/* Desktop table (hidden on small screens) */}
-            <div className="hidden sm:block">
-            <table className="w-full border-collapse text-base shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700' }}>
+            <div className="hidden lg:block">
+            <table className="w-full border-collapse text-sm shadow-xl overflow-hidden bg-white/10" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764', color: 'white', borderColor: '#FFD700', tableLayout: 'fixed' }}>
               <thead>
                 <tr style={{ background: '#00204A' }}>
-                  <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Date</th>
-                  <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Type</th>
-                  <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Course</th>
-                  <th className="border px-2 py-1 w-[100px] text-center" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Status</th>
-                  <th className={`border border-white px-2 py-1${isAdmin(user) ? ' w-[260px]' : ''}`} style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Action</th>
+                  <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif', width: '12%'}}>Date</th>
+                  <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif', width: '18%'}}>Type</th>
+                  <th className="border px-2 py-1" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif', width: '20%'}}>Course</th>
+                  <th className="border px-2 py-1 text-center" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif', width: '10%'}}>Status</th>
+                  <th className={`border border-white px-2 py-1`} style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif', width: '40%'}}>Action</th>
                 </tr>
               </thead>
             <tbody>
@@ -316,11 +317,11 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 }
                 return (
                   <tr key={keyBase + '-info'} className={`border${status === 'Closed' ? ' bg-gray-800/60' : ''}`}> 
-                    <td className={`border px-2 py-1${status === 'Closed' ? ' text-gray-300' : ''}`}>{formatDate(comp.date)}</td>
-                    <td className={`border px-2 py-1 whitespace-nowrap${status === 'Closed' ? ' text-gray-300' : ''}`}>{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</td>
-                    <td className={`border px-2 py-1 whitespace-nowrap${status === 'Closed' ? ' text-gray-300' : ''}`}>{comp.club || comp.joinCode || comp.joincode || '-'}</td>
+                    <td className={`border px-2 py-1 whitespace-nowrap${status === 'Closed' ? ' text-gray-300' : ''}`}>{formatDate(comp.date)}</td>
+                    <td className={`border px-2 py-1${status === 'Closed' ? ' text-gray-300' : ''}`} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</td>
+                    <td className={`border px-2 py-1${status === 'Closed' ? ' text-gray-300' : ''}`} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{comp.club || comp.joinCode || comp.joincode || '-'}</td>
                     <td className={
-                      `border border-white px-2 py-1 text-center align-middle w-[100px] ${
+                      `border border-white px-2 py-1 text-center align-middle ${
                         status === 'Open'
                           ? 'bg-[#1B3A6B] text-white'
                           : status === 'Closed'
@@ -330,33 +331,33 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                     }>
                       {status}
                     </td>
-                    <td className={`border px-2 py-1${isAdmin(user) ? ' w-[260px]' : ''}`}>
-                      <div className={`flex flex-row gap-2 items-center${isAdmin(user) ? ' w-full justify-between' : ' justify-center'}`}>
+                    <td className={`border px-2 py-1`}>
+                      <div className={`flex flex-row gap-1 items-center${isAdmin(user) ? ' w-full justify-between' : ' justify-center'}`}>
                         <button
-                          className={`py-1 px-3 flex items-center gap-1 border font-semibold rounded-2xl transition ${status === 'Closed' ? 'bg-gray-700 border-gray-500 text-gray-400 cursor-not-allowed' : 'border-[#FFD700] text-[#002F5F] bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F]'}`}
+                          className={`py-1 px-2 flex items-center gap-1 border font-semibold rounded-2xl transition text-sm ${status === 'Closed' ? 'bg-gray-700 border-gray-500 text-gray-400 cursor-not-allowed' : 'border-[#FFD700] text-[#002F5F] bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F]'}`}
                           style={{ boxShadow: '0 2px 8px 0 rgba(255,215,0,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
                           onClick={() => {
                             if (status !== 'Closed') navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}`, { state: { comp } });
                           }}
                           disabled={status === 'Closed'}
                         >
-                          <EyeIcon className="h-5 w-5 mr-1" /> Info
+                          <EyeIcon className="h-4 w-4" /> Info
                         </button>
                         {isAdmin(user) && (
                           <>
                             <button
-                              className={`py-1 px-3 flex items-center gap-1 border font-semibold rounded-2xl transition ${status === 'Closed' ? 'bg-gray-700 border-gray-500 text-gray-400 cursor-not-allowed' : 'border-[#FFD700] text-[#002F5F] bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F]'}`}
+                              className={`py-1 px-2 flex items-center gap-1 border font-semibold rounded-2xl transition text-sm ${status === 'Closed' ? 'bg-gray-700 border-gray-500 text-gray-400 cursor-not-allowed' : 'border-[#FFD700] text-[#002F5F] bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F]'}`}
                               style={{ boxShadow: '0 2px 8px 0 rgba(255,215,0,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}
                               onClick={() => {
                                 if (status !== 'Closed') navigate(`/competition/${comp.joinCode || comp.joincode || comp.id}/edit`, { state: { comp } });
                               }}
                               disabled={status === 'Closed'}
                             >
-                              <ScissorsIcon className="h-5 w-5 mr-1" /> Edit
+                              <ScissorsIcon className="h-4 w-4" /> Edit
                             </button>
                             {(() => {
-                              const endBtnClass = "py-1 px-6 min-w-[115px] flex items-center gap-1 border border-[#FFD700] text-[#002F5F] font-semibold rounded-2xl transition bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F] whitespace-nowrap";
-                              const reopenBtnClass = "py-1 px-3 min-w-[80px] flex items-center gap-1 border border-[#FFD700] text-[#002F5F] font-semibold rounded-2xl transition bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F] whitespace-nowrap";
+                              const endBtnClass = "py-1 px-2 flex items-center gap-1 border border-[#FFD700] text-[#002F5F] font-semibold rounded-2xl transition bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F] text-sm whitespace-nowrap";
+                              const reopenBtnClass = "py-1 px-2 flex items-center gap-1 border border-[#FFD700] text-[#002F5F] font-semibold rounded-2xl transition bg-[#FFD700] hover:bg-[#F5D06F] hover:text-[#002F5F] text-sm whitespace-nowrap";
                               return (
                                 <button
                                   className={status === 'Open' ? endBtnClass : reopenBtnClass}
@@ -405,13 +406,13 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                                   }}
                                   disabled={deleting}
                                 >
-                                  {status === 'Open' ? <XMarkIcon className="h-5 w-5 mr-1" /> : <ArrowPathIcon className="h-5 w-5 mr-1" />}
+                                  {status === 'Open' ? <XMarkIcon className="h-4 w-4" /> : <ArrowPathIcon className="h-4 w-4" />}
                                   {status === 'Open' ? 'End' : 'Re-open'}
                                 </button>
                               );
                             })()}
                             <button
-                              className="py-1 px-3 flex items-center gap-1 border text-white font-semibold rounded-2xl transition"
+                              className="py-1 px-2 flex items-center gap-1 border text-white font-semibold rounded-2xl transition text-sm"
                               style={{
                                 backgroundColor: '#dc2626', // Tailwind red-600
                                 borderColor: '#dc2626',
@@ -428,7 +429,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                               onClick={() => { setShowDeleteModal(true); setDeleteCompId(comp.id); }}
                               disabled={deleting}
                             >
-                              <TrashIcon className="h-5 w-5 mr-1" /> Delete
+                              <TrashIcon className="h-4 w-4" /> Delete
                             </button>
                           </>
                         )}
@@ -439,6 +440,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
               })}
             </tbody>
             </table>
+            </div>
             </div>
         </div>
         {/* Delete Competition Modal */}
