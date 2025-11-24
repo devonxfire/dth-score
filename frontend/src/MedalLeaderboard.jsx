@@ -904,10 +904,8 @@ function MedalLeaderboard() {
                       <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.waters || ''}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.twoClubs || ''}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">
-                        {isAdmin(currentUser) ? (
-                          <input
-                            type="number"
-                            min="0"
+                        {isAdmin(currentUser) || isCaptain(currentUser, comp) ? (
+                          <select
                             value={entry.fines || ''}
                             onChange={e => {
                               const v = e.target.value;
@@ -916,9 +914,12 @@ function MedalLeaderboard() {
                               // save immediately; pass player name and comp id for fallback when team/user ids are missing
                               saveFines(entry.teamId, entry.userId, v, entry.name, comp?.id || id);
                             }}
-                            className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
-                            style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
-                          />
+                            className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold"
+                            style={{ border: 'none' }}
+                          >
+                            <option value="">0</option>
+                            {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
                         ) : (
                           entry.fines || ''
                         )}

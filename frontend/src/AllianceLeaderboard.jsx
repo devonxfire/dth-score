@@ -93,9 +93,18 @@ function getPlayingHandicap(entry, comp) {
                 const dog = group.dog?.[name] ?? false;
                 const twoClubs = group.two_clubs?.[name] ?? group.twoClubs?.[name] ?? '';
                 const fines = group.fines?.[name] ?? '';
-                const teamId = group.teamId || group.id || group.team_id || group.group_id || null;
+                let teamId = group.teamId || group.id || group.team_id || group.group_id || null;
                 // include any underlying teamIds for 4BBB groups so we can try fetching teams_users rows
                 const groupTeamIds = Array.isArray(group.teamIds) && group.teamIds.length > 0 ? group.teamIds.filter(Boolean) : [];
+                
+                // For 4BBB: try to find the specific team this player belongs to
+                // This is important for fines and other per-player operations
+                if (groupTeamIds.length > 0 && userId) {
+                  // Try to match player to one of the team IDs by checking backend
+                  // We'll do this asynchronously after building entries
+                  teamId = teamId; // Keep default for now, will be refined in async fetch below
+                }
+                
                 built.push({ name, scores, total: gross || 0, handicap, groupIdx, userId, displayName: displayNameFromUser, nick: nickFromUser, waters, dog, twoClubs, fines, teamId, groupTeamIds });
               });
             }
@@ -107,7 +116,6 @@ function getPlayingHandicap(entry, comp) {
           const fetchPromises = (built || []).map(async (entry) => {
             try {
               if (!entry) return;
-              if (entry.handicap !== undefined && entry.handicap !== '') return;
               if (!entry.userId) return;
               // prioritize explicit teamId, then try groupTeamIds (4BBB)
               const tryTeamIds = [];
@@ -118,17 +126,26 @@ function getPlayingHandicap(entry, comp) {
                   const res = await fetch(apiUrl(`/api/teams/${tId}/users/${entry.userId}`));
                   if (!res.ok) continue;
                   const data = await res.json();
+                  // If we found a matching team, update the entry's teamId to the correct one
+                  if (data && data.team_id) {
+                    entry.teamId = data.team_id;
+                  }
                   const ch = data?.course_handicap ?? data?.handicap ?? data?.courseHandicap ?? data?.course_handicap;
                   if (ch !== undefined && ch !== null && ch !== '') {
                     entry.handicap = ch;
-                    break;
                   }
+                  // Also load fines from teams_users
+                  if (data?.fines !== undefined && data?.fines !== null) {
+                    entry.fines = data.fines;
+                  }
+                  // Found a match, stop looking
+                  if (data && (data.team_id || ch !== undefined)) break;
                 } catch (e) { /* ignore per-team errors */ }
               }
             } catch (e) { /* per-entry ignore */ }
           });
           await Promise.all(fetchPromises);
-          // push updated entries into state so UI picks up refreshed handicaps
+          // push updated entries into state so UI picks up refreshed handicaps and teamIds
           setEntries(Array.isArray(built) ? built.slice() : built);
             // If some entries still lack CH, ask the server to compute an authoritative
             // leaderboard (this will use competitions.groups + teams_users + scores).
@@ -590,11 +607,14 @@ function getPlayingHandicap(entry, comp) {
       }
 
       async function saveFines(teamId, userId, fines, playerName, compId) {
+        console.log('[saveFines] Called with:', { teamId, userId, fines, playerName, compId });
         try {
           if (teamId && userId) {
+            console.log('[saveFines] Using direct team/user endpoint');
             const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
             const url = apiUrl(`/api/teams/${teamId}/users/${userId}`);
             const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
+            console.log('[saveFines] Request:', url, body);
             const res = await fetch(url, {
               method: 'PATCH',
               headers: {
@@ -605,26 +625,33 @@ function getPlayingHandicap(entry, comp) {
             });
             if (!res.ok) {
               const text = await res.text();
+              console.error('[saveFines] Direct save failed:', res.status, text);
               alert('Failed to save fines: ' + res.status + ' ' + text);
               return;
             }
             const data = await res.json();
+            console.log('[saveFines] Direct save succeeded:', data);
             setEntries(es => es.map(e => (e.teamId === teamId && e.userId === userId) ? { ...e, fines: data.fines ?? (fines !== '' ? fines : '') } : e));
             return;
           }
           if (!compId || !playerName) {
+            console.error('[saveFines] Missing compId or playerName');
             alert('Cannot save fines: missing team/user and insufficient fallback data');
             return;
           }
+          console.log('[saveFines] Using fallback competition/player endpoint');
           const url = apiUrl(`/api/competitions/${compId}/players/${encodeURIComponent(playerName)}/fines`);
           const body = { fines: fines !== '' && fines != null ? Number(fines) : null };
+          console.log('[saveFines] Fallback request:', url, body);
           const res = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           if (!res.ok) {
             const text = await res.text();
+            console.error('[saveFines] Fallback save failed:', res.status, text);
             alert('Fallback save failed: ' + res.status + ' ' + text);
             return;
           }
           const data = await res.json();
+          console.log('[saveFines] Fallback save succeeded:', data);
           setEntries(es => es.map(e => (e.name === playerName ? { ...e, fines: data.fines ?? (fines !== '' ? fines : '') } : e)));
         } catch (err) {
           console.error('Failed to save fines', err);
@@ -941,6 +968,7 @@ function getPlayingHandicap(entry, comp) {
         y += lineHeight;
 
         rows.forEach(r => { 
+          let x = margin;
           if (y > pageHeight - margin - lineHeight) { 
             pdf.addPage(); 
             y = margin;
@@ -958,8 +986,8 @@ function getPlayingHandicap(entry, comp) {
             }); 
             pdf.setFont(undefined,'normal');
             y += lineHeight;
+            x = margin; // Reset x after header
           } 
-          let x = margin; 
           const display = (r.displayName || r.name || '').toUpperCase();
           const displayWithCH = display + (r.handicap ? ` (${r.handicap})` : '');
           const rowValues = [r.pos, displayWithCH, String(r.thru), String(r.teamPoints), String(r.gross || ''), String(r.handicap ?? ''), String(r.dthNet || ''), String(r.net || ''), String(r.back9Points || ''), r.dog ? 'Y' : '', r.waters || '', r.twoClubs || '', r.fines || '']; 
@@ -979,10 +1007,10 @@ function getPlayingHandicap(entry, comp) {
 
         try {
           const d = comp?.date ? new Date(comp.date) : new Date();
-          const y = String(d.getFullYear());
+          const yr = String(d.getFullYear());
           const m = String(d.getMonth() + 1).padStart(2, '0');
           const dd = String(d.getDate()).padStart(2, '0');
-          const datePart = `${y}${m}${dd}`;
+          const datePart = `${yr}${m}${dd}`;
           const compTypeDisplay = (COMP_TYPE_DISPLAY[comp?.type] || comp?.type || '').toString().toUpperCase();
           const typePart = compTypeDisplay.replace(/[^A-Z0-9 ]/g, '').trim().replace(/\s+/g, '_') || 'COMPETITION';
           const filename = `${datePart}_DTH_LEADERBOARD_${typePart}.pdf`;
@@ -1241,19 +1269,20 @@ function getPlayingHandicap(entry, comp) {
                           <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.waters || ''}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.twoClubs || ''}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">
-                            {isAdmin(currentUser) ? (
-                              <input
-                                type="number"
-                                min="0"
+                            {isAdmin(currentUser) || isCaptain(currentUser, comp) ? (
+                              <select
                                 value={entry.fines || ''}
                                 onChange={e => {
                                   const v = e.target.value;
                                   setEntries(es => es.map(x => x.name === entry.name ? { ...x, fines: v } : x));
                                   saveFines(entry.teamId, entry.userId, v, entry.name, comp?.id || null);
                                 }}
-                                className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner"
-                                style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }}
-                              />
+                                className="w-12 text-center rounded focus:outline-none font-semibold"
+                                style={{ border: 'none', backgroundColor: 'transparent', color: '#ffffff' }}
+                              >
+                                <option value="">0</option>
+                                {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                              </select>
                             ) : (
                               entry.fines || ''
                             )}

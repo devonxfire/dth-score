@@ -1515,31 +1515,137 @@ app.patch('/api/competitions/:compId/players/:playerName/fines', async (req, res
   const { compId, playerName } = req.params;
   const { fines } = req.body;
   try {
+    console.log('[fines-fallback] Attempting to save fines for', playerName, 'in competition', compId);
+    
+    // Normalize function that handles quotes, apostrophes, and special characters
+    const normalized = (s) => {
+      if (!s) return '';
+      return String(s)
+        .replace(/['']/g, "'")  // Normalize curly quotes to straight quotes
+        .replace(/[""]/g, '"')   // Normalize curly double quotes
+        .trim()
+        .toLowerCase();
+    };
+    
     // Find teams for competition
     const teams = await prisma.teams.findMany({ where: { competition_id: Number(compId) } });
-    if (!teams || teams.length === 0) return res.status(404).json({ error: 'No teams found for competition' });
-    const normalized = (s) => (s || '').trim().toLowerCase();
+    console.log('[fines-fallback] Found', teams.length, 'teams for competition', compId);
+    
+    // If no teams exist (e.g., Medal individual competitions), try to save to competition.groups.fines directly
+    if (!teams || teams.length === 0) {
+      console.log('[fines-fallback] No teams found, attempting to save to competition.groups.fines');
+      try {
+        const comp = await prisma.competitions.findUnique({ where: { id: Number(compId) } });
+        if (!comp) return res.status(404).json({ error: 'Competition not found' });
+        
+        const groups = Array.isArray(comp.groups) ? comp.groups : [];
+        let updated = false;
+        let matchedPlayerName = null;
+        
+        // Find the group containing this player and update their fines
+        for (const group of groups) {
+          if (Array.isArray(group.players)) {
+            // Try to find exact match first, then normalized match
+            const exactMatch = group.players.find(p => p === playerName);
+            if (exactMatch) {
+              matchedPlayerName = exactMatch;
+            } else {
+              const normalizedPlayerName = normalized(playerName);
+              matchedPlayerName = group.players.find(p => normalized(p) === normalizedPlayerName);
+            }
+            
+            if (matchedPlayerName) {
+              // Initialize fines object if it doesn't exist
+              if (!group.fines || typeof group.fines !== 'object') {
+                group.fines = {};
+              }
+              // Update fines using the matched player name (preserves original formatting)
+              group.fines[matchedPlayerName] = fines !== undefined && fines !== null ? Number(fines) : null;
+              updated = true;
+              console.log('[fines-fallback] Updated fines in group.fines for', matchedPlayerName);
+              break;
+            }
+          }
+        }
+        
+        if (!updated) {
+          console.log('[fines-fallback] Player not found in any group');
+          return res.status(404).json({ error: 'Player not found in any group' });
+        }
+        
+        // Save updated groups back to competition
+        await prisma.competitions.update({
+          where: { id: Number(compId) },
+          data: { groups }
+        });
+        
+        // Emit socket update
+        try {
+          if (global.io) {
+            global.io.to(`competition:${compId}`).emit('fines-updated', { competitionId: Number(compId), playerName: matchedPlayerName });
+          }
+        } catch (e) {
+          console.error('Error emitting fines-updated', e);
+        }
+        
+        console.log('[fines-fallback] Successfully saved fines to competition.groups');
+        return res.json({ fines: fines !== undefined && fines !== null ? Number(fines) : null });
+      } catch (err) {
+        console.error('Error saving fines to competition.groups:', err);
+        return res.status(500).json({ error: 'Failed to save fines to competition groups' });
+      }
+    }
+    
     let foundTeam = null;
+    let matchedPlayerName = null;
+    
     // Find team that contains this player name in its players array (string match)
     for (const t of teams) {
       if (Array.isArray(t.players)) {
-        if (t.players.map(p => normalized(p)).includes(normalized(playerName))) {
+        console.log('[fines-fallback] Checking team', t.id, 'with players:', t.players);
+        
+        // Try exact match first
+        if (t.players.includes(playerName)) {
           foundTeam = t;
+          matchedPlayerName = playerName;
+          console.log('[fines-fallback] Found matching team:', t.id, '(exact match)');
+          break;
+        }
+        
+        // Try normalized match
+        const normalizedPlayerName = normalized(playerName);
+        matchedPlayerName = t.players.find(p => normalized(p) === normalizedPlayerName);
+        if (matchedPlayerName) {
+          foundTeam = t;
+          console.log('[fines-fallback] Found matching team:', t.id, '(normalized match for', matchedPlayerName, ')');
           break;
         }
       }
     }
-    if (!foundTeam) return res.status(404).json({ error: 'Team for player not found' });
-    // Find user record by name (case-insensitive)
+    
+    if (!foundTeam) {
+      console.log('[fines-fallback] Team for player not found in', teams.length, 'teams');
+      return res.status(404).json({ error: 'Team for player not found' });
+    }
+    
+    // Find user record by name (case-insensitive, handle quotes)
     const allUsers = await prisma.users.findMany();
-    const user = allUsers.find(u => normalized(u.name) === normalized(playerName));
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const normalizedPlayerName = normalized(playerName);
+    const user = allUsers.find(u => normalized(u.name) === normalizedPlayerName);
+    if (!user) {
+      console.log('[fines-fallback] User not found in database. Searched for:', playerName, 'normalized:', normalizedPlayerName);
+      return res.status(404).json({ error: 'User not found' });
+    }
+    console.log('[fines-fallback] Found user:', user.id, user.name);
+    
     // Upsert teams_users record
     let record = await prisma.teams_users.findFirst({ where: { team_id: foundTeam.id, user_id: user.id } });
     const updateData = { fines: fines !== undefined && fines !== null ? Number(fines) : null };
     if (record) {
+      console.log('[fines-fallback] Updating existing teams_users record:', record.id);
       record = await prisma.teams_users.update({ where: { id: record.id }, data: updateData });
     } else {
+      console.log('[fines-fallback] Creating new teams_users record');
       record = await prisma.teams_users.create({ data: { team_id: foundTeam.id, user_id: user.id, ...updateData } });
     }
     try {
@@ -1549,6 +1655,7 @@ app.patch('/api/competitions/:compId/players/:playerName/fines', async (req, res
     } catch (e) {
       console.error('Error emitting fines-updated', e);
     }
+    console.log('[fines-fallback] Successfully saved fines via teams_users');
     res.json(record);
   } catch (err) {
     console.error('Error upserting fines by competition/player:', err);
