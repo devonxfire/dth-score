@@ -96,7 +96,7 @@ export default function InstallPrompt() {
         }}>
           <strong>How to install on iPhone:</strong>
           <ol style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
-            <li>Tap the <strong>Share</strong> button <span style={{ fontSize: '18px' }}>⎋</span> (bottom of screen)</li>
+            <li>Tap the <strong>Share</strong> icon <span style={{ fontSize: '20px' }}>⎙</span> in the address bar (top right)</li>
             <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
             <li>Tap <strong>"Add"</strong></li>
           </ol>
