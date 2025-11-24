@@ -28,3 +28,6 @@ backend/.env
 .env
 frontend/.env
 frontend/.env.development
+
+# AI assistant files
+AI_ASSISTANT_SUMMARY.md
