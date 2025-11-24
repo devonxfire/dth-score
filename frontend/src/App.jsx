@@ -22,6 +22,7 @@ import IndividualLeaderboard from './IndividualLeaderboard';
 import FourballScorecard from './FourballScorecard';
 import FourballLeaderboard from './FourballLeaderboard';
 import AssignFourballsPage from './AssignFourballsPage';
+import InstallPrompt from './InstallPrompt';
 
 function AppRoutes({ user, setUser }) {
   const navigate = useNavigate();
@@ -95,6 +96,7 @@ function App() {
   return (
     <Router>
       <AppRoutes user={user} setUser={handleSetUser} />
+      <InstallPrompt />
     </Router>
   );
 }
