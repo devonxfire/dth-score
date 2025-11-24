@@ -219,21 +219,33 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
             </div>
             <div className="flex flex-col gap-2 mt-2">
               {group.players.map((player, pIdx) => (
-                <select
-                  key={pIdx}
-                  className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
-                  style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700 }}
-                  value={player}
-                  onChange={e => handlePlayerChange(idx, pIdx, e.target.value)}
-                  required
-                >
-                  <option value="" style={{ color: '#1B3A6B', fontWeight: 700 }}>Select player</option>
-                  {[...available.filter(name => !groups.flatMap(g => g.players).includes(name) || name === player), ...(player && !available.includes(player) ? [player] : [])]
-                    .filter((name, i, arr) => name && arr.indexOf(name) === i)
-                    .map((name, optIdx) => (
-                      <option key={`${name}-${idx}-${pIdx}-${optIdx}`} value={name} style={{ color: '#1B3A6B', fontWeight: 700 }}>{name}</option>
-                    ))}
-                </select>
+                <div key={pIdx} className="flex flex-col gap-1">
+                  <select
+                    className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
+                    style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 700 }}
+                    value={player}
+                    onChange={e => handlePlayerChange(idx, pIdx, e.target.value)}
+                    required
+                  >
+                    <option value="" style={{ color: '#1B3A6B', fontWeight: 700 }}>Select player</option>
+                    <option value="GUEST" style={{ color: '#1B3A6B', fontWeight: 700 }}>Guest</option>
+                    {[...available.filter(name => !groups.flatMap(g => g.players).includes(name) || name === player), ...(player && !available.includes(player) ? [player] : [])]
+                      .filter((name, i, arr) => name && arr.indexOf(name) === i)
+                      .map((name, optIdx) => (
+                        <option key={`${name}-${idx}-${pIdx}-${optIdx}`} value={name} style={{ color: '#1B3A6B', fontWeight: 700 }}>{name}</option>
+                      ))}
+                  </select>
+                  {player && player.startsWith('Guest') && (
+                    <input
+                      type="text"
+                      placeholder="Enter guest name"
+                      value={guestNames[idx]?.[pIdx] || ''}
+                      onChange={e => handleGuestNameChange(idx, pIdx, e.target.value)}
+                      className="border border-white bg-transparent text-white rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-white"
+                      style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700', fontWeight: 400, fontSize: '0.9rem' }}
+                    />
+                  )}
+                </div>
               ))}
             </div>
             <button

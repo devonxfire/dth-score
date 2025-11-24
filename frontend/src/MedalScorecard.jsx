@@ -200,8 +200,19 @@ export default function MedalScorecard(props) {
   const [groups, setGroups] = useState([]);
   const [groupIdx, setGroupIdx] = useState(0);
   const [players, setPlayers] = useState([]);
+  const [displayNames, setDisplayNames] = useState([]);
   const autoSetGroupIdxDone = React.useRef(false);
   const [playerData, setPlayerData] = useState({});
+  
+  // Helper to get display name for a player (uses custom guest name if set)
+  const getDisplayName = (playerName, index) => {
+    if (!playerName) return '';
+    // If player starts with "Guest" and we have a custom display name, use it
+    if (playerName.startsWith('Guest') && displayNames[index] && displayNames[index].trim()) {
+      return displayNames[index];
+    }
+    return playerName;
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState({});
@@ -591,6 +602,7 @@ export default function MedalScorecard(props) {
           setGroups(Array.isArray(data.groups) ? data.groups : []);
           if (Array.isArray(data.groups) && data.groups.length > 0) {
             setPlayers(data.groups[groupIdx]?.players || []);
+            setDisplayNames(data.groups[groupIdx]?.displayNames || []);
           }
         }
         setLoading(false);
@@ -884,6 +896,7 @@ export default function MedalScorecard(props) {
       }
       if (!cancelled) {
         setPlayers(group.players);
+        setDisplayNames(group.displayNames || []);
         setPlayerData(newData);
         setMiniTableStats(newMiniStats);
       }
@@ -1414,15 +1427,17 @@ export default function MedalScorecard(props) {
               </tr>
             </thead>
             <tbody>
-                {players.map((name, idx) => (
+                {players.map((name, idx) => {
+                  const displayName = getDisplayName(name, idx);
+                  return (
                   <tr key={name}>
                     <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
                     <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>
                       {/* Mobile: show Initial + Surname only. Desktop: full name */}
-                      <span className="block sm:hidden truncate whitespace-nowrap" title={name}>
+                      <span className="block sm:hidden truncate whitespace-nowrap" title={displayName}>
                         {(() => {
                           try {
-                            const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+                            const parts = (displayName || '').trim().split(/\s+/).filter(Boolean);
                             if (parts.length === 0) return '';
                             if (parts.length === 1) return parts[0];
                             // remove nickname tokens wrapped in quotes or parentheses from initial detection
@@ -1431,11 +1446,11 @@ export default function MedalScorecard(props) {
                             const initial = (first && first[0]) ? first[0].toUpperCase() : '';
                             return initial ? `${initial}. ${surname}` : surname;
                           } catch (e) {
-                            return name;
+                            return displayName;
                           }
                         })()}
                       </span>
-                      <span className="hidden sm:block truncate whitespace-nowrap" title={name}>{name}</span>
+                      <span className="hidden sm:block truncate whitespace-nowrap" title={displayName}>{displayName}</span>
                     </td>
                       <td className="border px-2 py-1 text-center">
                       <select
@@ -1493,7 +1508,8 @@ export default function MedalScorecard(props) {
                       <input type="number" min="0" className="w-12 text-center text-white bg-transparent rounded focus:outline-none font-semibold no-spinner" style={{ border: 'none', MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none' }} value={miniTableStats[name]?.twoClubs || ''} onChange={e => { if (!canEdit(name)) return; handleMiniTableChange(name, 'twoClubs', e.target.value); }} disabled={!canEdit(name)} />
                     </td>
                   </tr>
-                ))}
+                );
+                })}
               </tbody>
             
               </table>
@@ -1515,14 +1531,16 @@ export default function MedalScorecard(props) {
                     {/* Removed erroneous insertion here; pair Score rows are rendered inside the main front/back tables after the appropriate player rows. */}
                   </thead>
                   <tbody>
-                    {players.map((name, idx) => (
+                    {players.map((name, idx) => {
+                      const displayName = getDisplayName(name, idx);
+                      return (
                       <tr key={'extras-' + name}>
                         <td className={`border border-white px-2 py-1 font-bold text-center align-middle ${playerColors[idx % playerColors.length]}`} style={{ minWidth: 32 }}>{String.fromCharCode(65 + idx)}</td>
                         <td className={`border border-white px-2 py-1 font-semibold text-left ${playerColors[idx % playerColors.length]}`}>
-                          <span className="truncate whitespace-nowrap" title={name}>
+                          <span className="truncate whitespace-nowrap" title={displayName}>
                             {(() => {
                               try {
-                                const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+                                const parts = (displayName || '').trim().split(/\s+/).filter(Boolean);
                                 if (parts.length === 0) return '';
                                 if (parts.length === 1) return parts[0];
                                 const first = parts[0].replace(/^["'\(]+|["'\)]+$/g, '');
@@ -1530,7 +1548,7 @@ export default function MedalScorecard(props) {
                                 const initial = (first && first[0]) ? first[0].toUpperCase() : '';
                                 return initial ? `${initial}. ${surname}` : surname;
                               } catch (e) {
-                                return name;
+                                return displayName;
                               }
                             })()}
                           </span>
@@ -1551,7 +1569,8 @@ export default function MedalScorecard(props) {
                           </select>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1663,6 +1682,7 @@ export default function MedalScorecard(props) {
 
                       <div className="space-y-4">
                         {players.map((pName, idx) => {
+                          const displayName = getDisplayName(pName, idx);
                           const stable = computePlayerStablefordTotals(pName);
                           const grossArr = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
                           const curVal = grossArr[mobileSelectedHole - 1] || '';
@@ -1672,7 +1692,7 @@ export default function MedalScorecard(props) {
                           for (let i = 0; i < grossArr.length; i++) { const v = parseInt(grossArr[i], 10); if (Number.isFinite(v)) { parSumPlayer += (holesArr[i]?.par || 0); anyScorePlayer = true; } }
                           const diffPlayer = grossTotal - parSumPlayer;
                           const parLabelPlayer = anyScorePlayer ? (diffPlayer === 0 ? ' (E)' : ` (${diffPlayer > 0 ? '+' : ''}${diffPlayer})`) : '';
-                          const initialLabel = (() => { try { const parts = (pName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return pName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return pName; } })();
+                          const initialLabel = (() => { try { const parts = (displayName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return displayName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return displayName; } })();
 
                           return (
                             <div key={`mob-wrap-${pName}`}>
@@ -1915,7 +1935,8 @@ export default function MedalScorecard(props) {
                       <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 18 ? 1 : h + 1))}>▶</button>
                     </div>
                     <div className="space-y-3">
-                      {players.map((pName) => {
+                      {players.map((pName, pIdx) => {
+                        const displayName = getDisplayName(pName, pIdx);
                         const grossArr = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');
                         const curVal = grossArr[mobileSelectedHole - 1] || '';
                         const grossTotal = grossArr.reduce((s, v) => s + (parseInt(v, 10) || 0), 0);
@@ -1941,7 +1962,7 @@ export default function MedalScorecard(props) {
                         for (let i = 0; i < grossArr.length; i++) { const v = parseInt(grossArr[i], 10); if (Number.isFinite(v)) { parSumPlayer += (holesArr[i]?.par || 0); anyScorePlayer = true; } }
                         const diffPlayer = grossTotal - parSumPlayer;
                         const parLabelPlayer = anyScorePlayer ? (diffPlayer === 0 ? ' (E)' : ` (${diffPlayer > 0 ? '+' : ''}${diffPlayer})`) : '';
-                        const initialLabel = (() => { try { const parts = (pName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return pName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return pName; } })();
+                        const initialLabel = (() => { try { const parts = (displayName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return displayName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return displayName; } })();
 
                         return (
                           <div key={`mob-medal-${pName}`} className="p-2 rounded border border-white/10 relative">

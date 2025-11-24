@@ -556,6 +556,10 @@ function MedalLeaderboard() {
     pdf.text(`Course: ${courseText}`, margin, y);
     pdf.text(`Handicap Allowance: ${allowanceText}`, margin + 80, y);
     y += lineHeight * 1.2;
+    y += lineHeight * 0.3;
+    const guests = []; (comp.groups || []).forEach(g => { (g.players || []).forEach((name, i) => { if (name && name.startsWith('Guest') && g.displayNames && g.displayNames[i] && g.displayNames[i].trim()) { guests.push(g.displayNames[i].trim()); } }); });
+    pdf.text(`Guests: ${guests.length > 0 ? guests.join(', ') : 'None'}`, margin, y);
+    y += lineHeight * 1.2;
     pdf.text(`Notes: ${notesText}`, margin, y);
     y += lineHeight * 1.2;
 
@@ -802,6 +806,17 @@ function MedalLeaderboard() {
               <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type || ''} <br />
               <span className="font-semibold">Course:</span> {comp?.club || comp?.course || '-'} <br />
               <span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance && comp.handicapallowance !== 'N/A' ? comp.handicapallowance + '%' : 'N/A'} <br />
+              <span className="font-semibold" style={{ marginTop: '0.5rem', display: 'inline-block' }}>Guests:</span> {(() => {
+                const guests = [];
+                (comp.groups || []).forEach(g => {
+                  (g.players || []).forEach((name, i) => {
+                    if (name && name.startsWith('Guest') && g.displayNames && g.displayNames[i] && g.displayNames[i].trim()) {
+                      guests.push(g.displayNames[i].trim());
+                    }
+                  });
+                });
+                return guests.length > 0 ? guests.join(', ') : 'None';
+              })()} <br />
               <div style={{ marginTop: 8, marginBottom: 6, textDecoration: 'underline', textUnderlineOffset: 3 }} className="font-semibold">Notes:</div>
               {canEditNotes(currentUser, comp) ? (
                 editingNotes ? (
@@ -859,8 +874,8 @@ function MedalLeaderboard() {
                     <th className="border px-0.5 sm:px-2 py-0.5 text-left" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Name</th>
                     <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Thru</th>
                     <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
-                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>CH Net</th>
+                    <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>PH Net</th>
                     <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
                     <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
                     <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#002F5F',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>2 Clubs</th>
@@ -876,8 +891,8 @@ function MedalLeaderboard() {
                       </td>
                       <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5">{entry.total}</td>
-                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
                       <td className={"border px-0.5 sm:px-2 py-0.5" + (showExtras ? ' show-extras' : '')}>{entry.dthNet}</td>
+                      <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.dog ? '🐶' : ''}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.waters || ''}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.twoClubs || ''}</td>

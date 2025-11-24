@@ -651,8 +651,13 @@ function getPlayingHandicap(entry, comp) {
           (groups || []).forEach((group, idx) => {
             (group.players || []).forEach((name, i) => {
               let ent = entries.find(e => (e.name || '').trim().toLowerCase() === (name || '').trim().toLowerCase());
-              if (!ent && Array.isArray(group.displayNames) && group.displayNames[i]) {
-                const guestName = group.displayNames[i].trim().toLowerCase();
+              // Check if there's a custom displayName for this guest
+              let customDisplayName = '';
+              if (Array.isArray(group.displayNames) && group.displayNames[i] && group.displayNames[i].trim()) {
+                customDisplayName = group.displayNames[i].trim();
+              }
+              if (!ent && customDisplayName) {
+                const guestName = customDisplayName.toLowerCase();
                 ent = entries.find(e => (e.name || '').trim().toLowerCase() === guestName);
               }
               if (!ent) {
@@ -664,7 +669,7 @@ function getPlayingHandicap(entry, comp) {
               const stable = playerStableford(ent);
               const playerObj = {
                 name: ent.name,
-                displayName: ent.displayName || '',
+                displayName: customDisplayName || ent.displayName || '',
                 userId: ent.userId || null,
                 teamId: ent.teamId || null,
                 waters: ent.waters || '',
@@ -705,8 +710,13 @@ function getPlayingHandicap(entry, comp) {
         (groups || []).forEach((group, idx) => {
           const groupPlayers = (group.players || []).map((name, i) => {
             let ent = entries.find(e => (e.name || '').trim().toLowerCase() === (name || '').trim().toLowerCase());
-            if (!ent && Array.isArray(group.displayNames) && group.displayNames[i]) {
-              const guestName = group.displayNames[i].trim().toLowerCase();
+            // Check if there's a custom displayName for this guest
+            let customDisplayName = '';
+            if (Array.isArray(group.displayNames) && group.displayNames[i] && group.displayNames[i].trim()) {
+              customDisplayName = group.displayNames[i].trim();
+            }
+            if (!ent && customDisplayName) {
+              const guestName = customDisplayName.toLowerCase();
               ent = entries.find(e => (e.name || '').trim().toLowerCase() === guestName);
             }
             if (!ent) {
@@ -721,7 +731,7 @@ function getPlayingHandicap(entry, comp) {
             const stable = playerStableford(ent);
             return {
               name: ent.name,
-              displayName: ent.displayName || '',
+              displayName: customDisplayName || ent.displayName || '',
               userId: ent.userId || null,
               teamId: ent.teamId || null,
               waters: ent.waters || '',
@@ -896,6 +906,9 @@ function getPlayingHandicap(entry, comp) {
         const allowanceText = comp?.handicapallowance && comp.handicapallowance !== 'N/A' ? `${comp.handicapallowance}%` : (comp?.handicapallowance === 'N/A' ? 'N/A' : '100%');
         const courseText = comp?.club || comp?.course || '-';
         pdf.text(`Course: ${courseText}`, margin, y); pdf.text(`Handicap Allowance: ${allowanceText}`, margin + 80, y); y += lineHeight * 1.2;
+        y += lineHeight * 0.3;
+        const guests = []; (comp.groups || []).forEach(g => { (g.players || []).forEach((name, i) => { if (name && name.startsWith('Guest') && g.displayNames && g.displayNames[i] && g.displayNames[i].trim()) { guests.push(g.displayNames[i].trim()); } }); });
+        pdf.text(`Guests: ${guests.length > 0 ? guests.join(', ') : 'None'}`, margin, y); y += lineHeight * 1.2;
         pdf.text(`Notes: ${comp?.notes || '-'}`, margin, y); y += lineHeight * 1.2;
 
   const rows = [];
@@ -982,7 +995,16 @@ function getPlayingHandicap(entry, comp) {
   const rowsForUI = [];
   // Build per-player rows, but for team competitions (4BBB) show the team's BB score in the Score column
   teams.forEach((team, teamIndex) => {
-    (team.players || []).forEach(p => {
+    // Sort players within the team so non-guests appear first
+    const sortedPlayers = (team.players || []).slice().sort((a, b) => {
+      const aIsGuest = (a.name || '').startsWith('Guest');
+      const bIsGuest = (b.name || '').startsWith('Guest');
+      if (aIsGuest && !bIsGuest) return 1; // a after b
+      if (!aIsGuest && bIsGuest) return -1; // a before b
+      return 0; // keep original order
+    });
+    
+    sortedPlayers.forEach(p => {
       const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0;
       const thru = holesPlayed === 18 ? 'F' : holesPlayed;
       // Use the team's teamPoints for the Score column so both teammates display the same BB Score
@@ -1069,6 +1091,17 @@ function getPlayingHandicap(entry, comp) {
                   <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp?.type] || (comp?.type ? comp.type.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/(Four\s+Bbb)/i, '4BBB') : '')} <br />
                   <span className="font-semibold">Course:</span> {comp?.club || comp?.course || '-'} <br />
                   <span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance && comp.handicapallowance !== 'N/A' ? comp.handicapallowance + '%' : 'N/A'} <br />
+                  <span className="font-semibold" style={{ marginTop: '0.5rem', display: 'inline-block' }}>Guests:</span> {(() => {
+                    const guests = [];
+                    (comp.groups || []).forEach(g => {
+                      (g.players || []).forEach((name, i) => {
+                        if (name && name.startsWith('Guest') && g.displayNames && g.displayNames[i] && g.displayNames[i].trim()) {
+                          guests.push(g.displayNames[i].trim());
+                        }
+                      });
+                    });
+                    return guests.length > 0 ? guests.join(', ') : 'None';
+                  })()} <br />
 
                   <div style={{ marginTop: 8, marginBottom: 6, textDecoration: 'underline', textUnderlineOffset: 3 }} className="font-semibold">Notes:</div>
                   {canEditNotes(currentUser, comp) ? (
@@ -1146,8 +1179,8 @@ function getPlayingHandicap(entry, comp) {
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Thru</th>
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>{isIndividualRender ? 'Points' : 'Score'}</th>
                         <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Gross</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Net</th>
-                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>DTH Net</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>CH Net</th>
+                        <th className="border px-0.5 sm:px-2 py-0.5" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>PH Net</th>
                         <th className={"border px-0.5 sm:px-2 py-0.5 hide-on-portrait" + (showExtras ? ' show-extras' : '')} style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Back 9</th>
                         <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Dog</th>
                         <th className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait" style={{background:'#0e3764',color:'#FFD700', borderColor:'#FFD700', fontFamily:'Merriweather, Georgia, serif'}}>Waters</th>
@@ -1201,8 +1234,8 @@ function getPlayingHandicap(entry, comp) {
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.teamPoints}{(entry.backendTeamPoints !== undefined && entry.backendTeamPoints !== entry.teamPoints) ? ` (db ${entry.backendTeamPoints})` : (entry.computedTeamPoints != null && entry.computedTeamPoints !== entry.teamPoints ? ` (calc ${entry.computedTeamPoints})` : '')}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5">{entry.gross}</td>
-                          <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
                           <td className={"border px-0.5 sm:px-2 py-0.5" + (showExtras ? ' show-extras' : '')}>{entry.dthNet}</td>
+                          <td className="border px-0.5 sm:px-2 py-0.5">{entry.net}</td>
                           <td className={"border px-0.5 sm:px-2 py-0.5 hide-on-portrait" + (showExtras ? ' show-extras' : '')}>{entry.back9Points}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.dog ? '🐶' : ''}</td>
                           <td className="border px-0.5 sm:px-2 py-0.5 hide-on-portrait">{entry.waters || ''}</td>
