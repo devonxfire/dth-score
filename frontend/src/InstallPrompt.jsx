@@ -44,40 +44,58 @@ export default function InstallPrompt() {
   if (!showPrompt) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      width: '90%',
-      maxWidth: '400px',
-      backgroundColor: '#0e3764',
-      color: '#FFD700',
-      padding: '20px',
-      borderRadius: '12px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-      zIndex: 9999,
-      fontFamily: 'Lato, Arial, sans-serif'
-    }}>
-      <button
-        onClick={() => handleDismiss(false)}
-        style={{
-          position: 'absolute',
-          top: '12px',
-          right: '12px',
-          background: 'transparent',
-          border: 'none',
-          color: '#FFD700',
-          fontSize: '28px',
-          cursor: 'pointer',
-          padding: '0',
-          width: '30px',
-          height: '30px',
-          lineHeight: '30px'
-        }}
-      >
-        ×
-      </button>
+    <>
+      {/* Backdrop blur overlay */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(4px)',
+        zIndex: 9998
+      }} onClick={() => handleDismiss(false)} />
+
+      {/* Prompt modal */}
+      <div style={{
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '90%',
+        maxWidth: '400px',
+        backgroundColor: '#0e3764',
+        color: '#FFD700',
+        padding: '20px',
+        paddingTop: '40px',
+        borderRadius: '12px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+        zIndex: 9999,
+        fontFamily: 'Lato, Arial, sans-serif'
+      }}>
+        <button
+          onClick={() => handleDismiss(false)}
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            background: 'transparent',
+            border: 'none',
+            color: '#FFD700',
+            fontSize: '32px',
+            cursor: 'pointer',
+            padding: '0',
+            width: '36px',
+            height: '36px',
+            lineHeight: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          ×
+        </button>
 
       <div style={{ marginBottom: '16px' }}>
         <strong style={{ fontSize: '18px', display: 'block', marginBottom: '10px' }}>
@@ -146,5 +164,6 @@ export default function InstallPrompt() {
         </label>
       </div>
     </div>
+    </>
   );
 }
