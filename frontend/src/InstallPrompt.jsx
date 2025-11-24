@@ -12,10 +12,9 @@ export default function InstallPrompt() {
     
     if (isInstalled) {
       // Show message that they can close the browser tab if there is one
-      const hasSeenStandaloneMessage = sessionStorage.getItem('dth-standalone-message-seen');
+      const hasSeenStandaloneMessage = localStorage.getItem('dth-standalone-message-seen');
       if (!hasSeenStandaloneMessage) {
         setShowStandaloneMessage(true);
-        sessionStorage.setItem('dth-standalone-message-seen', 'true');
       }
       return;
     }
@@ -92,7 +91,10 @@ export default function InstallPrompt() {
             DTH Score is now installed as an app. If you have a browser tab open, you can close it and use the app from your home screen.
           </p>
           <button
-            onClick={() => setShowStandaloneMessage(false)}
+            onClick={() => {
+              localStorage.setItem('dth-standalone-message-seen', 'true');
+              setShowStandaloneMessage(false);
+            }}
             style={{
               backgroundColor: '#FFD700',
               color: '#0e3764',
