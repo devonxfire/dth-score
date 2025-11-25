@@ -1166,25 +1166,51 @@ function getPlayingHandicap(entry, comp) {
                 <div className="text-white/80">No scores submitted yet.</div>
               ) : (
                 <div className={"w-full overflow-x-auto " + (showExtras ? 'show-extras' : '')}>
-                  <div className="flex justify-end mb-2">
-                    <button
-                      className="extras-toggle ml-2 text-xs px-2 py-0.5 rounded font-semibold"
-                      onClick={() => setShowExtras(s => !s)}
-                      title={showExtras ? 'Hide extras' : 'View extras'}
-                      style={{ background: '#0e3764', color: '#FFD700', border: '1px solid #FFD700' }}
-                    >
-                      {showExtras ? '- Hide Extras' : '+ View Extras'}
-                    </button>
-                    {isAdmin(currentUser) && (
+                  <div className="flex justify-between items-center mb-2">
+                    <div>
                       <button
-                        className="handicap-debug ml-2 text-xs px-2 py-0.5 rounded font-semibold"
-                        onClick={() => setShowHandicaps(s => !s)}
-                        title={showHandicaps ? 'Hide group handicaps' : 'Show group handicaps'}
-                        style={{ background: showHandicaps ? '#FFD700' : '#0e3764', color: showHandicaps ? '#002F5F' : '#FFD700', border: '1px solid #FFD700' }}
+                        className="extras-toggle mr-2 text-xs px-2 py-0.5 rounded font-semibold"
+                        onClick={async () => {
+                          try {
+                            setLoading(true);
+                            const id = comp?.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : null);
+                            if (!id) return setLoading(false);
+                            const res = await fetch(apiUrl(`/api/competitions/${id}`));
+                            if (!res.ok) return setLoading(false);
+                            const data = await res.json();
+                            await processCompetitionPayload(data);
+                          } catch (e) {
+                            setLoading(false);
+                          }
+                        }}
+                        title="Refresh leaderboard"
+                        style={{ background: '#0e3764', color: '#FFD700', border: '1px solid #FFD700' }}
                       >
-                        {showHandicaps ? 'Hide Handicaps' : 'Show Handicaps'}
+                        &#x21bb; Refresh Leaderboard
                       </button>
-                    )}
+                    </div>
+                    <div className="flex items-center">
+                      <button
+                        className="extras-toggle ml-2 text-xs px-2 py-0.5 rounded font-semibold"
+                        onClick={() => setShowExtras(s => !s)}
+                        title={showExtras ? 'Hide extras' : 'View extras'}
+                        style={{ background: '#0e3764', color: '#FFD700', border: '1px solid #FFD700' }}
+                      >
+                        {showExtras ? '- Hide Extras' : '+ View Extras'}
+                      </button>
+                      {/*
+                      {isAdmin(currentUser) && (
+                        <button
+                          className="handicap-debug ml-2 text-xs px-2 py-0.5 rounded font-semibold"
+                          onClick={() => setShowHandicaps(s => !s)}
+                          title={showHandicaps ? 'Hide group handicaps' : 'Show group handicaps'}
+                          style={{ background: showHandicaps ? '#FFD700' : '#0e3764', color: showHandicaps ? '#002F5F' : '#FFD700', border: '1px solid #FFD700' }}
+                        >
+                          {showHandicaps ? 'Hide Handicaps' : 'Show Handicaps'}
+                        </button>
+                      )}
+                      */}
+                    </div>
                   </div>
                   {showHandicaps && (
                     <div className="mb-3 p-3 bg-white/5 rounded text-left text-[12px]" style={{ maxHeight: 220, overflow: 'auto' }}>

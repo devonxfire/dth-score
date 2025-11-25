@@ -864,15 +864,37 @@ function MedalLeaderboard() {
             <div className="text-white/80">No scores submitted yet.</div>
           ) : (
             <div className={"w-full overflow-x-auto " + (showExtras ? 'show-extras' : '')}>
-              <div className="flex justify-end mb-2">
-                <button
-                  className="extras-toggle ml-2 text-xs px-2 py-0.5 rounded font-semibold"
-                  onClick={() => setShowExtras(s => !s)}
-                  title={showExtras ? 'Hide extras' : 'View extras'}
-                  style={{ background: '#0e3764', color: '#FFD700', border: '1px solid #FFD700' }}
-                >
-                  {showExtras ? '- Hide Extras' : '+ View Extras'}
-                </button>
+              <div className="flex justify-between items-center mb-2">
+                <div>
+                  <button
+                    className="extras-toggle mr-2 text-xs px-2 py-0.5 rounded font-semibold"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(apiUrl(`/api/competitions/${id}`));
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        setComp(data);
+                        setGroups(Array.isArray(data.groups) ? data.groups : []);
+                        // Optionally, reprocess leaderboardRows if needed
+                      } catch (e) {}
+                    }}
+                    title="Refresh leaderboard"
+                    style={{ background: '#0e3764', color: '#FFD700', border: '1px solid #FFD700' }}
+                  >
+                    &#x21bb; Refresh Leaderboard
+                  </button>
+                </div>
+                <div className="flex items-center">
+                  <button
+                    className="extras-toggle ml-2 text-xs px-2 py-0.5 rounded font-semibold"
+                    onClick={() => setShowExtras(s => !s)}
+                    title={showExtras ? 'Hide extras' : 'View extras'}
+                    style={{ background: '#0e3764', color: '#FFD700', border: '1px solid #FFD700' }}
+                  >
+                    {showExtras ? '- Hide Extras' : '+ View Extras'}
+                  </button>
+                  {/* Add any other right-aligned buttons here if needed */}
+                </div>
               </div>
               <table className="min-w-full border text-center mb-8 text-[10px] sm:text-base" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#002F5F', color: 'white', borderColor: '#FFD700' }}>
                 <thead>
