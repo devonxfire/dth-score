@@ -171,13 +171,13 @@ export default function InstallPrompt() {
         </button>
 
       <div style={{ marginBottom: '20px' }}>
-        <strong style={{ fontSize: '26px', display: 'block', marginBottom: '16px', lineHeight: 1.2 }}>
+        <strong style={{ fontSize: '22px', display: 'block', marginBottom: '14px', lineHeight: 1.2 }}>
           📱 Please follow these quick installation instructions first
         </strong>
-        <p style={{ margin: '0 0 12px 0', fontSize: '20px', color: '#ffffff', lineHeight: '1.5' }}>
+        <p style={{ margin: '0 0 10px 0', fontSize: '17px', color: '#ffffff', lineHeight: '1.5' }}>
           Follow these steps to add a shortcut to your home screen.
         </p>
-        <p style={{ margin: '0', fontSize: '20px', color: '#FFD700', fontWeight: 'bold', lineHeight: '1.5' }}>
+        <p style={{ margin: '0', fontSize: '17px', color: '#FFD700', fontWeight: 'bold', lineHeight: '1.5' }}>
           It will work just like a mobile app!
         </p>
       </div>
@@ -185,20 +185,20 @@ export default function InstallPrompt() {
       {platform === 'ios' && (
         <div style={{ 
           backgroundColor: 'rgba(255,255,255,0.1)', 
-          padding: '16px', 
+          padding: '14px', 
           borderRadius: '10px',
-          marginBottom: '16px',
-          fontSize: '20px',
+          marginBottom: '14px',
+          fontSize: '17px',
           color: '#ffffff'
         }}>
-          <strong style={{ fontSize: '22px', display: 'block', marginBottom: '10px' }}>How to add shortcut on iPhone:</strong>
-          <ol style={{ margin: '12px 0 0 0', paddingLeft: '24px', fontSize: '20px' }}>
-            <li style={{ marginBottom: '8px' }}>Tap the <strong>Share</strong> icon <span style={{ fontSize: '24px' }}>⎙</span> in the address bar (top right)</li>
-            <li style={{ marginBottom: '8px' }}>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
-            <li style={{ marginBottom: '8px' }}>Tap <strong>"Add"</strong></li>
+          <strong style={{ fontSize: '18px', display: 'block', marginBottom: '8px' }}>How to add shortcut on iPhone:</strong>
+          <ol style={{ margin: '10px 0 0 0', paddingLeft: '22px', fontSize: '17px' }}>
+            <li style={{ marginBottom: '7px' }}>Tap the <strong>Share</strong> icon <span style={{ fontSize: '20px' }}>⎙</span> in the address bar (top right)</li>
+            <li style={{ marginBottom: '7px' }}>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+            <li style={{ marginBottom: '7px' }}>Tap <strong>"Add"</strong></li>
             <li>Launch the app from your Home Screen by clicking the DTH Score icon</li>
           </ol>
-          <p style={{ margin: '16px 0 0 0', fontSize: '18px', color: '#FFD700', fontWeight: 'bold' }}>
+          <p style={{ margin: '14px 0 0 0', fontSize: '15px', color: '#FFD700', fontWeight: 'bold' }}>
             Close this browser window and use the app launcher for the best user experience!
           </p>
         </div>
@@ -207,17 +207,17 @@ export default function InstallPrompt() {
       {platform === 'android' && (
         <div style={{ 
           backgroundColor: 'rgba(255,255,255,0.1)', 
-          padding: '16px', 
+          padding: '14px', 
           borderRadius: '10px',
-          marginBottom: '16px',
-          fontSize: '20px',
+          marginBottom: '14px',
+          fontSize: '17px',
           color: '#ffffff'
         }}>
-          <strong style={{ fontSize: '22px', display: 'block', marginBottom: '10px' }}>How to add shortcut on Android:</strong>
-          <ol style={{ margin: '12px 0 0 0', paddingLeft: '24px', fontSize: '20px' }}>
-            <li style={{ marginBottom: '8px' }}>Tap the <strong>menu</strong> button <span style={{ fontSize: '22px' }}>⋮</span> (top right)</li>
-            <li style={{ marginBottom: '8px' }}>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></li>
-            <li style={{ marginBottom: '8px' }}>Tap <strong>"Install"</strong></li>
+          <strong style={{ fontSize: '18px', display: 'block', marginBottom: '8px' }}>How to add shortcut on Android:</strong>
+          <ol style={{ margin: '10px 0 0 0', paddingLeft: '22px', fontSize: '17px' }}>
+            <li style={{ marginBottom: '7px' }}>Tap the <strong>menu</strong> button <span style={{ fontSize: '18px' }}>⋮</span> (top right)</li>
+            <li style={{ marginBottom: '7px' }}>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></li>
+            <li style={{ marginBottom: '7px' }}>Tap <strong>"Install"</strong></li>
             <li>Launch the app from your Home Screen by clicking the DTH Score icon</li>
           </ol>
           <p style={{ margin: '12px 0 0 0', fontSize: '13px', color: '#FFD700', fontWeight: 'bold' }}>
