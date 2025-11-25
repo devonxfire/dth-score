@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { getDisplayName } from './displayNameHelper';
 import { apiUrl } from './api';
 import socket from './socket';
 import PageBackground from './PageBackground';
@@ -1031,8 +1032,30 @@ function getPlayingHandicap(entry, comp) {
       if (!aIsGuest && bIsGuest) return -1; // a before b
       return 0; // keep original order
     });
-    
-    sortedPlayers.forEach(p => {
+
+    sortedPlayers.forEach((p, idx) => {
+      // Find the group object for this player (to pass displayNames for guests)
+      let groupForPlayer = null;
+      let guestIdx = -1;
+      if (Array.isArray(groups)) {
+        // Find the group that actually contains this player name
+        groupForPlayer = groups.find(g => Array.isArray(g.players) && g.players.includes(p.name));
+        if (groupForPlayer && p.name && p.name.startsWith('Guest') && Array.isArray(groupForPlayer.players)) {
+          guestIdx = groupForPlayer.players.findIndex(n => n === p.name);
+        }
+      }
+      const displayNameResult = getDisplayName(p.name, groupForPlayer);
+      if (p.name && p.name.startsWith('Guest')) {
+        // Dev log for guest mapping
+        console.log('[DTH DEBUG] Guest row:', {
+          playerName: p.name,
+          guestIdx,
+          groupForPlayer,
+          groupPlayers: groupForPlayer?.players,
+          displayNames: groupForPlayer?.displayNames,
+          displayNameResult
+        });
+      }
       const holesPlayed = (p.perHole && p.perHole.filter(v => v != null).length) || (p.scores && p.scores.filter(s => s && s !== '').length) || 0;
       const thru = holesPlayed === 18 ? 'F' : holesPlayed;
       // Use the team's teamPoints for the Score column so both teammates display the same BB Score
@@ -1043,7 +1066,7 @@ function getPlayingHandicap(entry, comp) {
         back9Points: team.back9Points ?? 0,
         teeTime: team.teeTime,
         name: p.name,
-        displayName: p.displayName || '',
+        displayName: displayNameResult,
         userId: p.userId || null,
         teamId: team.teamId || null,
         teamIndex: teamIndex,
@@ -1157,7 +1180,11 @@ function getPlayingHandicap(entry, comp) {
                   )}
                   <div className="mt-4 mb-2 text-white text-base font-semibold" style={{maxWidth: '100%', textAlign: 'left'}}>
                     <div style={{marginBottom: 4, marginLeft: 0, textDecoration: 'underline', textUnderlineOffset: 3}}>Good Scores</div>
-                    {goodScores.length === 0 ? <div style={{marginLeft: 0}}>No one.</div> : goodScores.map(p => (<div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{(p.displayName || p.name).toUpperCase()}: Net {p.dthNet}</div>))}
+                    {goodScores.length === 0 ? <div style={{marginLeft: 0}}>No one.</div> : goodScores.map(p => (
+                      <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>
+                        {getDisplayName(p.name, p).toUpperCase()}: Net {p.dthNet}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -1264,9 +1291,9 @@ function getPlayingHandicap(entry, comp) {
                           <td className="border px-0.5 sm:px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>
                             <div className="max-w-none truncate">
                               {isFirstInTeam && !isExpanded && teamPlayers.length > 1 ? (
-                                `${(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}'S TEAM`
+                                `${entry.displayName.toUpperCase()}'S TEAM`
                               ) : (
-                                `${(compactDisplayName(entry) || entry.displayName || entry.name).toUpperCase()}${entry.handicap ? ` (${entry.handicap})` : ''}`
+                                `${entry.displayName.toUpperCase()}${entry.handicap ? ` (${entry.handicap})` : ''}`
                               )}
                             </div>
                           </td>

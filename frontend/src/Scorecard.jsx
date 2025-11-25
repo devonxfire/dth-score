@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { getDisplayName } from './displayNameHelper';
 import { apiUrl } from './api';
 import { TrophyIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -433,14 +434,7 @@ export default function Scorecard(props) {
   function totalScore(playerIdx) {
     return scores[playerIdx].reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
   }
-  async function handleSaveScores() {
-    // Optionally, you could save all players' scores here, but for now just reload all scores from backend
-    if (typeof fetchAllScores === 'function') {
-      setScoresLoading(true);
-      await fetchAllScores();
-      setScoresLoading(false);
-    }
-  }
+  // Removed handleSaveScores re-fetching after save. Local state is now source of truth until explicit refresh.
 
   // Flush and save all players' scores immediately (mobile Save Scores button)
   async function flushAndSaveAllScores() {
@@ -462,30 +456,17 @@ export default function Scorecard(props) {
         const patchBody = { competitionId: competition.id, scores: playerScores };
         saves.push(fetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody) }));
       }
-  await Promise.allSettled(saves);
-  // Ask server to rebroadcast this saved update so other clients (leaderboard tabs) refresh
-  try {
-    const payload = { competitionId: Number(competition?.id), teamId: groupTeamId, groupPlayers };
-    try { socket && socket.emit && socket.emit('client-medal-saved', payload); } catch (e) {}
-  } catch (e) {}
-  // inline feedback: show saved briefly
-  try { setSaveStatus('saved'); } catch (e) {}
-  try { if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current); } catch (e) {}
-  try { saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000); } catch (e) {}
-      // Re-fetch to sync
-      if (typeof fetchAllScores === 'function') {
-        setScoresLoading(true);
-        await fetchAllScores();
-        setScoresLoading(false);
-      }
-      // Fetch full competition and ask server to rebroadcast a full-competition payload
+      await Promise.allSettled(saves);
+      // Ask server to rebroadcast this saved update so other clients (leaderboard tabs) refresh
       try {
-        const compRes = await fetch(apiUrl(`/api/competitions/${competition.id}`));
-        if (compRes.ok) {
-          const compData = await compRes.json();
-          try { socket && socket.emit && socket.emit('client-medal-saved', { competitionId: Number(competition.id), fullCompetition: compData }); } catch (e) {}
-        }
+        const payload = { competitionId: Number(competition?.id), teamId: groupTeamId, groupPlayers };
+        try { socket && socket.emit && socket.emit('client-medal-saved', payload); } catch (e) {}
       } catch (e) {}
+      // inline feedback: show saved briefly
+      try { setSaveStatus('saved'); } catch (e) {}
+      try { if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current); } catch (e) {}
+      try { saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000); } catch (e) {}
+      // No re-fetch here: local state is source of truth until explicit refresh or socket update
     } catch (err) {
       console.error('Failed to flush saves', err);
     }
@@ -712,23 +693,16 @@ export default function Scorecard(props) {
                             if (teebox === 'White') teeBg = 'bg-white text-black border-white';
                             else if (teebox === 'Red') teeBg = 'bg-red-500 text-white';
                             else if (teebox === 'Yellow') teeBg = 'bg-yellow-300 text-black border-white';
-                            // Format player name as first initial + surname (ignore nickname), or show guest display name if present
-                            let displayName = name;
-                            const guestIdx = ['Guest 1','Guest 2','Guest 3'].indexOf(name);
-                            let guestDisplay = null;
-                            if (guestIdx !== -1 && Array.isArray(groupForPlayer?.displayNames) && groupForPlayer.displayNames[guestIdx]) {
-                              guestDisplay = `GUEST - ${groupForPlayer.displayNames[guestIdx]}`;
-                            }
-                            if (guestDisplay) {
-                              displayName = guestDisplay;
-                            } else if (guestIdx !== -1) {
-                              displayName = name;
-                            } else if (name && typeof name === 'string') {
-                              const parts = name.trim().split(' ');
+                            // Use getDisplayName helper for all player names, but preserve SNR./JNR. in short form
+                            let displayName = getDisplayName(name, groupForPlayer);
+                            // If SNR./JNR. present, keep it in short form too
+                            if ((displayName.includes('(SNR.)') || displayName.includes('(JNR.)')) && displayName.match(/^J\.? HORN/i)) {
+                              displayName = 'J. HORN' + (displayName.includes('(SNR.)') ? ' (SNR.)' : ' (JNR.)');
+                            } else if (displayName.includes(' ')) {
+                              // Default short form: first initial + surname, but keep suffix if present
+                              const parts = displayName.split(' ');
                               if (parts.length > 1) {
                                 displayName = parts[0][0] + '. ' + parts[parts.length - 1];
-                              } else {
-                                displayName = name;
                               }
                             }
                             return (
@@ -995,26 +969,9 @@ export default function Scorecard(props) {
                           ph = group.handicaps[name];
                         }
                       }
-                      // Guest display name logic
-                      let displayName = name;
+                      // Use getDisplayName helper for all player names
                       const group = competition.groups?.find(g => g.players?.includes(name));
-                      const guestIdx = ['Guest 1','Guest 2','Guest 3'].indexOf(name);
-                      let guestDisplay = null;
-                      if (guestIdx !== -1 && Array.isArray(group?.displayNames) && group.displayNames[guestIdx]) {
-                        guestDisplay = `GUEST - ${group.displayNames[guestIdx]}`;
-                      }
-                      if (guestDisplay) {
-                        displayName = guestDisplay;
-                      } else if (guestIdx !== -1) {
-                        displayName = name;
-                      } else if (name && typeof name === 'string') {
-                        const parts = name.trim().split(' ');
-                        if (parts.length > 1) {
-                          displayName = parts[0][0] + '. ' + parts[parts.length - 1];
-                        } else {
-                          displayName = name;
-                        }
-                      }
+                      let displayName = getDisplayName(name, group);
                       return (
                         <li key={name} className="mb-1">
                           <span className="font-semibold">{displayName}</span>

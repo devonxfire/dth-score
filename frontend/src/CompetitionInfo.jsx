@@ -9,6 +9,7 @@ function formatDate(dateStr) {
 }
 
 import React, { useEffect, useState } from "react";
+import { getDisplayName } from './displayNameHelper';
 import { apiUrl } from './api';
 import { ArrowLeftIcon, ChartBarIcon, TrophyIcon, SignalIcon } from '@heroicons/react/24/solid';
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -114,24 +115,9 @@ export default function CompetitionInfo({ user }) {
                   <div className="text-white font-semibold">{group.name || idx + 1} <span className="text-sm text-white/80">{group.teeTime ? ` — ${group.teeTime}` : ''}</span></div>
                   <div className="text-white text-sm">
                     {Array.isArray(group.players) && group.players.length > 0 ? (
-                      group.players.map((name, i, arr) => {
-                        if (['Guest 1','Guest 2','Guest 3'].includes(name) && Array.isArray(group.displayNames) && group.displayNames[i]) {
-                          return (<div key={i} className="font-bold">GUEST - {group.displayNames[i]}{i < arr.length - 1 ? ', ' : ''}</div>);
-                        } else if (['Guest 1','Guest 2','Guest 3'].includes(name)) {
-                          return (<div key={i} className="font-bold">{name}{i < arr.length - 1 ? ', ' : ''}</div>);
-                        } else if (typeof name === 'string') {
-                          const parts = name.trim().split(/\s+/);
-                          let initial = '', surname = '';
-                          if (parts.length > 1) {
-                            initial = parts[0][0].toUpperCase();
-                            surname = parts[parts.length - 1].toUpperCase();
-                          } else {
-                            initial = parts[0][0].toUpperCase();
-                            surname = '';
-                          }
-                          return (<div key={i}>{initial}{surname && '. '}{surname}{i < arr.length - 1 ? ', ' : ''}</div>);
-                        } else return null;
-                      })
+                      group.players.map((name, i, arr) => (
+                        <div key={i} className="font-bold">{getDisplayName(name, group)}{i < arr.length - 1 ? ', ' : ''}</div>
+                      ))
                     ) : null}
                   </div>
                 </div>

@@ -144,6 +144,7 @@ export function installTestHelper() {
       else if (type === 'blowup') { emoji = '💥'; title = 'How Embarrassing!'; body = `${name} just blew up on Hole ${holeNumber}`; }
       else if (type === 'waters') { emoji = '💧'; title = 'Splash!'; body = `${name} has earned a water`; }
       else if (type === 'dog') { emoji = '🐶'; title = 'Woof!'; body = `${name} got the dog`; }
+      else if (type === '2club') { emoji = '2️⃣'; title = '2 Club!'; body = `${name} scored a 2 Club!`; }
 
       const content = (
         <div className="flex flex-col items-center popup-jiggle" style={{ padding: '1rem 1.25rem' }}>

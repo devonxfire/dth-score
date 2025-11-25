@@ -22,6 +22,7 @@ function formatDate(dateStr) {
 }
 
 import React, { useEffect, useState } from 'react';
+import { getDisplayName } from './displayNameHelper';
 import { useBackendTeams } from './hooks/useBackendTeams';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageBackground from './PageBackground';
@@ -174,21 +175,8 @@ function Leaderboard() {
       }
       // Propagate guest display names for UI
       let displayPlayers = (group.players || []).map((name, i) => {
-        const guestIdx = ['Guest 1','Guest 2','Guest 3'].indexOf(name);
-        if (guestIdx !== -1 && Array.isArray(group.displayNames) && group.displayNames[guestIdx]) {
-          return `GUEST - ${group.displayNames[guestIdx]}`;
-        } else if (guestIdx !== -1) {
-          return name;
-        } else if (typeof name === 'string') {
-          const parts = name.trim().split(' ');
-          if (parts.length > 1) {
-            return parts[0][0] + '. ' + parts[parts.length - 1];
-          } else {
-            return name;
-          }
-        } else {
-          return '';
-        }
+        // Use getDisplayName helper for all players, passing group for guest display
+        return getDisplayName(name, group);
       });
       // Find backend team_points by matching player names
       let backendTeamPoints;
