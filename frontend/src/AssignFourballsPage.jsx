@@ -154,9 +154,7 @@ export default function AssignFourballsPage({ user }) {
               >
                 Import screenshot of 'Yes' Votes
               </button>
-              {showOCR && (
 
-              )}
               <UnifiedFourballAssignment
                 fourballs={(initialGroups && initialGroups.length) || 1}
                 initialGroups={initialGroups}
