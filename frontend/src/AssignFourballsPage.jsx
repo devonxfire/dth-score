@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import OCRImport from './OCRImport';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import UnifiedFourballAssignment from './UnifiedFourballAssignment';
 import { apiUrl } from './api';
@@ -11,6 +12,18 @@ export default function AssignFourballsPage({ user }) {
   const location = useLocation();
   const compId = params.id || (location.state && location.state.compId);
   const [initialGroups, setInitialGroups] = useState(location.state?.initialGroups || []);
+  const [showOCR, setShowOCR] = useState(false);
+    // Handler for names extracted from OCR
+    function handleNamesFromOCR(names) {
+      setShowOCR(false);
+      if (!Array.isArray(names) || !names.length) return;
+      // Assign names to 4-balls of 4 (or as close as possible)
+      const groups = [];
+      for (let i = 0; i < names.length; i += 4) {
+        groups.push({ players: names.slice(i, i + 4) });
+      }
+      setInitialGroups(groups);
+    }
   const [comp, setComp] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -146,6 +159,15 @@ export default function AssignFourballsPage({ user }) {
           {loading && <div className="text-white">Loading groups...</div>}
           {!loading && (
             <div className="w-full p-6">
+              <button
+                className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={() => setShowOCR(true)}
+              >
+                Import screenshot of 'Yes' Votes
+              </button>
+              {showOCR && (
+                <OCRImport onNamesExtracted={handleNamesFromOCR} />
+              )}
               <UnifiedFourballAssignment
                 fourballs={(initialGroups && initialGroups.length) || 1}
                 initialGroups={initialGroups}

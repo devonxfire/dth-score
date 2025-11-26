@@ -1,7 +1,38 @@
 import React, { useEffect, useState } from 'react';
+import OCRImport from './OCRImport';
 import { apiUrl } from './api';
 import PageBackground from './PageBackground';
 import { useNavigate, useParams } from 'react-router-dom';
+
+// Reference member names from backend/seedMembers.js
+const MEMBER_NAMES = [
+  "Andy 'Panda' Williams",
+  "Arno 'Ah No' Erasmus",
+  "Brent 'Sally' Lyall",
+  "Brian 'Grizzly' Galloway",
+  "Byron 'Mullet' Mulholland",
+  "Dave 'Big D' Alhadeff",
+  "David 'Smasher' Dyer",
+  "Denzil 'Takke' Burger",
+  "Devon 'Radar' Haantjes",
+  "Dev 'Tugger' Martindale",
+  "Eddie 'Mega' Scholtz",
+  "Gary 'Chips' Mulder",
+  "Graeme 'Knotty' Knott",
+  "Jason 'Jay-Boy' Horn",
+  "Jeremy 'Garmin' Park",
+  "Jon 'Leak' Horn",
+  "Mike 'Jabba' Downie",
+  "Nigel 'Slumpy' Martindale",
+  "Hannes 'Jigsaw' Marais",
+  "Paul 'Boskak' Verney",
+  "Stephen 'Skollie' Kelly",
+  "Stevie 'Wondie' Steenkamp",
+  "Storm 'Beefy' Currie",
+  "Guest 1",
+  "Guest 2",
+  "Guest 3"
+];
 
 export default function UnifiedFourballAssignment(props) {
   const params = useParams();
@@ -33,6 +64,128 @@ export default function UnifiedFourballAssignment(props) {
     }
     return [Array(4).fill('')];
   });
+
+  const [showOCR, setShowOCR] = useState(false);
+
+  // Handler for names extracted from OCR
+  // Fuzzy match: find closest user name (case-insensitive, partial match)
+  // Manual aliases for common WhatsApp names
+  const MANUAL_ALIASES = {
+    dad: "Nigel 'Slumpy' Martindale",
+    arno: "Arno 'Ah No' Erasmus",
+    teapot: "Arno 'Ah No' Erasmus",
+    panda: "Andy 'Panda' Williams",
+    andy: "Andy 'Panda' Williams",
+    "brett m": "Brent 'Sally' Lyall",
+    brett: "Brent 'Sally' Lyall",
+    gary: "Gary 'Chips' Mulder",
+    ed: "Eddie 'Mega' Scholtz",
+    eddie: "Eddie 'Mega' Scholtz",
+  };
+
+  function stripEmojisAndSpecial(str) {
+    // Remove emojis and most non-letter chars
+    return str.replace(/[^\p{L}\s'-]/gu, '').trim();
+  }
+
+  function findAlias(cleaned) {
+    // Try full cleaned string, then each word
+    const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+    const cleanedNorm = norm(cleaned);
+    if (MANUAL_ALIASES[cleanedNorm]) return MANUAL_ALIASES[cleanedNorm];
+    const words = cleaned.split(/\s+/);
+    for (const word of words) {
+      const wNorm = norm(word);
+      if (MANUAL_ALIASES[wNorm]) return MANUAL_ALIASES[wNorm];
+    }
+    return null;
+  }
+
+  function findClosestName(input, candidates = MEMBER_NAMES) {
+    if (!input || !candidates || !candidates.length) return input;
+    let cleaned = stripEmojisAndSpecial(input);
+    let alias = findAlias(cleaned);
+    if (alias) return alias;
+    // Try again with lowercased
+    alias = findAlias(cleaned.toLowerCase());
+    if (alias) return alias;
+
+    // Try unique first-name match
+    const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+    const inputNorm = norm(cleaned);
+    const inputFirst = inputNorm.split(/[^a-z]/)[0];
+    if (inputFirst) {
+      // Find all members whose first name matches
+      const matches = candidates.filter(cand => {
+        const candFirst = norm(cand).split(/[^a-z]/)[0];
+        return candFirst === inputFirst;
+      });
+      if (matches.length === 1) return matches[0];
+    }
+
+    // Fallback: fuzzy match
+    let best = candidates[0];
+    let bestScore = 0;
+    for (const cand of candidates) {
+      const candNorm = norm(cand);
+      let score = 0;
+      if (candNorm === inputNorm) score += 100;
+      if (candNorm.includes(inputNorm) || inputNorm.includes(candNorm)) score += 50;
+      // Allow first-name-only match
+      const candFirst = candNorm.split(/[^a-z]/)[0];
+      if (candFirst && inputNorm && candFirst === inputNorm) score += 40;
+      // Count matching chars
+      for (let i = 0; i < Math.min(inputNorm.length, candNorm.length); i++) {
+        if (inputNorm[i] === candNorm[i]) score++;
+      }
+      if (score > bestScore) {
+        best = cand;
+        bestScore = score;
+      }
+    }
+    // Only return if some reasonable match
+    return bestScore > 0 ? best : input;
+  }
+
+  function handleNamesFromOCR(names) {
+    setShowOCR(false);
+    if (!Array.isArray(names) || !names.length) return;
+    // Track assigned members to avoid duplicates
+    const assigned = new Set();
+    function matchName(nm) {
+      // Remove all special characters, keep only letters and spaces
+      let cleaned = (nm || '').replace(/[^a-zA-Z\s]/g, '').trim();
+      if (!cleaned) return '';
+      // Try alias first
+      let alias = findAlias(cleaned) || findAlias(cleaned.toLowerCase());
+      if (alias && MEMBER_NAMES.includes(alias) && !assigned.has(alias)) {
+        assigned.add(alias);
+        return alias;
+      }
+      // Extract first word (first name)
+      const firstName = cleaned.split(/\s+/)[0].toLowerCase();
+      if (!firstName) return '';
+      // Find all members whose first name matches
+      const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+      const matches = MEMBER_NAMES.filter(cand => {
+        const candFirst = norm(cand).split(/[^a-z]/)[0];
+        return candFirst === firstName;
+      });
+      if (matches.length === 1 && !assigned.has(matches[0])) {
+        assigned.add(matches[0]);
+        return matches[0];
+      }
+      // If not unique, leave blank
+      return '';
+    }
+    const groupsFromOCR = [];
+    for (let i = 0; i < names.length; i += 4) {
+      const groupNames = names.slice(i, i + 4).map(matchName);
+      groupsFromOCR.push({ players: groupNames, teeTime: '', displayNames: Array(4).fill('') });
+    }
+    setGroups(groupsFromOCR);
+    setGuestNames(groupsFromOCR.map(() => Array(4).fill('')));
+  }
 
   // Fetch comp info on mount
   useEffect(() => {
@@ -298,22 +451,41 @@ export default function UnifiedFourballAssignment(props) {
                 );
               })}
             </div>
-            <button
-              className="mt-2 px-4 py-2 rounded bg-red-700 text-white font-bold"
-              onClick={() => removeGroup(idx)}
-              disabled={groups.length <= 1}
-            >
-              Remove Group
-            </button>
-            <button
-              className="mt-2 ml-2 px-4 py-2 rounded bg-blue-600 text-white font-bold"
-              onClick={() => randomizeGroup(idx)}
-            >
-              Randomise
-            </button>
+            <div className="flex gap-2 mt-2">
+              <button
+                className="px-4 py-2 rounded bg-red-700 text-white font-bold"
+                onClick={() => removeGroup(idx)}
+                disabled={groups.length <= 1}
+              >
+                Remove Group
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-gray-600 text-white font-bold"
+                onClick={() => {
+                  setGroups(prev => prev.map((g, i) => {
+                    if (i !== idx) return g;
+                    const shuffled = [...(g.players || [])];
+                    for (let j = shuffled.length - 1; j > 0; j--) {
+                      const k = Math.floor(Math.random() * (j + 1));
+                      [shuffled[j], shuffled[k]] = [shuffled[k], shuffled[j]];
+                    }
+                    return { ...g, players: shuffled };
+                  }));
+                }}
+              >
+                Shuffle
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-blue-600 text-white font-bold"
+                onClick={() => randomizeGroup(idx)}
+              >
+                Randomise
+              </button>
+            </div>
           </div>
         ))}
         
+        {/* ...existing code... */}
         <button
           className="w-full py-3 px-4 mt-2 rounded-2xl font-bold shadow border border-white transition text-lg"
           style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
@@ -328,6 +500,16 @@ export default function UnifiedFourballAssignment(props) {
           disabled={saving}
         >
           {saving ? 'Saving...' : 'Save & Continue'}
+        </button>
+        <button
+          className="w-full py-3 px-4 mt-4 rounded-2xl font-bold shadow border border-white transition text-lg"
+          style={{ backgroundColor: '#2563eb', color: 'white', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+          onClick={() => {
+            setGroups([{ players: Array(4).fill(''), teeTime: '', displayNames: Array(4).fill('') }]);
+            setGuestNames([Array(4).fill('')]);
+          }}
+        >
+          Reset All
         </button>
       </div>
     </PageBackground>
