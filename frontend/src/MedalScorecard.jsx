@@ -1,3 +1,11 @@
+  // Helper for mobile input focus scroll
+  function handleInputFocus(e) {
+    try {
+      if (typeof window !== 'undefined' && (!('ontouchstart' in window) || window.innerWidth > 700)) {
+        e.currentTarget.scrollIntoView({ block: 'center' });
+      }
+    } catch (err) {}
+  }
 import React, { useEffect, useState, useRef } from 'react';
 import { TrophyIcon } from '@heroicons/react/24/solid';
 import { apiUrl } from './api';
@@ -2133,17 +2141,26 @@ export default function MedalScorecard(props) {
                               </div>
                               <div className="flex items-center gap-2">
                                 <button aria-label={`decrement-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { applyDeltaToHole(name, hIdx, -1); }} disabled={!canEdit(name)}>−</button>
-                                <input inputMode="numeric" pattern="[0-9]*" className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none placeholder-gray-400" placeholder={hole?.par ?? ''} value={playerData[name]?.scores?.[hIdx] ?? ''} onChange={e => { if (!canEdit(name)) return; const v = (e.target.value || '').replace(/[^0-9]/g, ''); try { lastActionValueRef.current[`${name}:${hIdx}`] = { value: v, ts: Date.now() }; } catch (err) {} handleScoreChange(name, hIdx, v); }} disabled={!canEdit(name)} onFocus={e => {
-                                  try {
-                                    // Avoid forcing scroll on touch/mobile devices which can cause
-                                    // the page to jump/bounce when the user is intentionally
-                                    // scrolling to the bottom. Only auto-scroll for non-touch
-                                    // or wide viewports (desktop/tablet).
-                                    if (typeof window !== 'undefined' && (!('ontouchstart' in window) || window.innerWidth > 700)) {
-                                      e.currentTarget.scrollIntoView({ block: 'center' });
-                                    }
-                                  } catch (err) {}
-                                }} />
+                                <div style={{ position: 'relative', display: 'inline-block' }}>
+                                  <input
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    className="w-14 text-center bg-transparent text-lg font-bold focus:outline-none placeholder-gray-400"
+                                    placeholder={hole?.par ?? ''}
+                                    value={playerData[name]?.scores?.[hIdx] ?? ''}
+                                    onChange={e => {
+                                      if (!canEdit(name)) return;
+                                      const v = (e.target.value || '').replace(/[^0-9]/g, '');
+                                      try { lastActionValueRef.current[`${name}:${hIdx}`] = { value: v, ts: Date.now() }; } catch (err) {}
+                                      handleScoreChange(name, hIdx, v);
+                                    }}
+                                    disabled={!canEdit(name)}
+                                    onFocus={handleInputFocus}
+                                  />
+                                  {cellSaving && cellSaving[`${name}:${hIdx}`] && (
+                                    <span style={{ position: 'absolute', right: 2, top: 2, fontSize: '1.1em', color: '#FFD700' }} title="Saving...">⏳</span>
+                                  )}
+                                </div>
                                 <button aria-label={`increment-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { applyDeltaToHole(name, hIdx, +1); }} disabled={!canEdit(name)}>+</button>
                               </div>
                             </div>
