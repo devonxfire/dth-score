@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import OCRImport from './OCRImport';
 import { apiUrl } from './api';
 import PageBackground from './PageBackground';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -68,8 +67,6 @@ export default function UnifiedFourballAssignment(props) {
   const [showOCR, setShowOCR] = useState(false);
 
   // Handler for names extracted from OCR
-  // Fuzzy match: find closest user name (case-insensitive, partial match)
-  // Manual aliases for common WhatsApp names
   const MANUAL_ALIASES = {
     dad: "Nigel 'Slumpy' Martindale",
     arno: "Arno 'Ah No' Erasmus",
