@@ -1,4 +1,4 @@
-import OCRImportPage from './OCRImportPage';
+
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import CreateCompetition from './CreateCompetition';
@@ -50,7 +50,7 @@ function AppRoutes({ user, setUser }) {
         <Route path="*" element={<Login onLogin={setUser} />} />
       ) : (
         <>
-            <Route path="/import-ocr" element={<OCRImportPage />} />
+
           <Route path="/dashboard" element={<Dashboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/" element={<Dashboard user={user} onSignOut={handleSignOut} />} />
           <Route path="/create" element={<CreateCompetition user={user} />} />
