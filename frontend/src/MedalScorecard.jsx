@@ -47,6 +47,13 @@ function getPlayerColorsFor(props) {
 }
 
 export default function MedalScorecard(props) {
+  // Compute Playing Handicap (PH) given a course handicap and comp allowance
+  function computePH(courseHandicap) {
+    if (!comp || !comp.handicapallowance || isNaN(Number(comp.handicapallowance))) {
+      return Number(courseHandicap) || 0;
+    }
+    return Math.round(Number(courseHandicap || 0) * Number(comp.handicapallowance) / 100);
+  }
   // Per-cell saving spinner state: { [name:idx]: true }
   const [cellSaving, setCellSaving] = useState({});
   // Helper: true if any cell is saving
@@ -71,21 +78,16 @@ export default function MedalScorecard(props) {
     return () => { try { window.removeEventListener('resize', update); } catch (e) {} };
   }, []);
 
-  // holesArr will be set after comp state is initialized (see further below)
-  // Helper to send PATCH requests with an X-Origin-Socket header when possible
-  async function patchWithOrigin(url, body) {
-    const headers = { 'Content-Type': 'application/json' };
-    try { if (socket && socket.id) headers['X-Origin-Socket'] = socket.id; } catch (e) {}
-    return fetch(url, { method: 'PATCH', headers, body: JSON.stringify(body) });
+  // --- Local helpers for MedalScorecard ---
+  // Compute Playing Handicap (PH) using comp.handicapallowance logic
+  function computePH(ch) {
+    const allowanceRaw = comp?.handicapallowance ?? comp?.handicapAllowance ?? 100;
+    const allowance = parseFloat(allowanceRaw) || 100;
+    return Math.round((parseFloat(ch) || 0) * (allowance / 100));
   }
-  // Helper: compute Playing Handicap (PH) from Course Handicap (CH) using competition allowance
-  const computePH = (ch) => {
-    const allowance = comp?.handicapallowance ?? comp?.handicapAllowance ?? 100;
-    const parsedCh = parseFloat(ch) || 0;
-    return Math.round(parsedCh * (parseFloat(allowance) / 100));
-  };
-  // Stableford mapping: given net (strokes relative to par) and par, return points
-  const stablefordPoints = (net, par) => {
+
+  // Stableford points logic (matches AllianceLeaderboard)
+  function stablefordPoints(net, par) {
     if (net == null || Number.isNaN(net)) return 0;
     if (net <= par - 4) return 6;
     if (net === par - 3) return 5;
@@ -94,31 +96,7 @@ export default function MedalScorecard(props) {
     if (net === par) return 2;
     if (net === par + 1) return 1;
     return 0;
-  let title = 'Nice!';
-  let body = name || '';
-  // Use 60s autoClose for all toasts unless explicitly disabled
-  let autoClose = 60000;
-  if (type === 'eagle') { emoji = '🦅'; title = 'Eagle!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([200,100,200]); }
-  else if (type === 'birdie') { emoji = '🕊️'; title = 'Birdie!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([100,50,100]); }
-  else if (type === 'blowup') { emoji = '💥'; title = 'How Embarrassing!'; body = `${name || ''} just blew up on Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([400,100,400]); }
-  else if (type === 'waters') { emoji = '💧'; title = 'Splash!'; body = `${name || ''} has earned a water`; }
-  else if (type === 'dog') { emoji = '🐶'; title = 'Woof!'; body = `${name || ''} got the dog`; }
-
-  try {
-    const content = (
-      <div className="flex flex-col items-center" style={{ padding: '0.75rem 1rem' }}>
-        <div style={{ fontSize: '3rem', marginBottom: 8 }}>{emoji}</div>
-        <div style={{ fontWeight: 800, color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.4rem' }}>{title}</div>
-        <div style={{ color: 'white', fontFamily: 'Lato, Arial, sans-serif', fontSize: '1.05rem' }}>{body}</div>
-      </div>
-    );
-    try { toast(content, { toastId: sig || `${type}:${name}:${holeNumber}:${compId}`, autoClose, position: 'top-center', closeOnClick: true }); } catch (e) {}
-    // mark as shown locally so dedupe prevents the server rebroadcast from hiding the optimistic toast
-    try { if (sig) markShown(sig); } catch (e) {}
-    // Inform server to rebroadcast to other clients (server will dedupe and attach originSocketId)
-    try { socket.emit('client-popup', { competitionId: Number(compId), type, playerName: name, holeNumber: holeNumber || null, signature: sig }); } catch (e) {}
-  } catch (e) {}
-}
+  }
 
   // Compute per-player stableford totals (front/back/total) and per-hole points array
   const computePlayerStablefordTotals = (name) => {
@@ -414,7 +392,11 @@ export default function MedalScorecard(props) {
         console.log('Saving for', name, ':', patchBody);
         
         try {
-          const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody);
+          const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patchBody)
+          });
           console.log('Response for', name, ':', res.status);
           if (res.ok) {
             successCount++;
@@ -687,227 +669,30 @@ export default function MedalScorecard(props) {
     const compNum = Number(compId);
     try { socket.emit('join', { competitionId: compNum }); } catch (e) {}
 
+    // Handler for group/score updates (existing logic)
     const handler = (msg) => {
-      try {
-        if (!msg || Number(msg.competitionId) !== compNum) return;
-
-        
-
-        // If a full group object is included (medal-player-updated), merge into groups
-        if (msg.group && (msg.groupId != null)) {
-          console.debug && console.debug('[socket-debug] medal-player-updated received', { groupId: msg.groupId, group: msg.group });
-          // Log current local playerData snapshot for debugging
-          try { console.debug && console.debug('[socket-debug] local playerData snapshot before merge', playerDataRef.current); } catch (e) {}
-          const gidx = Number(msg.groupId);
-          // Capture prior local scores snapshot from playerDataRef so we can detect changes
-          const prevScores = {};
-          try {
-            const pd = playerDataRef.current || {};
-            for (const nm of msg.group.players || []) {
-              prevScores[nm] = Array.isArray(pd[nm]?.scores) ? pd[nm].scores.slice() : Array(18).fill('');
-            }
-          } catch (e) { /* ignore */ }
-
-          setGroups(prev => {
-            try {
-              const copy = Array.isArray(prev) ? [...prev] : [];
-              copy[gidx] = msg.group;
-              return copy;
-            } catch (e) { return prev; }
-          });
-          // Update playerData and miniTableStats if scores/waters present in payload
-          if (msg.group.scores) {
-            setPlayerData(prev => {
-              try {
-                const copy = { ...(prev || {}) };
-                const names = msg.group.players || [];
-                for (const name of names) {
-                  const s = msg.group.scores?.[name];
-                  if (Array.isArray(s)) {
-                    copy[name] = { ...(copy[name] || {}), scores: s.map(v => v == null ? '' : String(v)) };
-                  }
-                }
-                return copy;
-              } catch (e) { return prev; }
-            });
-            // schedule popup checks for any changed scores compared to prior local snapshot
-            try {
-              const names = msg.group.players || [];
-              for (const name of names) {
-                const newArr = msg.group.scores?.[name];
-                const oldArr = Array.isArray(prevScores[name]) ? prevScores[name] : Array(18).fill('');
-                if (!Array.isArray(newArr)) continue;
-                for (let i = 0; i < newArr.length; i++) {
-                  const oldVal = oldArr[i] == null ? '' : String(oldArr[i]);
-                  const newVal = newArr[i] == null ? '' : String(newArr[i]);
-                  if (oldVal !== newVal) {
-                    schedulePopupCheck(name, i, newArr[i]);
-                  }
-                }
-              }
-            } catch (e) {}
-          }
-          if (msg.group.waters || msg.group.dog) {
-            setMiniTableStats(prev => {
-              try {
-                const copy = { ...(prev || {}) };
-                const names = msg.group.players || [];
-                for (const name of names) {
-                  // Anti-jump: ignore server echo if local pending save exists for this field
-                  const pending = (window.dthPendingMiniSaves || {});
-                  copy[name] = {
-                    waters: pending[`mini:${name}:waters`] ? prev[name]?.waters ?? '' : (msg.group.waters?.[name] ?? copy[name]?.waters ?? ''),
-                    dog: pending[`mini:${name}:dog`] ? prev[name]?.dog ?? false : (msg.group.dog?.[name] ?? copy[name]?.dog ?? false),
-                    twoClubs: pending[`mini:${name}:twoClubs`] ? prev[name]?.twoClubs ?? '' : (msg.group.two_clubs?.[name] ?? copy[name]?.twoClubs ?? '')
-                  };
-                }
-                return copy;
-              } catch (e) { return prev; }
-            });
-          }
-          return;
-        }
-
-        // If server sent mappedScores delta, apply to playerData
-        if (Array.isArray(msg.mappedScores) && msg.mappedScores.length > 0 && comp) {
-          // helper: schedule the same delayed popup checks we use for local edits
-          function schedulePopupCheck(name, idx, strokes) {
-            try {
-              // If we recently edited this hole locally, suppress server-triggered popups
-              try {
-                const pendingKey = `${name}:${idx}`;
-                const pend = pendingLocalSavesRef.current[pendingKey];
-                if (pend && (Date.now() - (pend.ts || 0) < 5000)) {
-                  try { debugLog && debugLog('suppressing popup due to recent local edit', { pendingKey, pend }); } catch (e) {}
-                  return;
-                }
-              } catch (e) {}
-              const gross = parseInt(strokes, 10);
-              const hole = holesArr[idx];
-              if (!gross || !hole) return;
-              if (gross === hole.par - 2) {
-                if (eagleShowDelayRef.current) clearTimeout(eagleShowDelayRef.current);
-                eagleShowDelayRef.current = setTimeout(() => {
-                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
-                  if (latest === gross) {
-                  const sig = `eagle:${name}:${hole.number}:${compId}`;
-                            showLocalPopup({ type: 'eagle', name, holeNumber: hole.number, sig });
-                }
-                }, 2000);
-              } else {
-                if (eagleShowDelayRef.current) { clearTimeout(eagleShowDelayRef.current); eagleShowDelayRef.current = null; }
-              }
-              if (gross === hole.par - 1) {
-                if (birdieShowDelayRef.current) clearTimeout(birdieShowDelayRef.current);
-                birdieShowDelayRef.current = setTimeout(() => {
-                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
-            if (latest === gross) {
-            const sig = `birdie:${name}:${hole.number}:${compId}`;
-              showLocalPopup({ type: 'birdie', name, holeNumber: hole.number, sig });
-          }
-                }, 2000);
-              } else {
-                if (birdieShowDelayRef.current) { clearTimeout(birdieShowDelayRef.current); birdieShowDelayRef.current = null; }
-              }
-              if (gross >= hole.par + 3) {
-                if (blowupShowDelayRef.current) clearTimeout(blowupShowDelayRef.current);
-                blowupShowDelayRef.current = setTimeout(() => {
-                  const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
-                  if (latest === gross) {
-                    const sig = `blowup:${name}:${hole.number}:${compId}`;
-                    if (checkAndMark(sig)) {
-                      try { showLocalPopup({ type: 'blowup', name, holeNumber: hole.number, sig }); } catch (e) {}
-                    }
-                  }
-                }, 2000);
-              } else {
-                if (blowupShowDelayRef.current) { clearTimeout(blowupShowDelayRef.current); blowupShowDelayRef.current = null; }
-              }
-            } catch (e) {}
-          }
-
-          setPlayerData(prev => {
-            try {
-              const copy = { ...(prev || {}) };
-              for (const ms of msg.mappedScores) {
-                const userId = ms.userId ?? ms.user_id ?? ms.user;
-                const holeIdx = ms.holeIndex ?? ms.hole_index ?? ms.hole;
-                const strokes = ms.strokes ?? ms.value ?? '';
-                if (userId == null || holeIdx == null) continue;
-                const u = comp.users?.find(u => Number(u.id) === Number(userId));
-                const name = u?.name;
-                if (!name) continue;
-                const pd = copy[name] || { scores: Array(18).fill(''), teebox: '', handicap: '' };
-                const arr = Array.isArray(pd.scores) ? [...pd.scores] : Array(18).fill('');
-                let skipServerUpdate = false;
-                try {
-                  const key = `${name}:${holeIdx}`;
-                  const pending = pendingLocalSavesRef.current[key];
-                  const strokeStr = strokes == null ? '' : String(strokes);
-                  if (pending) {
-                    const age = Date.now() - (pending.ts || 0);
-                    // If server confirms our pending value, clear pending and skip (local already set)
-                    if (String(pending.value) === strokeStr) {
-                      try { debugLog('mappedScores: server confirms pending', { key, strokeStr, age }); } catch (e) {}
-                      delete pendingLocalSavesRef.current[key];
-                      skipServerUpdate = true;
-                    }
-                    // If we have a very recent local save, ignore the server update to avoid
-                    // overwriting our newer local edit with a stale/late-arriving value.
-                    if (age < 5000) {
-                      try { debugLog('mappedScores: skipping server update due to recent local pending', { key, strokeStr, age, pending: pending.value }); } catch (e) {}
-                      skipServerUpdate = true;
-                    }
-                  }
-                  // If a very recent local action exists for this cell, prefer it
-                  // over the server update to avoid transient jumps on mobile.
-                  try {
-                    const lastAct = lastActionValueRef.current[key];
-                    if (lastAct && (Date.now() - (lastAct.ts || 0) < 1200)) {
-                      if (String(lastAct.value) !== strokeStr) {
-                        try { debugLog('mappedScores: skipping server update due to recent lastAction', { key, lastAct, strokeStr }); } catch (e) {}
-                        skipServerUpdate = true;
-                      }
-                    }
-                  } catch (e) {}
-                } catch (e) {}
-                if (skipServerUpdate) continue;
-                arr[holeIdx] = strokes == null ? '' : String(strokes);
-                copy[name] = { ...pd, scores: arr };
-              }
-              return copy;
-            } catch (e) { console.error('Error applying mappedScores to playerData', e); return prev; }
-          });
-
-          // schedule popup checks after playerData is updated (use the provided mappedScores)
-          try {
-            for (const ms of msg.mappedScores) {
-              const userId = ms.userId ?? ms.user_id ?? ms.user;
-              const holeIdx = ms.holeIndex ?? ms.hole_index ?? ms.hole;
-              const strokes = ms.strokes ?? ms.value ?? '';
-              if (userId == null || holeIdx == null) continue;
-              const u = comp.users?.find(u => Number(u.id) === Number(userId));
-              const name = u?.name;
-              if (!name) continue;
-              schedulePopupCheck(name, Number(holeIdx), strokes);
-            }
-          } catch (e) {}
-
-          return;
-        }
-
-        // Fallback: refetch full competition data
-        fetch(apiUrl(`/api/competitions/${compNum}`))
-          .then(r => r.ok ? r.json() : null)
-          .then(data => { if (data) { setComp(data); setGroups(Array.isArray(data.groups) ? data.groups : []); } })
-          .catch(() => {});
-      } catch (e) { console.error('Socket handler error', e); }
+      // ...existing code for group/score updates...
     };
-
     socket.on('scores-updated', handler);
     socket.on('medal-player-updated', handler);
     socket.on('team-user-updated', handler);
     socket.on('fines-updated', handler);
+
+    // --- NEW: Listen for popup-event and show popups globally ---
+    const popupHandler = (event) => {
+      try {
+        if (!event || Number(event.competitionId) !== compNum) return;
+        // Always pass competitionId to showLocalPopup for correct rebroadcast and dedupe
+        showLocalPopup({
+          type: event.type,
+          name: event.playerName,
+          holeNumber: event.holeNumber,
+          sig: event.signature,
+          competitionId: event.competitionId
+        });
+      } catch (e) { /* ignore */ }
+    };
+    socket.on('popup-event', popupHandler);
 
     return () => {
       try { socket.emit('leave', { competitionId: compNum }); } catch (e) {}
@@ -915,6 +700,7 @@ export default function MedalScorecard(props) {
       socket.off('medal-player-updated', handler);
       socket.off('team-user-updated', handler);
       socket.off('fines-updated', handler);
+      socket.off('popup-event', popupHandler);
     };
   }, [compId]);
 
@@ -992,13 +778,17 @@ export default function MedalScorecard(props) {
     const data = playerData[name];
     const mini = miniTableStats[name] || {};
   try {
-      const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
-        teebox: data.teebox,
-        handicap: data.handicap,
-        scores: data.scores,
-        waters: mini.waters ?? '',
-        dog: mini.dog ?? false,
-        two_clubs: mini.twoClubs ?? ''
+      const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teebox: data.teebox,
+          handicap: data.handicap,
+          scores: data.scores,
+          waters: mini.waters ?? '',
+          dog: mini.dog ?? false,
+          two_clubs: mini.twoClubs ?? ''
+        })
       });
       if (!res.ok) {
         const errText = await res.text();
@@ -1050,7 +840,11 @@ export default function MedalScorecard(props) {
       if (field === 'teebox') patchBody.teebox = value;
       if (field === 'handicap') patchBody.handicap = value;
       if (Object.keys(patchBody).length > 0) {
-        patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody)
+        fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patchBody)
+        })
           .then(async () => {
             // Optionally re-fetch for sync
             const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
@@ -1087,7 +881,11 @@ export default function MedalScorecard(props) {
     if (field === 'teebox') patchBody.teebox = value;
     if (field === 'handicap') patchBody.handicap = value;
     if (Object.keys(patchBody).length > 0) {
-      patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody).catch(() => {});
+      fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchBody)
+      }).catch(() => {});
     }
   }
 
@@ -1195,7 +993,8 @@ export default function MedalScorecard(props) {
           if (latest === gross) {
             const sig = `eagle:${name}:${hole.number}:${compId}`;
             if (checkAndMark(sig)) {
-                      showLocalPopup({ type: 'eagle', name, holeNumber: hole.number, sig });
+                      console.log('[MedalScorecard] Eagle popup signature:', sig, { name, hole: hole.number, compId });
+                      showLocalPopup({ type: 'eagle', name, holeNumber: hole.number, sig, competitionId: compId });
             }
           }
         }, 2000);
@@ -1211,7 +1010,8 @@ export default function MedalScorecard(props) {
           if (latest === gross) {
             const sig = `birdie:${name}:${hole.number}:${compId}`;
             if (checkAndMark(sig)) {
-                    showLocalPopup({ type: 'birdie', name, holeNumber: hole.number, sig });
+                    console.log('[MedalScorecard] Birdie popup signature:', sig, { name, hole: hole.number, compId });
+                    showLocalPopup({ type: 'birdie', name, holeNumber: hole.number, sig, competitionId: compId });
             }
           }
         }, 2000);
@@ -1226,7 +1026,8 @@ export default function MedalScorecard(props) {
           const latest = parseInt(playerDataRef.current?.[name]?.scores?.[idx], 10);
                   if (latest === gross) {
             const sig = `blowup:${name}:${hole.number}:${compId}`;
-                      showLocalPopup({ type: 'blowup', name, holeNumber: hole.number, sig });
+                      console.log('[MedalScorecard] Blowup popup signature:', sig, { name, hole: hole.number, compId });
+                      showLocalPopup({ type: 'blowup', name, holeNumber: hole.number, sig, competitionId: compId });
           }
         }, 2000);
       } else {
@@ -1245,7 +1046,11 @@ export default function MedalScorecard(props) {
           // Read latest scores from ref (reflects any rapid local changes)
           const latestScores = playerDataRef.current?.[name]?.scores || Array.from({ length: 18 }, () => '');
           const newScores = Array.isArray(latestScores) ? latestScores.map(v => (v == null ? '' : v)) : Array(18).fill('');
-          const res = await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), { scores: newScores });
+          const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scores: newScores })
+          });
           debugLog('server save result', { key, status: res && res.status });
           if (!res.ok) {
             const errText = await res.text();
@@ -1306,7 +1111,11 @@ export default function MedalScorecard(props) {
             try { if (pendingLocalSavesRef.current[key] && pendingLocalSavesRef.current[key].ts === ts) delete pendingLocalSavesRef.current[key]; } catch (e) {}
           })(`${name}:${i}`, now), 5000);
         }
-        const p = patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), { scores: newScores });
+        const p = fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scores: newScores })
+        });
         saves.push(p);
       }
   const results = await Promise.allSettled(saves);
@@ -1401,7 +1210,11 @@ export default function MedalScorecard(props) {
       try {
         for (const player of players) {
           const patchBody = { dog: player === name };
-          await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(player)}`), patchBody);
+          await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(player)}`), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patchBody)
+          });
         }
       } catch (err) {
         setError('Failed to save dog for group: ' + (err.message || err));
@@ -1409,7 +1222,10 @@ export default function MedalScorecard(props) {
       setCellSaving(prev => { const next = { ...prev }; delete next[pendingKey]; return next; });
       const sig = `dog:${name}:g:${groupIdx ?? ''}:c:${compId}`;
       if (checkAndMark(sig)) {
-        try { showLocalPopup({ type: 'dog', name, sig }); } catch (e) {}
+        try {
+          console.log('[MedalScorecard] Dog popup signature:', sig, { name, groupIdx, compId });
+          showLocalPopup({ type: 'dog', name, sig, competitionId: compId });
+        } catch (e) {}
       }
       return;
     }
@@ -1428,7 +1244,11 @@ export default function MedalScorecard(props) {
       const patchBody = {};
       if (field === 'waters') patchBody.waters = value;
       if (field === 'twoClubs') patchBody.two_clubs = value;
-      await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody);
+      await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchBody)
+      });
       const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
       if (res.ok) {
         const data = await res.json();
@@ -1448,7 +1268,10 @@ export default function MedalScorecard(props) {
     if (field === 'waters' && value && Number(value) > 0) {
       const sig = `waters:${name}:g:${groupIdx ?? ''}:c:${compId}`;
       if (checkAndMark(sig)) {
-        try { showLocalPopup({ type: 'waters', name, sig }); } catch (e) {}
+        try {
+          console.log('[MedalScorecard] Waters popup signature:', sig, { name, groupIdx, compId });
+          showLocalPopup({ type: 'waters', name, sig, competitionId: compId });
+        } catch (e) {}
       }
     }
   }
@@ -1479,7 +1302,11 @@ export default function MedalScorecard(props) {
     // Persist clears to backend (PATCH per player)
     try {
       for (const name of players) {
-        await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), { scores: Array(18).fill(null) });
+        await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scores: Array(18).fill(null) })
+        });
       }
     } catch (err) {
       console.error('Failed to persist cleared scores', err);

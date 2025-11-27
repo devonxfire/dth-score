@@ -18,8 +18,10 @@ function normalizeSignature(sig) {
     s = s.replace(/["']/g, '');
     // Normalize whitespace and lower-case for stable comparison
     s = s.replace(/\s+/g, ' ').trim().toLowerCase();
+    console.log('[popupDedupe] normalizeSignature input:', sig, 'output:', s);
     return s;
   } catch (e) {
+    console.log('[popupDedupe] normalizeSignature error for:', sig, e);
     return String(sig);
   }
 }

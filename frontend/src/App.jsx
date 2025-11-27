@@ -24,6 +24,7 @@ import FourballScorecard from './FourballScorecard';
 import FourballLeaderboard from './FourballLeaderboard';
 import AssignFourballsPage from './AssignFourballsPage';
 import InstallPrompt from './InstallPrompt';
+import GlobalPopups from './GlobalPopups';
 
 function AppRoutes({ user, setUser }) {
   const navigate = useNavigate();
@@ -98,6 +99,7 @@ function App() {
   return (
     <Router>
       <AppRoutes user={user} setUser={handleSetUser} />
+      <GlobalPopups />
       <InstallPrompt />
     </Router>
   );

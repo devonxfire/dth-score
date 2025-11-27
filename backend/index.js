@@ -1773,6 +1773,7 @@ io.on('connection', (socket) => {
   // of a canonical popup-event via 'client-popup'. The server will attach
   // an eventId and originSocketId and use popupSignatureSeen to prevent dupes.
   socket.on('client-popup', (payload) => {
+      console.log('[backend] client-popup received:', payload, 'from socket:', socket.id);
     try {
       const compId = Number(payload?.competitionId);
       if (!compId) return;
@@ -1782,7 +1783,10 @@ io.on('connection', (socket) => {
       const sig = payload.signature || payload.signature === 0 ? payload.signature : (type && playerName ? `${type}:${playerName}:${holeNumber}:${compId}` : null);
       if (!sig) return;
       // server-side dedupe to avoid rapid duplicate rebroadcasts
-      if (popupSignatureSeen(sig)) return;
+      if (popupSignatureSeen(sig)) {
+        console.log('[backend] popupSignatureSeen deduped:', sig, payload);
+        return;
+      }
       const event = {
         eventId: makeEventId(),
         competitionId: compId,
@@ -1793,6 +1797,7 @@ io.on('connection', (socket) => {
         signature: sig,
         originSocketId: socket.id
       };
+      console.log('[backend] Rebroadcasting popup-event to competition room:', `competition:${compId}`, event);
       global.io.to(`competition:${compId}`).emit('popup-event', event);
     } catch (e) {
       console.error('Error handling client-popup', e);

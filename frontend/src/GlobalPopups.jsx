@@ -7,6 +7,9 @@ import { checkAndMark, shouldShowPopup, markShown } from './popupDedupe';
 import { toast } from './simpleToast';
 
 export default function GlobalPopups() {
+    useEffect(() => {
+      console.log('[GlobalPopups] Mounted and will join competitions and listen for popup-event');
+    }, []);
   const [showBirdie, setShowBirdie] = useState(false);
   const [birdiePlayer, setBirdiePlayer] = useState('');
   const [birdieHole, setBirdieHole] = useState(null);
@@ -116,9 +119,8 @@ export default function GlobalPopups() {
     (async () => {
       try {
         const res = await fetch(apiUrl('/api/competitions'));
-  if (!res.ok) { return; }
+        if (!res.ok) { return; }
         const data = await res.json();
-  // fetched competitions
         if (cancelled) return;
         const comps = (data || []);
 
@@ -156,11 +158,12 @@ export default function GlobalPopups() {
           for (const c of comps) {
             try {
               const id = Number(c.id || c._id);
+              console.log('[GlobalPopups] Joining competition', id);
               socket.emit('join', { competitionId: id });
               joined.push(id);
             } catch (e) { /* ignore */ }
           }
-          /* joined competitions (best-effort) */
+          console.log('[GlobalPopups] Joined competitions:', joined);
         };
 
         if (socket && socket.connected) {
@@ -312,9 +315,12 @@ export default function GlobalPopups() {
     const popupEventHandler = (event) => {
       try {
         if (!event || !event.eventId) return;
+        // Debug: log all popup-events received
+        console.log('[GlobalPopups] popup-event received:', event, 'socket.id:', socket && socket.id);
         // If this event originated from this client's socket, ignore it to avoid echoing
         try {
           if (event.originSocketId && socket && socket.id && event.originSocketId === socket.id) {
+            console.log('[GlobalPopups] Ignoring popup-event from own socket:', event);
             return; // ignore echo from same socket
           }
         } catch (e) { /* ignore origin checks */ }
@@ -322,10 +328,13 @@ export default function GlobalPopups() {
         // clients which showed an optimistic local popup (using the same
         // signature) will suppress the server rebroadcast. Fall back to
         // deduping by eventId when no signature exists.
-  const dedupeKey = event.signature || event.eventId;
-  try { if (typeof window !== 'undefined') window.__lastPopupEvent = event; } catch (e) {}
-  if (!checkAndMark(dedupeKey)) { return; }
-  const { type, playerName, holeNumber } = event;
+        const dedupeKey = event.signature || event.eventId;
+        try { if (typeof window !== 'undefined') window.__lastPopupEvent = event; } catch (e) {}
+        if (!checkAndMark(dedupeKey)) {
+          console.log('[GlobalPopups] Dedupe suppressed popup-event:', dedupeKey, event);
+          return;
+        }
+        const { type, playerName, holeNumber } = event;
         // suppress lower-priority popups for same player+hole when a higher
         // priority popup has been shown recently. e.g. birdie then eagle.
         try {
@@ -440,8 +449,9 @@ export default function GlobalPopups() {
     socket.on('medal-player-updated', handler);
     socket.on('team-user-updated', handler);
     socket.on('fines-updated', handler);
-  socket.on('popup-event', popupEventHandler);
-  socket.on('initial-mini-stats', initialMiniHandler);
+    socket.on('popup-event', popupEventHandler);
+    socket.on('initial-mini-stats', initialMiniHandler);
+    console.log('[GlobalPopups] Event handlers attached: scores-updated, medal-player-updated, team-user-updated, fines-updated, popup-event, initial-mini-stats');
 
     return () => {
       socket.off('scores-updated', handler);
