@@ -94,7 +94,7 @@ export default function MedalScorecard(props) {
     if (net === par) return 2;
     if (net === par + 1) return 1;
     return (
-      <div className="relative min-h-screen bg-gradient-to-b from-[#0e3764] to-[#1B3A6B] pb-24">
+      <div className="relative min-h-screen bg-linear-to-b from-[#0e3764] to-[#1B3A6B] pb-24">
         {/* Global saving overlay */}
         {anyCellSaving && (
           <div style={{
@@ -1858,11 +1858,9 @@ export default function MedalScorecard(props) {
                                         <div className="text-right">In: <span className="font-bold">{grossBack}</span></div>
                                         <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
                                         <div className="text-right">Points: <span className="font-bold">{
-                                          Array.isArray(stable.total)
-                                            ? stable.total.join(', ')
-                                            : (typeof stable.total === 'object' && stable.total !== null)
-                                              ? JSON.stringify(stable.total)
-                                              : stable.total
+                                          (typeof stable.total === 'number' && Number.isFinite(stable.total))
+                                            ? stable.total
+                                            : (Array.isArray(stable.total) ? stable.total.join(', ') : (typeof stable.total === 'object' && stable.total !== null ? '' : String(stable.total)))
                                         }</span></div>
                                       </>
                                     );
@@ -2410,7 +2408,13 @@ export default function MedalScorecard(props) {
                           </div>
                         </td>
                       ))}
-                      <td className="border px-2 py-1 font-bold text-base">{Array.isArray(playerData[name]?.scores) ? playerData[name].scores.slice(0,9).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''}</td>
+                      <td className="border px-2 py-1 font-bold text-base">{
+                        (() => {
+                          if (!Array.isArray(playerData[name]?.scores)) return '';
+                          const total = playerData[name].scores.slice(0,9).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
+                          return Number.isFinite(total) && typeof total === 'number' ? total : '';
+                        })()
+                      }</td>
                     </tr>
                     {/* Net row (no player label cell) */}
                     <tr key={name + '-net-front'}>
@@ -2622,56 +2626,31 @@ export default function MedalScorecard(props) {
                         </td>
                       ))}
                       <td className="border px-2 py-1 font-bold text-base">{
-                        Array.isArray(playerData[name]?.scores) ? playerData[name].scores.slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''
+                        (() => {
+                          if (!Array.isArray(playerData[name]?.scores)) return '';
+                          const total = playerData[name].scores.slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
+                          return Number.isFinite(total) && typeof total === 'number' ? total : '';
+                        })()
                       }</td>
                       <td className="border px-2 py-1 font-bold text-base">{
-                        Array.isArray(playerData[name]?.scores) ? playerData[name].scores.reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0) : ''
+                        (() => {
+                          if (!Array.isArray(playerData[name]?.scores)) return '';
+                          const total = playerData[name].scores.reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
+                          return Number.isFinite(total) && typeof total === 'number' ? total : '';
+                        })()
                       }</td>
-                    </tr>
-                    {/* Net row (no player label cell) */}
-                    <tr key={name + '-net-back'}>
-                      <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>{resultLabel}</td>
-                      {holesArr.slice(9,18).map((hole, hIdx) => {
-                        const playingHandicap = computePH(playerData[name]?.handicap) || 0;
-                        let strokesReceived = 0;
-                        if (playingHandicap > 0) {
-                          if (playingHandicap >= 18) {
-                            strokesReceived = 1;
-                            if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
-                            else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
-                          } else if (hole.index <= playingHandicap) {
-                            strokesReceived = 1;
-                          }
-                        }
-                        const rawGross = playerData[name]?.scores?.[hIdx+9];
-                        const gross = rawGross === '' || rawGross == null ? NaN : parseInt(rawGross, 10);
-                        if (!Number.isFinite(gross)) {
-                          return <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}></td>;
-                        }
-                        const net = gross - strokesReceived;
-                        if ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance')) || is4bbb) {
-                          // For Alliance and 4BBB show stableford points per hole
-                          const holeIdx = 9 + hIdx;
-                          const pts = stable ? (stable.perHole ? stable.perHole[holeIdx] : stablefordPoints(net, hole.par)) : stablefordPoints(net, hole.par);
-                          return (
-                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
-                              {pts != null ? pts : ''}
-                            </td>
-                          );
-                        }
-                        return (
-                          <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
-                            {net}
-                          </td>
-                        );
-                      })}
                       {/* Net back 9 and total */}
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
                           const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
                           if (isAlliance || is4bbb || isIndividual) {
-                            const pts = stable ? stable.back : computePlayerStablefordTotals(name).back;
-                            return pts;
+                            let pts = '';
+                            if (stable && typeof stable.back === 'number' && Number.isFinite(stable.back)) pts = stable.back;
+                            else {
+                              const computed = computePlayerStablefordTotals(name);
+                              if (computed && typeof computed.back === 'number' && Number.isFinite(computed.back)) pts = computed.back;
+                            }
+                            return typeof pts === 'number' && Number.isFinite(pts) ? pts : '';
                           }
                           const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netBackTotal = 0;
@@ -2690,15 +2669,20 @@ export default function MedalScorecard(props) {
                             const net = gross ? gross - strokesReceived : 0;
                             if (typeof net === 'number') netBackTotal += net;
                           });
-                          return netBackTotal;
+                          return Number.isFinite(netBackTotal) && typeof netBackTotal === 'number' ? netBackTotal : '';
                         })()}
                       </td>
                       <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
                         {(() => {
                           const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
                           if (isAlliance || is4bbb || isIndividual) {
-                            const pts = stable ? stable.total : computePlayerStablefordTotals(name).total;
-                            return pts;
+                            let pts = '';
+                            if (stable && typeof stable.total === 'number' && Number.isFinite(stable.total)) pts = stable.total;
+                            else {
+                              const computed = computePlayerStablefordTotals(name);
+                              if (computed && typeof computed.total === 'number' && Number.isFinite(computed.total)) pts = computed.total;
+                            }
+                            return typeof pts === 'number' && Number.isFinite(pts) ? pts : '';
                           }
                           const playingHandicap = computePH(playerData[name]?.handicap) || 0;
                           let netTotal = 0;
@@ -2717,7 +2701,7 @@ export default function MedalScorecard(props) {
                             const net = gross ? gross - strokesReceived : 0;
                             if (typeof net === 'number') netTotal += net;
                           });
-                          return netTotal;
+                          return Number.isFinite(netTotal) && typeof netTotal === 'number' ? netTotal : '';
                         })()}
                       </td>
                     </tr>
