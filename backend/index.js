@@ -1107,25 +1107,44 @@ app.get('/api/debug/teams_users', async (req, res) => {
 app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
   const { teamId, userId } = req.params;
   const { competitionId, scores, bbScore } = req.body; // scores: array of 18 numbers/nulls, bbScore: optional number
+  const logTime = new Date().toISOString();
   if (!competitionId || !Array.isArray(scores) || scores.length !== 18) {
     return res.status(400).json({ error: 'competitionId and 18 scores required' });
   }
   // Defensive check: if a client accidentally sends an all-empty scores array we will
   // refuse to apply it unless allowClear === true is provided. This prevents accidental
   // mass-deletes caused by buggy clients. Operators can still clear scores explicitly.
-    try {
+  try {
     const allowClear = req.body && req.body.allowClear === true;
     const numNonEmpty = scores.reduce((c, s) => c + ((s != null && s !== '') ? 1 : 0), 0);
     if (numNonEmpty === 0 && !allowClear) {
-      console.warn('Rejecting all-empty scores update for team/user (need allowClear=true to clear):', { teamId, userId, competitionId });
+      console.warn(`[${logTime}] Rejecting all-empty scores update for team/user (need allowClear=true to clear):`, { teamId, userId, competitionId });
       return res.status(400).json({ error: 'No non-empty scores provided. To clear existing scores explicitly include { allowClear: true } in the request body.' });
     }
     // Audit logging: list of hole indexes that contain non-empty values and request origin info
     const touchedIndexes = scores.map((s, i) => ((s != null && s !== '') ? i : -1)).filter(i => i >= 0);
     const originSocket = req && req.headers && (req.headers['x-origin-socket'] || req.headers['X-Origin-Socket']) ? (req.headers['x-origin-socket'] || req.headers['X-Origin-Socket']) : null;
     const originIp = req && (req.ip || req.headers['x-forwarded-for'] || req.connection && req.connection.remoteAddress) ? (req.ip || req.headers['x-forwarded-for'] || (req.connection && req.connection.remoteAddress)) : 'unknown';
-    console.log(`PATCH /api/teams/${teamId}/users/${userId}/scores payload: competitionId=${competitionId}, nonEmpty=${numNonEmpty}, allowClear=${allowClear}, touchedIndexes=[${touchedIndexes.join(',')}], originSocket=${originSocket || ''}, originIp=${originIp}`);
-  } catch (e) {}
+    // Fetch previous scores for this user/team/competition
+    let prevScores = [];
+    try {
+      prevScores = await prisma.scores.findMany({
+        where: {
+          competition_id: Number(competitionId),
+          team_id: Number(teamId),
+          user_id: Number(userId)
+        },
+        orderBy: { hole_id: 'asc' }
+      });
+    } catch (e) { prevScores = []; }
+    const prevStrokes = prevScores.map(s => s.strokes);
+    console.log(`[${logTime}] PATCH /api/teams/${teamId}/users/${userId}/scores`);
+    console.log(`  competitionId=${competitionId}, nonEmpty=${numNonEmpty}, allowClear=${allowClear}, touchedIndexes=[${touchedIndexes.join(',')}]`);
+    console.log(`  originSocket=${originSocket || ''}, originIp=${originIp}`);
+    console.log(`  prevScores: [${prevStrokes.join(', ')}]`);
+    console.log(`  newScores:  [${scores.join(', ')}]`);
+    if (typeof bbScore !== 'undefined') console.log(`  bbScore (frontend override): ${bbScore}`);
+  } catch (e) { console.error(`[${logTime}] Error in logging score update:`, e); }
   try {
     // Fetch holes for this competition, ordered by number (1-18)
     const holes = await prisma.holes.findMany({
@@ -1191,6 +1210,11 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
           handicapMap[tu.user_id] = Number(tu.course_handicap);
         }
       }
+      // Log CH values for all team members
+      try {
+        const chLog = team.teams_users.map(tu => `user:${tu.user_id} CH:${tu.course_handicap}`).join(', ');
+        console.log(`[${logTime}] TeamId ${teamId} CH values: ${chLog}`);
+      } catch (e) { console.error(`[${logTime}] Error logging CH values:`, e); }
       // 5. Get handicap allowance for competition (if any)
       let comp = null;
       let handicapAllowance = 1;
