@@ -1857,7 +1857,13 @@ export default function MedalScorecard(props) {
                                         <div>Out: <span className="font-bold">{grossFront}</span></div>
                                         <div className="text-right">In: <span className="font-bold">{grossBack}</span></div>
                                         <div>Total: <span className="font-bold">{grossTotal}{parLabelPlayer}</span></div>
-                                        <div className="text-right">Points: <span className="font-bold">{stable.total}</span></div>
+                                        <div className="text-right">Points: <span className="font-bold">{
+                                          Array.isArray(stable.total)
+                                            ? stable.total.join(', ')
+                                            : (typeof stable.total === 'object' && stable.total !== null)
+                                              ? JSON.stringify(stable.total)
+                                              : stable.total
+                                        }</span></div>
                                       </>
                                     );
                                   })()}

@@ -1108,8 +1108,6 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
   const { teamId, userId } = req.params;
   const { competitionId, scores, bbScore } = req.body; // scores: array of 18 numbers/nulls, bbScore: optional number
   const logTime = new Date().toISOString();
-  // TEMPORARY: Artificial delay for frontend spinner testing
-  await new Promise(res => setTimeout(res, 3000)); // 3 second delay
   if (!competitionId || !Array.isArray(scores) || scores.length !== 18) {
     return res.status(400).json({ error: 'competitionId and 18 scores required' });
   }
@@ -1850,8 +1848,6 @@ app.post('/api/competitions', async (req, res) => {
 app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req, res) => {
   const { id, groupId, playerName } = req.params;
   const { teebox, handicap, scores, waters, dog, two_clubs } = req.body; // scores: array of 18 numbers/nulls
-  // TEMPORARY: Artificial delay for frontend spinner testing
-  await new Promise(res => setTimeout(res, 3000)); // 3 second delay
   try {
     const comp = await prisma.competitions.findUnique({ where: { id: Number(id) } });
     if (!comp || !Array.isArray(comp.groups)) {
