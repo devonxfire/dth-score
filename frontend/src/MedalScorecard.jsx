@@ -93,44 +93,7 @@ export default function MedalScorecard(props) {
     if (net === par - 1) return 3;
     if (net === par) return 2;
     if (net === par + 1) return 1;
-    return (
-      <div className="relative min-h-screen bg-linear-to-b from-[#0e3764] to-[#1B3A6B] pb-24">
-        {/* Global saving overlay */}
-        {anyCellSaving && (
-          <div style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            zIndex: 1000,
-            background: 'rgba(30, 41, 59, 0.18)',
-            backdropFilter: 'blur(2.5px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'all',
-            transition: 'opacity 0.2s',
-          }}>
-            <div style={{
-              background: 'rgba(30, 41, 59, 0.72)',
-              color: '#FFD700',
-              padding: '1.2em 2.2em',
-              borderRadius: '1.2em',
-              fontSize: '1.25em',
-              fontWeight: 500,
-              boxShadow: '0 2px 16px 0 rgba(27,58,107,0.18)',
-              letterSpacing: '0.01em',
-              opacity: 0.98,
-            }}>
-              Saving entry...
-            </div>
-          </div>
-        )}
-        <div style={anyCellSaving ? { filter: 'blur(2.5px)', pointerEvents: 'none', userSelect: 'none', transition: 'filter 0.2s' } : {}}>
-          <PageBackground />
-          <TopMenu />
-          {/* ...existing code... */}
-        </div>
-      </div>
-    );
+    return 0;
   let title = 'Nice!';
   let body = name || '';
   // Use 60s autoClose for all toasts unless explicitly disabled
@@ -1805,10 +1768,10 @@ export default function MedalScorecard(props) {
                   return (
                     <div className="grid grid-cols-1 gap-2 mb-3">
                       <div className="w-full p-3 rounded border-2 text-center" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
-                        <div className="font-extrabold text-2xl text-white">Team AB | BB Score: <span style={{ color: '#FFD700' }}>{ab.total != null ? ab.total : ''}</span></div>
+                        <div className="font-extrabold text-2xl text-white">Team AB | BB Score: <span style={{ color: '#FFD700' }}>{Number.isFinite(ab.total) ? ab.total : ''}</span></div>
                       </div>
                       <div className="w-full p-3 rounded border-2 text-center" style={{ borderColor: '#FFD700', background: '#002F5F' }}>
-                        <div className="font-extrabold text-2xl text-white">Team CD | BB Score: <span style={{ color: '#FFD700' }}>{cd.total != null ? cd.total : ''}</span></div>
+                        <div className="font-extrabold text-2xl text-white">Team CD | BB Score: <span style={{ color: '#FFD700' }}>{Number.isFinite(cd.total) ? cd.total : ''}</span></div>
                       </div>
                     </div>
                   );
@@ -1860,7 +1823,7 @@ export default function MedalScorecard(props) {
                                         <div className="text-right">Points: <span className="font-bold">{
                                           (typeof stable.total === 'number' && Number.isFinite(stable.total))
                                             ? stable.total
-                                            : (Array.isArray(stable.total) ? stable.total.join(', ') : (typeof stable.total === 'object' && stable.total !== null ? '' : String(stable.total)))
+                                            : ''
                                         }</span></div>
                                       </>
                                     );
@@ -2577,179 +2540,146 @@ export default function MedalScorecard(props) {
                 </tr>
               </thead>
               <tbody>
-                {players.map((name, pIdx) => {
-                  const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                  const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
-                  const isIndividual = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('individual')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('individual')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('individual'));
-                  const resultLabel = (isAlliance || is4bbb || isIndividual) ? 'Points' : 'Net';
-                  const stable = isAlliance ? computePlayerStablefordTotals(name) : null;
-
-                  // Return an array: the player's rows, and optionally the pair 'Score' row immediately after player B (pIdx===1) and player D (pIdx===3)
-                  return [
-                  <React.Fragment key={name + '-rows-back'}>
-                    {/* Gross row */}
-                    <tr key={name + '-gross-back'}>
-                      <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pIdx % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
-                        <span className="hidden sm:inline">{String.fromCharCode(65 + pIdx)}</span>
-                      </td>
-                      <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
-                      {holesArr.slice(9,18).map((hole, hIdx) => (
-                        <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
-                          <div className="flex items-center justify-center">
-                            {useMobilePicker ? (
-                              <select
-                                value={playerData[name]?.scores?.[hIdx+9] ?? ''}
-                                onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx+9, e.target.value); }}
-                                disabled={!canEdit(name)}
-                                className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base px-0 ${scoreCellClass(name, hIdx+9)}`}
-                                style={{ border: 'none', color: '#FFFFFF', background: 'transparent', ...scoreCellStyle(name, hIdx+9) }}
-                              >
-                                <option value="">-</option>
-                                {Array.from({ length: 21 }).map((_, i) => (
-                                  <option key={i} value={String(i)}>{i}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <input
-                                type="number"
-                                min="0"
-                                max="20"
-                                value={playerData[name]?.scores?.[hIdx+9] || ''}
-                                onChange={e => { if (!canEdit(name)) return; handleScoreChange(name, hIdx+9, e.target.value); }}
-                                disabled={!canEdit(name)}
-                                className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(name, hIdx+9)}`}
-                                inputMode="numeric"
-                                style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(name, hIdx+9) }}
-                              />
-                            )}
-                          </div>
+                {/* Render Back 9 in pairs: A+B, C+D */}
+                {[0, 2].map(pairStart => {
+                  const nameA = players[pairStart];
+                  const nameB = players[pairStart + 1];
+                  const stableA = computePlayerStablefordTotals(nameA);
+                  const stableB = computePlayerStablefordTotals(nameB);
+                  return (
+                    <React.Fragment key={`back9-pair-${pairStart}`}>
+                      {/* Gross row for A and B */}
+                      <tr>
+                        <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[pairStart % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
+                          <span className="hidden sm:inline">{String.fromCharCode(65 + pairStart)}</span>
                         </td>
-                      ))}
-                      <td className="border px-2 py-1 font-bold text-base">{
-                        (() => {
-                          if (!Array.isArray(playerData[name]?.scores)) return '';
-                          const total = playerData[name].scores.slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
-                          return Number.isFinite(total) && typeof total === 'number' ? total : '';
-                        })()
-                      }</td>
-                      <td className="border px-2 py-1 font-bold text-base">{
-                        (() => {
-                          if (!Array.isArray(playerData[name]?.scores)) return '';
-                          const total = playerData[name].scores.reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
-                          return Number.isFinite(total) && typeof total === 'number' ? total : '';
-                        })()
-                      }</td>
-                      {/* Net back 9 and total */}
-                      <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
-                        {(() => {
-                          const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                          if (isAlliance || is4bbb || isIndividual) {
-                            let pts = '';
-                            if (stable && typeof stable.back === 'number' && Number.isFinite(stable.back)) pts = stable.back;
-                            else {
-                              const computed = computePlayerStablefordTotals(name);
-                              if (computed && typeof computed.back === 'number' && Number.isFinite(computed.back)) pts = computed.back;
-                            }
-                            return typeof pts === 'number' && Number.isFinite(pts) ? pts : '';
-                          }
-                          const playingHandicap = computePH(playerData[name]?.handicap) || 0;
-                          let netBackTotal = 0;
-                          holesArr.slice(9,18).forEach((hole, hIdx) => {
-                            let strokesReceived = 0;
-                            if (playingHandicap > 0) {
-                              if (playingHandicap >= 18) {
-                                strokesReceived = 1;
-                                if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
-                                else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
-                              } else if (hole.index <= playingHandicap) {
-                                strokesReceived = 1;
-                              }
-                            }
-                            const gross = parseInt(playerData[name]?.scores?.[hIdx+9], 10) || 0;
-                            const net = gross ? gross - strokesReceived : 0;
-                            if (typeof net === 'number') netBackTotal += net;
-                          });
-                          return Number.isFinite(netBackTotal) && typeof netBackTotal === 'number' ? netBackTotal : '';
-                        })()}
-                      </td>
-                      <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>
-                        {(() => {
-                          const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
-                          if (isAlliance || is4bbb || isIndividual) {
-                            let pts = '';
-                            if (stable && typeof stable.total === 'number' && Number.isFinite(stable.total)) pts = stable.total;
-                            else {
-                              const computed = computePlayerStablefordTotals(name);
-                              if (computed && typeof computed.total === 'number' && Number.isFinite(computed.total)) pts = computed.total;
-                            }
-                            return typeof pts === 'number' && Number.isFinite(pts) ? pts : '';
-                          }
-                          const playingHandicap = computePH(playerData[name]?.handicap) || 0;
-                          let netTotal = 0;
-                          holesArr.forEach((hole, hIdx) => {
-                            let strokesReceived = 0;
-                            if (playingHandicap > 0) {
-                              if (playingHandicap >= 18) {
-                                strokesReceived = 1;
-                                if (playingHandicap - 18 >= hole.index) strokesReceived = 2;
-                                else if (hole.index <= (playingHandicap % 18)) strokesReceived = 2;
-                              } else if (hole.index <= playingHandicap) {
-                                strokesReceived = 1;
-                              }
-                            }
-                            const gross = parseInt(playerData[name]?.scores?.[hIdx], 10) || 0;
-                            const net = gross ? gross - strokesReceived : 0;
-                            if (typeof net === 'number') netTotal += net;
-                          });
-                          return Number.isFinite(netTotal) && typeof netTotal === 'number' ? netTotal : '';
-                        })()}
-                      </td>
-                    </tr>
-                  </React.Fragment>,
-                  (is4bbb && (pIdx === 1 || pIdx === 3)) ? (() => {
-                    const pairStart = pIdx === 1 ? 0 : 2;
-                    const nameA = players[pairStart];
-                    const nameB = players[pairStart + 1];
-                    const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0) };
-                    const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0) };
-                        const perHoleBack = defaultHoles.slice(9, 18).map((_, idx) => {
-                          const holeIdx = 9 + idx;
-                          const a = stabA.perHole?.[holeIdx];
-                          const b = stabB.perHole?.[holeIdx];
-                          if (a == null && b == null) return null;
-                          return Math.max(Number(a || 0), Number(b || 0));
-                        });
-                        const backSum = perHoleBack.reduce((s, v) => s + (v != null ? v : 0), 0);
-                        const totalPerHole = defaultHoles.map((_, i) => {
-                          const a = stabA.perHole?.[i];
-                          const b = stabB.perHole?.[i];
-                          if (a == null && b == null) return null;
-                          return Math.max(Number(a || 0), Number(b || 0));
-                        });
-                        const totalSum = totalPerHole.reduce((s, v) => s + (v != null ? v : 0), 0);
-                    return (
-                      <tr key={`pair-score-back-${pairStart}`}>
-                        <td className="border px-2 py-1 bg-white/5" />
-                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>BB Score</td>
-                        {perHoleBack.map((val, hIdx) => (
-                          <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
-                            {val != null ? val : ''}
+                        <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
+                        {holesArr.slice(9,18).map((hole, hIdx) => (
+                          <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
+                            <div className="flex items-center justify-center">
+                              {useMobilePicker ? (
+                                <select
+                                  value={playerData[nameA]?.scores?.[hIdx+9] ?? ''}
+                                  onChange={e => { if (!canEdit(nameA)) return; handleScoreChange(nameA, hIdx+9, e.target.value); }}
+                                  disabled={!canEdit(nameA)}
+                                  className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base px-0 ${scoreCellClass(nameA, hIdx+9)}`}
+                                  style={{ border: 'none', color: '#FFFFFF', background: 'transparent', ...scoreCellStyle(nameA, hIdx+9) }}
+                                >
+                                  <option value="">-</option>
+                                  {Array.from({ length: 21 }).map((_, i) => (
+                                    <option key={i} value={String(i)}>{i}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="20"
+                                  value={playerData[nameA]?.scores?.[hIdx+9] || ''}
+                                  onChange={e => { if (!canEdit(nameA)) return; handleScoreChange(nameA, hIdx+9, e.target.value); }}
+                                  disabled={!canEdit(nameA)}
+                                  className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(nameA, hIdx+9)}`}
+                                  inputMode="numeric"
+                                  style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(nameA, hIdx+9) }}
+                                />
+                              )}
+                            </div>
                           </td>
                         ))}
-                        {(() => {
-                          const backCount = perHoleBack.filter(v => v != null).length;
-                          const totalCount = totalPerHole.filter(v => v != null).length;
-                          return (
-                            <>
-                              <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{backCount ? backSum : ''}</td>
-                              <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{totalCount ? totalSum : ''}</td>
-                            </>
-                          );
-                        })()}
+                        <td className="border px-2 py-1 font-bold text-base">{
+                          (() => {
+                            if (!Array.isArray(playerData[nameA]?.scores)) return '';
+                            const total = playerData[nameA].scores.slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
+                            return Number.isFinite(total) && typeof total === 'number' ? total : '';
+                          })()
+                        }</td>
+                        <td className="border px-2 py-1 font-bold text-base">{
+                          (() => {
+                            if (!Array.isArray(playerData[nameA]?.scores)) return '';
+                            const total = playerData[nameA].scores.reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
+                            return Number.isFinite(total) && typeof total === 'number' ? total : '';
+                          })()
+                        }</td>
                       </tr>
-                    );
-                  })() : null
-                  ];
+                      {/* Points row for A */}
+                      <tr>
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Points</td>
+                        {holesArr.slice(9,18).map((hole, hIdx) => {
+                          const pts = stableA && stableA.perHole ? stableA.perHole[hIdx+9] : '';
+                          return (
+                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>{Number.isFinite(pts) ? pts : ''}</td>
+                          );
+                        })}
+                        <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{Number.isFinite(stableA?.back) ? stableA.back : ''}</td>
+                        <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{Number.isFinite(stableA?.total) ? stableA.total : ''}</td>
+                      </tr>
+                      {/* Gross row for B */}
+                      <tr>
+                        <td rowSpan={2} className={`border border-white px-2 py-1 font-bold text-lg text-center align-middle ${playerColors[(pairStart+1) % playerColors.length]}`} style={{ minWidth: 32, verticalAlign: 'middle' }}>
+                          <span className="hidden sm:inline">{String.fromCharCode(65 + pairStart + 1)}</span>
+                        </td>
+                        <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
+                        {holesArr.slice(9,18).map((hole, hIdx) => (
+                          <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
+                            <div className="flex items-center justify-center">
+                              {useMobilePicker ? (
+                                <select
+                                  value={playerData[nameB]?.scores?.[hIdx+9] ?? ''}
+                                  onChange={e => { if (!canEdit(nameB)) return; handleScoreChange(nameB, hIdx+9, e.target.value); }}
+                                  disabled={!canEdit(nameB)}
+                                  className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base px-0 ${scoreCellClass(nameB, hIdx+9)}`}
+                                  style={{ border: 'none', color: '#FFFFFF', background: 'transparent', ...scoreCellStyle(nameB, hIdx+9) }}
+                                >
+                                  <option value="">-</option>
+                                  {Array.from({ length: 21 }).map((_, i) => (
+                                    <option key={i} value={String(i)}>{i}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="20"
+                                  value={playerData[nameB]?.scores?.[hIdx+9] || ''}
+                                  onChange={e => { if (!canEdit(nameB)) return; handleScoreChange(nameB, hIdx+9, e.target.value); }}
+                                  disabled={!canEdit(nameB)}
+                                  className={`w-10 h-10 text-center focus:outline-none block mx-auto font-bold text-base no-spinner px-0 ${scoreCellClass(nameB, hIdx+9)}`}
+                                  inputMode="numeric"
+                                  style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', ...scoreCellStyle(nameB, hIdx+9) }}
+                                />
+                              )}
+                            </div>
+                          </td>
+                        ))}
+                        <td className="border px-2 py-1 font-bold text-base">{
+                          (() => {
+                            if (!Array.isArray(playerData[nameB]?.scores)) return '';
+                            const total = playerData[nameB].scores.slice(9,18).reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
+                            return Number.isFinite(total) && typeof total === 'number' ? total : '';
+                          })()
+                        }</td>
+                        <td className="border px-2 py-1 font-bold text-base">{
+                          (() => {
+                            if (!Array.isArray(playerData[nameB]?.scores)) return '';
+                            const total = playerData[nameB].scores.reduce((sum, val) => sum + (parseInt(val, 10) || 0), 0);
+                            return Number.isFinite(total) && typeof total === 'number' ? total : '';
+                          })()
+                        }</td>
+                      </tr>
+                      {/* Points row for B */}
+                      <tr>
+                        <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>Points</td>
+                        {holesArr.slice(9,18).map((hole, hIdx) => {
+                          const pts = stableB && stableB.perHole ? stableB.perHole[hIdx+9] : '';
+                          return (
+                            <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>{Number.isFinite(pts) ? pts : ''}</td>
+                          );
+                        })}
+                        <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{Number.isFinite(stableB?.back) ? stableB.back : ''}</td>
+                        <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{Number.isFinite(stableB?.total) ? stableB.total : ''}</td>
+                      </tr>
+                    </React.Fragment>
+                  );
                 })}
                 {/* Alliance team 'Score' row for Back 9: show best-two back and total */}
                 {((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'))) && (
