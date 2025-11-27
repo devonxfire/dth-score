@@ -1856,7 +1856,7 @@ export default function MedalScorecard(props) {
                                     onClick={() => { flushAndSaveAll(); }}
                                     disabled={saveStatus === 'saving'}
                                   >
-                                    {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save and Go to Next Hole')}
+                                    {saveStatus === 'saving' ? 'Saving scores and going to next hole...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save')}
                                   </button>
                                 </div>
                               )}
@@ -1873,7 +1873,7 @@ export default function MedalScorecard(props) {
                               onClick={() => { flushAndSaveAll(); }}
                               disabled={saveStatus === 'saving'}
                             >
-                              {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save and Go to Next Hole')}
+                              {saveStatus === 'saving' ? 'Saving scores and going to next hole...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save')}
                             </button>
                           </div>
                         )}
@@ -2051,10 +2051,10 @@ export default function MedalScorecard(props) {
                             disabled={saveStatus === 'saving'}
                           >
                             {saveStatus === 'saving'
-                              ? 'Saving Scores...'
+                              ? 'Saving scores and going to next hole...'
                               : (saveStatus === 'saved'
                                 ? 'Scores Saved!'
-                                : 'Save and Go to Next Hole')}
+                                : 'Save')}
                           </button>
                         </div>
                         {/* Mobile Leaderboard button for medal/alliance/4bbb mobile view */}

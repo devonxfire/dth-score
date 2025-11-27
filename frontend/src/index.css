@@ -1,3 +1,12 @@
+/* Pulse animation for Save and Go to Next Hole button */
+.pulse-btn {
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(59,130,246,0); }
+  100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+}
 /* Double border effect for double bogey */
 .double-border {
   position: relative;
