@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getDisplayName } from './displayNameHelper';
 import { apiUrl } from './api';
 import { TrophyIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
@@ -7,6 +7,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
 import { checkAndMark, markShown } from './popupDedupe';
+import { showLocalPopup } from './popupHelpers.jsx';
 import socket from './socket';
 import { toast } from './simpleToast';
 import './popupJiggle.css';
@@ -78,32 +79,6 @@ const defaultHoles = [
 
 
 export default function Scorecard(props) {
-  // Show a local toast and ask the server to rebroadcast to other clients
-  function showLocalPopup({ type, name, holeNumber, sig }) {
-    try {
-  let emoji = '🎉';
-  let title = 'Nice!';
-  let body = name || '';
-  // 60s default for all toast popups
-  let autoClose = 60000;
-  if (type === 'eagle') { emoji = '🦅'; title = 'Eagle!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([200,100,200]); }
-  else if (type === 'birdie') { emoji = '🕊️'; title = 'Birdie!'; body = `For ${name || ''} — Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([100,50,100]); }
-  else if (type === 'blowup') { emoji = '💥'; title = 'How Embarrassing!'; body = `${name || ''} just blew up on Hole ${holeNumber || ''}`; if (navigator.vibrate) navigator.vibrate([400,100,400]); }
-  else if (type === 'waters') { emoji = '💧'; title = 'Splash!'; body = `${name || ''} has earned a water`; }
-  else if (type === 'dog') { emoji = '🐶'; title = 'Woof!'; body = `${name || ''} got the dog`; }
-
-      const content = (
-        <div className="flex flex-col items-center" style={{ padding: '0.75rem 1rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: 8 }}>{emoji}</div>
-          <div style={{ fontWeight: 800, color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.4rem' }}>{title}</div>
-          <div style={{ color: 'white', fontFamily: 'Lato, Arial, sans-serif', fontSize: '1.05rem' }}>{body}</div>
-        </div>
-      );
-  try { toast(content, { toastId: sig || `${type}:${name}:${holeNumber}:${competition?.id}`, autoClose, position: 'top-center', closeOnClick: true }); } catch (e) {}
-  try { if (sig) markShown(sig); } catch (e) {}
-  try { socket.emit('client-popup', { competitionId: Number(competition?.id), type, playerName: name, holeNumber: holeNumber || null, signature: sig }); } catch (e) {}
-    } catch (e) {}
-  }
   // Waters popup state
   const [showWatersPopup, setShowWatersPopup] = useState(false);
   const [watersPlayer, setWatersPlayer] = useState(null);
@@ -303,8 +278,15 @@ export default function Scorecard(props) {
   const [scores, setScores] = useState(() => groupPlayers.map(() => Array(18).fill('')));
   // Track loading state for scores
   const [scoresLoading, setScoresLoading] = useState(false);
-  // Debounce timers for per-field score updates (keyed by `${teamId}:${userId}:${holeIdx}`)
-  const scoreDebounceTimers = React.useRef({});
+  // Debounce timers for per-field score updates (keyed by `${teamId}:${userId}:${holeIdx}`])
+  const scoreDebounceTimers = useRef({});
+  // Track recent local per-hole saves so we can ignore short-lived server echoes
+  const pendingLocalSavesRef = useRef({});
+  // Track per-cell saving state
+  const [cellSaving, setCellSaving] = useState({});
+  // Keep a ref copy of scores so delayed callbacks can read latest values
+  const scoresRef = useRef(scores);
+  useEffect(() => { scoresRef.current = scores; }, [scores]);
   // Cleanup any pending timers on unmount
   useEffect(() => {
     return () => {
@@ -326,13 +308,12 @@ export default function Scorecard(props) {
       if (!competition || !competition.id || !groupTeamId) return;
       setScoresLoading(true);
       const newScores = await Promise.all(groupPlayers.map(async (name, idx) => {
-        // Find userId for this player
         let userId = null;
         if (competition.users) {
           const user = competition.users.find(u => u.name === name);
           if (user) userId = user.id || user.user_id || user.userId;
         }
-  const url = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores?competitionId=${competition.id}`);
+        const url = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores?competitionId=${competition.id}`);
         if (!userId) return Array(18).fill('');
         try {
           const res = await fetch(url);
@@ -352,81 +333,96 @@ export default function Scorecard(props) {
     return () => { cancelled = true; };
   }, [groupPlayers.length, competition?.id, groupTeamId]);
 
+  // Listen for socket updates and apply anti-jump logic
+  useEffect(() => {
+    function handleSocketUpdate(msg) {
+      if (!msg || Number(msg.competitionId) !== Number(competition?.id)) return;
+      if (!msg.scores || !Array.isArray(msg.scores)) return;
+      setScores(prev => {
+        return prev.map((row, pIdx) => {
+          return row.map((cell, hIdx) => {
+            const cellKey = `${pIdx}:${hIdx}`;
+            // If a local save is pending for this cell, ignore server update
+            if (pendingLocalSavesRef.current[cellKey]) return cell;
+            // Otherwise, update from server
+            return msg.scores[pIdx]?.[hIdx] ?? cell;
+          });
+        });
+      });
+    }
+    socket.on('scores-updated', handleSocketUpdate);
+    return () => { socket.off('scores-updated', handleSocketUpdate); };
+  }, [competition?.id]);
+
   async function handleScoreChange(holeIdx, value, playerIdx) {
-    let updatedScores;
     setScores(prev => {
       const updated = prev.map(row => row.slice());
       updated[playerIdx][holeIdx] = value;
-      updatedScores = updated;
-      // Birdie/Eagle/Blowup detection logic
-      const gross = parseInt(value, 10);
-      const hole = defaultHoles[holeIdx];
-      if (gross > 0 && hole) {
-        // Eagle: 2 under par
-        if (gross === hole.par - 2) {
-          const sig = `eagle:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
-          try { showLocalPopup({ type: 'eagle', name: groupPlayers[playerIdx], holeNumber: hole.number, sig }); } catch (e) {}
-        } else if (gross === hole.par - 1) {
-          const sig = `birdie:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
-          try { showLocalPopup({ type: 'birdie', name: groupPlayers[playerIdx], holeNumber: hole.number, sig }); } catch (e) {}
-        } else if (gross >= hole.par + 3) {
-          const sig = `blowup:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
-          try { showLocalPopup({ type: 'blowup', name: groupPlayers[playerIdx], holeNumber: hole.number, sig }); } catch (e) {}
-        }
-      }
       return updated;
     });
+    // Mark this cell as pending local save
+    const cellKey = `${playerIdx}:${holeIdx}`;
+    pendingLocalSavesRef.current[cellKey] = { value: String(value), ts: Date.now() };
+    setCellSaving(prev => ({ ...prev, [cellKey]: true }));
+    // Birdie/Eagle/Blowup detection logic
+    const gross = parseInt(value, 10);
+    const hole = defaultHoles[holeIdx];
+    if (gross > 0 && hole) {
+      if (gross === hole.par - 2) {
+        const sig = `eagle:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
+        try { showLocalPopup({ type: 'eagle', name: groupPlayers[playerIdx], holeNumber: hole.number, sig }); } catch (e) {}
+      } else if (gross === hole.par - 1) {
+        const sig = `birdie:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
+        try { showLocalPopup({ type: 'birdie', name: groupPlayers[playerIdx], holeNumber: hole.number, sig }); } catch (e) {}
+      } else if (gross >= hole.par + 3) {
+        const sig = `blowup:${groupPlayers[playerIdx]}:${hole.number}:${competition?.id}`;
+        try { showLocalPopup({ type: 'blowup', name: groupPlayers[playerIdx], holeNumber: hole.number, sig }); } catch (e) {}
+      }
+    }
     // Save scores for this player
     if (!competition || !competition.id || !groupTeamId) return;
-    // Find userId for this player
     let userId = null;
     if (competition.users) {
       const user = competition.users.find(u => u.name === groupPlayers[playerIdx]);
       if (user) userId = user.id || user.user_id || user.userId;
     }
-    if (!userId) {
-      return;
-    }
-  // Prepare scores array for this player (use the freshly-created updatedScores to avoid stale state)
-  const playerScores = (updatedScores && Array.isArray(updatedScores[playerIdx])) ? updatedScores[playerIdx].map(v => v) : (scores[playerIdx] || Array(18).fill('')).map((v, idx) => idx === holeIdx ? value : v);
+    if (!userId) return;
+    // Prepare scores array for this player (use the freshest scoresRef)
+    const playerScores = (scoresRef.current && Array.isArray(scoresRef.current[playerIdx])) ? scoresRef.current[playerIdx].map((v, idx) => idx === holeIdx ? value : v) : Array(18).fill('');
     const patchUrl = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores`);
     const patchBody = { competitionId: competition.id, scores: playerScores.map(v => v === '' ? null : Number(v)) };
-    // Debounce per-field to avoid spamming socket/HTTP when user types or clicks rapidly
     try {
       const key = `${groupTeamId}:${userId}:${holeIdx}`;
-      // clear existing timer for this field
-      const existing = scoreDebounceTimers.current[key];
-      if (existing) clearTimeout(existing);
+      if (scoreDebounceTimers.current[key]) clearTimeout(scoreDebounceTimers.current[key]);
       scoreDebounceTimers.current[key] = setTimeout(async () => {
         try {
-          // Emit draft and then persist
-          try {
-            socket.emit('client-score-updated', {
-              competitionId: Number(competition?.id),
-              teamId: groupTeamId,
-              userId: userId,
-              playerName: groupPlayers[playerIdx],
-              holeIndex: holeIdx,
-              strokes: value === '' ? null : (Number.isNaN(Number(value)) ? value : Number(value)),
-              scores: playerScores.map(v => v === '' ? null : (Number.isNaN(Number(v)) ? v : Number(v)))
-            });
-          } catch (e) {}
-          try {
-            const res = await fetch(patchUrl, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(patchBody)
-            });
-            await res.json();
-          } catch (err) {
-            console.error('PATCH error (debounced):', err);
-          }
+          socket.emit('client-score-updated', {
+            competitionId: Number(competition?.id),
+            teamId: groupTeamId,
+            userId: userId,
+            playerName: groupPlayers[playerIdx],
+            holeIndex: holeIdx,
+            strokes: value === '' ? null : (Number.isNaN(Number(value)) ? value : Number(value)),
+            scores: playerScores.map(v => v === '' ? null : (Number.isNaN(Number(v)) ? v : Number(v)))
+          });
+          const res = await fetch(patchUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patchBody)
+          });
+          await res.json();
+          // Clear pending state for this cell
+          delete pendingLocalSavesRef.current[cellKey];
+          setCellSaving(prev => ({ ...prev, [cellKey]: false }));
+        } catch (err) {
+          setCellSaving(prev => ({ ...prev, [cellKey]: false }));
+          console.error('PATCH error (debounced):', err);
         } finally {
-          // cleanup timer reference
           try { delete scoreDebounceTimers.current[key]; } catch (e) {}
         }
-      }, 400); // 400ms debounce
+      }, 400);
     } catch (err) {
+      setCellSaving(prev => ({ ...prev, [cellKey]: false }));
       console.error('Error scheduling debounced score save', err);
     }
   }
@@ -1044,17 +1040,36 @@ export default function Scorecard(props) {
                                   else if (isDoubleBogey) inputClass += ' bg-transparent border-2 border-red-400 text-red-400';
                                   else if (isBogey) inputClass += ' bg-transparent border-2 border-yellow-400 text-yellow-400';
                                   else inputClass += ' text-white';
+                                  const cellKey = `${pIdx}:${hIdx}`;
                                   return (
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max="20"
-                                      value={val === undefined ? '' : val}
-                                      onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
-                                      className={inputClass}
-                                      inputMode="numeric"
-                                      style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
-                                    />
+                                    <div style={{ position: 'relative' }}>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="20"
+                                        value={val === undefined ? '' : val}
+                                        onChange={e => handleScoreChange(hIdx, e.target.value, pIdx)}
+                                        className={inputClass}
+                                        inputMode="numeric"
+                                        style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
+                                      />
+                                      {cellSaving[cellKey] && (
+                                        <span style={{
+                                          position: 'absolute',
+                                          right: 2,
+                                          top: 2,
+                                          width: 16,
+                                          height: 16,
+                                          display: 'inline-block',
+                                          pointerEvents: 'none',
+                                        }}>
+                                          <svg className="animate-spin" style={{ width: 16, height: 16 }} viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#FFD700" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="#FFD700" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                          </svg>
+                                        </span>
+                                      )}
+                                    </div>
                                   );
                                 })()}
                               </div>
@@ -1198,17 +1213,36 @@ export default function Scorecard(props) {
                                   else if (isDoubleBogey) inputClass += ' bg-transparent border-2 border-red-400 text-red-400';
                                   else if (isBogey) inputClass += ' bg-transparent border-2 border-yellow-400 text-yellow-400';
                                   else inputClass += ' text-white';
+                                  const cellKey = `${pIdx}:${hIdx+9}`;
                                   return (
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max="20"
-                                      value={val === undefined ? '' : val}
-                                      onChange={e => handleScoreChange(hIdx+9, e.target.value, pIdx)}
-                                      className={inputClass}
-                                      inputMode="numeric"
-                                      style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
-                                    />
+                                    <div style={{ position: 'relative' }}>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="20"
+                                        value={val === undefined ? '' : val}
+                                        onChange={e => handleScoreChange(hIdx+9, e.target.value, pIdx)}
+                                        className={inputClass}
+                                        inputMode="numeric"
+                                        style={{ MozAppearance: 'textfield', appearance: 'textfield', WebkitAppearance: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}
+                                      />
+                                      {cellSaving[cellKey] && (
+                                        <span style={{
+                                          position: 'absolute',
+                                          right: 2,
+                                          top: 2,
+                                          width: 16,
+                                          height: 16,
+                                          display: 'inline-block',
+                                          pointerEvents: 'none',
+                                        }}>
+                                          <svg className="animate-spin" style={{ width: 16, height: 16 }} viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#FFD700" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="#FFD700" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                          </svg>
+                                        </span>
+                                      )}
+                                    </div>
                                   );
                                 })()}
                               </div>

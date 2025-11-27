@@ -1,16 +1,17 @@
-  // Helper for mobile input focus scroll
-  function handleInputFocus(e) {
-    try {
-      if (typeof window !== 'undefined' && (!('ontouchstart' in window) || window.innerWidth > 700)) {
-        e.currentTarget.scrollIntoView({ block: 'center' });
-      }
-    } catch (err) {}
-  }
+// Helper for mobile input focus scroll
+function handleInputFocus(e) {
+  try {
+    if (typeof window !== 'undefined' && (!('ontouchstart' in window) || window.innerWidth > 700)) {
+      e.currentTarget.scrollIntoView({ block: 'center' });
+    }
+  } catch (err) {}
+}
 import React, { useEffect, useState, useRef } from 'react';
 import { TrophyIcon } from '@heroicons/react/24/solid';
 import { apiUrl } from './api';
 import socket from './socket';
 import { shouldShowPopup, markShown, checkAndMark } from './popupDedupe';
+import { showLocalPopup } from './popupHelpers.jsx';
 import { toast } from './simpleToast';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
@@ -46,6 +47,10 @@ function getPlayerColorsFor(props) {
 }
 
 export default function MedalScorecard(props) {
+  // Per-cell saving spinner state: { [name:idx]: true }
+  const [cellSaving, setCellSaving] = useState({});
+  // Helper: true if any cell is saving
+  const anyCellSaving = Object.values(cellSaving).some(Boolean);
   // Compute player colors based on competition type or overrideTitle
   const playerColors = getPlayerColorsFor(props);
   // Render numeric inputs as native picker selects on touch/narrow viewports
@@ -88,13 +93,44 @@ export default function MedalScorecard(props) {
     if (net === par - 1) return 3;
     if (net === par) return 2;
     if (net === par + 1) return 1;
-    return 0;
-  };
-
-  // Show a local toast and emit client-popup for other clients.
-  function showLocalPopup({ type, name, holeNumber, sig }) {
-    try {
-  let emoji = '🎉';
+    return (
+      <div className="relative min-h-screen bg-gradient-to-b from-[#0e3764] to-[#1B3A6B] pb-24">
+        {/* Global saving overlay */}
+        {anyCellSaving && (
+          <div style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 1000,
+            background: 'rgba(30, 41, 59, 0.18)',
+            backdropFilter: 'blur(2.5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'all',
+            transition: 'opacity 0.2s',
+          }}>
+            <div style={{
+              background: 'rgba(30, 41, 59, 0.72)',
+              color: '#FFD700',
+              padding: '1.2em 2.2em',
+              borderRadius: '1.2em',
+              fontSize: '1.25em',
+              fontWeight: 500,
+              boxShadow: '0 2px 16px 0 rgba(27,58,107,0.18)',
+              letterSpacing: '0.01em',
+              opacity: 0.98,
+            }}>
+              Saving entry...
+            </div>
+          </div>
+        )}
+        <div style={anyCellSaving ? { filter: 'blur(2.5px)', pointerEvents: 'none', userSelect: 'none', transition: 'filter 0.2s' } : {}}>
+          <PageBackground />
+          <TopMenu />
+          {/* ...existing code... */}
+        </div>
+      </div>
+    );
   let title = 'Nice!';
   let body = name || '';
   // Use 60s autoClose for all toasts unless explicitly disabled
@@ -105,20 +141,21 @@ export default function MedalScorecard(props) {
   else if (type === 'waters') { emoji = '💧'; title = 'Splash!'; body = `${name || ''} has earned a water`; }
   else if (type === 'dog') { emoji = '🐶'; title = 'Woof!'; body = `${name || ''} got the dog`; }
 
-      const content = (
-        <div className="flex flex-col items-center" style={{ padding: '0.75rem 1rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: 8 }}>{emoji}</div>
-          <div style={{ fontWeight: 800, color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.4rem' }}>{title}</div>
-          <div style={{ color: 'white', fontFamily: 'Lato, Arial, sans-serif', fontSize: '1.05rem' }}>{body}</div>
-        </div>
-      );
-  try { toast(content, { toastId: sig || `${type}:${name}:${holeNumber}:${compId}`, autoClose, position: 'top-center', closeOnClick: true }); } catch (e) {}
-  // mark as shown locally so dedupe prevents the server rebroadcast from hiding the optimistic toast
-  try { if (sig) markShown(sig); } catch (e) {}
-      // Inform server to rebroadcast to other clients (server will dedupe and attach originSocketId)
-      try { socket.emit('client-popup', { competitionId: Number(compId), type, playerName: name, holeNumber: holeNumber || null, signature: sig }); } catch (e) {}
-    } catch (e) {}
-  }
+  try {
+    const content = (
+      <div className="flex flex-col items-center" style={{ padding: '0.75rem 1rem' }}>
+        <div style={{ fontSize: '3rem', marginBottom: 8 }}>{emoji}</div>
+        <div style={{ fontWeight: 800, color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', fontSize: '1.4rem' }}>{title}</div>
+        <div style={{ color: 'white', fontFamily: 'Lato, Arial, sans-serif', fontSize: '1.05rem' }}>{body}</div>
+      </div>
+    );
+    try { toast(content, { toastId: sig || `${type}:${name}:${holeNumber}:${compId}`, autoClose, position: 'top-center', closeOnClick: true }); } catch (e) {}
+    // mark as shown locally so dedupe prevents the server rebroadcast from hiding the optimistic toast
+    try { if (sig) markShown(sig); } catch (e) {}
+    // Inform server to rebroadcast to other clients (server will dedupe and attach originSocketId)
+    try { socket.emit('client-popup', { competitionId: Number(compId), type, playerName: name, holeNumber: holeNumber || null, signature: sig }); } catch (e) {}
+  } catch (e) {}
+}
 
   // Compute per-player stableford totals (front/back/total) and per-hole points array
   const computePlayerStablefordTotals = (name) => {
@@ -720,10 +757,12 @@ export default function MedalScorecard(props) {
                 const copy = { ...(prev || {}) };
                 const names = msg.group.players || [];
                 for (const name of names) {
+                  // Anti-jump: ignore server echo if local pending save exists for this field
+                  const pending = (window.dthPendingMiniSaves || {});
                   copy[name] = {
-                    waters: msg.group.waters?.[name] ?? copy[name]?.waters ?? '',
-                    dog: msg.group.dog?.[name] ?? copy[name]?.dog ?? false,
-                    twoClubs: msg.group.two_clubs?.[name] ?? copy[name]?.twoClubs ?? ''
+                    waters: pending[`mini:${name}:waters`] ? prev[name]?.waters ?? '' : (msg.group.waters?.[name] ?? copy[name]?.waters ?? ''),
+                    dog: pending[`mini:${name}:dog`] ? prev[name]?.dog ?? false : (msg.group.dog?.[name] ?? copy[name]?.dog ?? false),
+                    twoClubs: pending[`mini:${name}:twoClubs`] ? prev[name]?.twoClubs ?? '' : (msg.group.two_clubs?.[name] ?? copy[name]?.twoClubs ?? '')
                   };
                 }
                 return copy;
@@ -988,6 +1027,58 @@ export default function MedalScorecard(props) {
 
   function handleChange(name, field, value) {
     if (!canEdit(name)) return;
+    // Only apply anti-jump/saving logic for teebox and handicap (CH)
+    if (field === 'teebox' || field === 'handicap') {
+      setCellSaving(prev => ({ ...prev, [`mini:${name}:${field}`]: true }));
+      const pendingKey = `mini:${name}:${field}`;
+      const ts = Date.now();
+      if (!window.dthPendingMiniSaves) window.dthPendingMiniSaves = {};
+      window.dthPendingMiniSaves[pendingKey] = { value, ts };
+      setTimeout(() => {
+        if (window.dthPendingMiniSaves[pendingKey] && window.dthPendingMiniSaves[pendingKey].ts === ts) {
+          delete window.dthPendingMiniSaves[pendingKey];
+        }
+      }, 5000);
+      setPlayerData(prev => ({
+        ...prev,
+        [name]: {
+          ...prev[name],
+          [field]: value
+        }
+      }));
+      if (!compId || !groups.length) {
+        setCellSaving(prev => { const next = { ...prev }; delete next[pendingKey]; return next; });
+        return;
+      }
+      const patchBody = {};
+      if (field === 'teebox') patchBody.teebox = value;
+      if (field === 'handicap') patchBody.handicap = value;
+      if (Object.keys(patchBody).length > 0) {
+        patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody)
+          .then(async () => {
+            // Optionally re-fetch for sync
+            const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
+            if (res.ok) {
+              const data = await res.json();
+              setPlayerData(prev => ({
+                ...prev,
+                [name]: {
+                  ...prev[name],
+                  teebox: data.teebox ?? prev[name]?.teebox ?? '',
+                  handicap: data.handicap ?? prev[name]?.handicap ?? ''
+                }
+              }));
+            }
+          })
+          .finally(() => {
+            setCellSaving(prev => { const next = { ...prev }; delete next[pendingKey]; return next; });
+          });
+      } else {
+        setCellSaving(prev => { const next = { ...prev }; delete next[pendingKey]; return next; });
+      }
+      return;
+    }
+    // Default: no anti-jump for other fields
     setPlayerData(prev => ({
       ...prev,
       [name]: {
@@ -995,7 +1086,6 @@ export default function MedalScorecard(props) {
         [field]: value
       }
     }));
-    // Persist teebox or handicap change immediately
     if (!compId || !groups.length) return;
     const patchBody = {};
     if (field === 'teebox') patchBody.teebox = value;
@@ -1041,6 +1131,8 @@ export default function MedalScorecard(props) {
   };
 
   async function handleScoreChange(name, idx, value, skipMobileAdvance = false) {
+      // Set per-cell saving spinner for this cell
+      setCellSaving(prev => ({ ...prev, [`${name}:${idx}`]: true }));
     if (!canEdit(name)) return;
     // remember last-edited hole for this competition (so refresh/navigation returns here)
     // BUT skip auto-advance if skipMobileAdvance flag is set OR if suppressMobileAdvanceRef is true (batch operations)
@@ -1175,6 +1267,12 @@ export default function MedalScorecard(props) {
           setError('Failed to save for ' + name + ': ' + (err.message || err));
         } finally {
           try { delete saveTimeoutsRef.current[key]; } catch (e) {}
+          // Clear per-cell saving spinner for this cell
+          setCellSaving(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
         }
   }, 500);
     } catch (err) {
@@ -1276,8 +1374,20 @@ export default function MedalScorecard(props) {
 
   async function handleMiniTableChange(name, field, value) {
     if (!canEdit(name)) return;
+    // Set per-field saving spinner
+    setCellSaving(prev => ({ ...prev, [`mini:${name}:${field}`]: true }));
+    // Mark this field as a recent local save
+    const pendingKey = `mini:${name}:${field}`;
+    const ts = Date.now();
+    if (!window.dthPendingMiniSaves) window.dthPendingMiniSaves = {};
+    window.dthPendingMiniSaves[pendingKey] = { value: value, ts };
+    setTimeout(() => {
+      if (window.dthPendingMiniSaves[pendingKey] && window.dthPendingMiniSaves[pendingKey].ts === ts) {
+        delete window.dthPendingMiniSaves[pendingKey];
+      }
+    }, 5000);
+
     if (field === 'dog' && value) {
-      // Only allow one player to have the dog
       setMiniTableStats(prev => {
         const updated = { ...prev };
         for (const player of players) {
@@ -1288,8 +1398,10 @@ export default function MedalScorecard(props) {
         }
         return updated;
       });
-      // Persist dog=false for all others, dog=true for selected
-      if (!compId || !groups.length) return;
+      if (!compId || !groups.length) {
+        setCellSaving(prev => { const next = { ...prev }; delete next[pendingKey]; return next; });
+        return;
+      }
       try {
         for (const player of players) {
           const patchBody = { dog: player === name };
@@ -1298,14 +1410,13 @@ export default function MedalScorecard(props) {
       } catch (err) {
         setError('Failed to save dog for group: ' + (err.message || err));
       }
-    const sig = `dog:${name}:g:${groupIdx ?? ''}:c:${compId}`;
-    if (checkAndMark(sig)) {
-      // Show a local toast and ask server to rebroadcast to other clients
-      try { showLocalPopup({ type: 'dog', name, sig }); } catch (e) {}
-    }
+      setCellSaving(prev => { const next = { ...prev }; delete next[pendingKey]; return next; });
+      const sig = `dog:${name}:g:${groupIdx ?? ''}:c:${compId}`;
+      if (checkAndMark(sig)) {
+        try { showLocalPopup({ type: 'dog', name, sig }); } catch (e) {}
+      }
       return;
     }
-    // Normal update for other fields
     setMiniTableStats(prev => ({
       ...prev,
       [name]: {
@@ -1313,14 +1424,15 @@ export default function MedalScorecard(props) {
         [field]: value
       }
     }));
-    // Persist mini table field to backend
-    if (!compId || !groups.length) return;
+    if (!compId || !groups.length) {
+      setCellSaving(prev => { const next = { ...prev }; delete next[pendingKey]; return next; });
+      return;
+    }
     try {
       const patchBody = {};
       if (field === 'waters') patchBody.waters = value;
       if (field === 'twoClubs') patchBody.two_clubs = value;
       await patchWithOrigin(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), patchBody);
-      // Re-fetch latest mini table data for sync
       const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
       if (res.ok) {
         const data = await res.json();
@@ -1336,13 +1448,13 @@ export default function MedalScorecard(props) {
     } catch (err) {
       setError('Failed to save mini table for ' + name + ': ' + (err.message || err));
     }
-    // Show popups for Waters
+    setCellSaving(prev => { const next = { ...prev }; delete next[pendingKey]; return next; });
     if (field === 'waters' && value && Number(value) > 0) {
-    const sig = `waters:${name}:g:${groupIdx ?? ''}:c:${compId}`;
-        if (checkAndMark(sig)) {
-          try { showLocalPopup({ type: 'waters', name, sig }); } catch (e) {}
-        }
+      const sig = `waters:${name}:g:${groupIdx ?? ''}:c:${compId}`;
+      if (checkAndMark(sig)) {
+        try { showLocalPopup({ type: 'waters', name, sig }); } catch (e) {}
       }
+    }
   }
 
   // Cleanup any pending timeouts on unmount
@@ -1380,9 +1492,22 @@ export default function MedalScorecard(props) {
   }
 
   return (
-    <PageBackground>
-      <TopMenu {...props} userComp={comp} competitionList={comp ? [comp] : []} />
-      <div className="flex flex-col items-center px-4 mt-12">
+    <>
+      {/* Global Saving Overlay and Blur */}
+      {anyCellSaving && (
+        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/60 backdrop-blur-[3px] transition-all duration-200" style={{ pointerEvents: 'auto' }}>
+          <div className="flex flex-col items-center">
+            <svg className="animate-spin h-12 w-12 text-yellow-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <div className="text-2xl font-extrabold text-yellow-300 drop-shadow-lg" style={{ fontFamily: 'Merriweather, Georgia, serif' }}>Saving entry...</div>
+          </div>
+        </div>
+      )}
+      <PageBackground>
+        <TopMenu {...props} userComp={comp} competitionList={comp ? [comp] : []} />
+        <div className={`flex flex-col items-center px-4 mt-12 transition-all duration-200 ${anyCellSaving ? 'blur-[3px] pointer-events-none select-none' : ''}`} style={anyCellSaving ? { filter: 'blur(3px)', pointerEvents: 'none', userSelect: 'none' } : {}}>
         <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#0e3764', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
           {props.overrideTitle || 'Medal Competition: Scorecard'}
         </h1>
@@ -1865,28 +1990,31 @@ export default function MedalScorecard(props) {
                                         >
                                           {hasScore ? 'SCORE ENTERED' : 'ENTER SCORE'}
                                         </span>
-                                        <select
-                                          aria-label={`score-select-${pName}`}
-                                          className="px-3 py-2 rounded text-xl font-bold text-center mt-1"
-                                          style={{ 
-                                            background: hasScore ? bgColor : '#6B7280',
-                                            color: textColor,
-                                            border: borderColor,
-                                            minWidth: '75px',
-                                            width: '75px'
-                                          }}
-                                          value={selectVal}
-                                          onChange={(e) => {
-                                            if (!canEdit(pName)) return;
-                                            handleScoreChange(pName, mobileSelectedHole - 1, e.target.value);
-                                          }}
-                                          disabled={!canEdit(pName)}
-                                        >
-                                          <option value="" disabled>{displayPar}</option>
-                                          {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
-                                            <option key={num} value={num}>{num}</option>
-                                          ))}
-                                        </select>
+                                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                                          <select
+                                            aria-label={`score-select-${pName}`}
+                                            className="px-3 py-2 rounded text-xl font-bold text-center mt-1"
+                                            style={{ 
+                                              background: hasScore ? bgColor : '#6B7280',
+                                              color: textColor,
+                                              border: borderColor,
+                                              minWidth: '75px',
+                                              width: '75px'
+                                            }}
+                                            value={selectVal}
+                                            onChange={(e) => {
+                                              if (!canEdit(pName)) return;
+                                              handleScoreChange(pName, mobileSelectedHole - 1, e.target.value);
+                                            }}
+                                            disabled={!canEdit(pName)}
+                                          >
+                                            <option value="" disabled>{displayPar}</option>
+                                            {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
+                                              <option key={num} value={num}>{num}</option>
+                                            ))}
+                                          </select>
+                                          {/* Spinner removed: now global overlay */}
+                                        </div>
                                       </>
                                     );
                                   })()}
@@ -2157,9 +2285,7 @@ export default function MedalScorecard(props) {
                                     disabled={!canEdit(name)}
                                     onFocus={handleInputFocus}
                                   />
-                                  {cellSaving && cellSaving[`${name}:${hIdx}`] && (
-                                    <span style={{ position: 'absolute', right: 2, top: 2, fontSize: '1.1em', color: '#FFD700' }} title="Saving...">⏳</span>
-                                  )}
+                                  {/* Spinner removed: now global overlay */}
                                 </div>
                                 <button aria-label={`increment-hole-${hole.number}-${name}`} className="px-2 py-1 rounded bg-white/10" onClick={() => { applyDeltaToHole(name, hIdx, +1); }} disabled={!canEdit(name)}>+</button>
                               </div>
@@ -2661,7 +2787,6 @@ export default function MedalScorecard(props) {
           {error && <div className="text-red-300 mt-4 font-semibold">{error}</div>}
         </div>
       </div>
-      
       {/* Reset Scores Confirmation Modal */}
       {showResetModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -2675,6 +2800,7 @@ export default function MedalScorecard(props) {
           </div>
         </div>
       )}
-    </PageBackground>
+      </PageBackground>
+    </>
   );
 }
