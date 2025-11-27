@@ -275,18 +275,62 @@ export default function MedalScorecard(props) {
     handleScoreChange(name, idx, String(next));
   }
   
+  // --- Per-group selected hole state for desktop/tablet navigation ---
+  // selectedHoleByGroup: { [groupKey]: holeNumber }
+  const [selectedHoleByGroup, setSelectedHoleByGroup] = useState({});
+  // Helper: get current group key (robust fallback)
+  const group = groups[groupIdx] || {};
+  const groupKey = group.id || group.group_id || group.groupId || group.name || group.label || String(groupIdx);
+  // Get selected hole for current group, fallback to 1
+  const selectedHole = selectedHoleByGroup[groupKey] || 1;
+
+  // Handler for hole navigation (prev/next/select) -- per group
+  const handleHoleChange = (holeNum) => {
+    if (!groupKey) return;
+    setSelectedHoleByGroup((prev) => ({
+      ...prev,
+      [groupKey]: holeNum,
+    }));
+  };
+
+  // When group changes, if no hole is set for this group, default to 1
+  useEffect(() => {
+    if (!groupKey) return;
+    setSelectedHoleByGroup((prev) => {
+      if (prev[groupKey]) return prev;
+      return { ...prev, [groupKey]: 1 };
+    });
+  }, [groupKey]);
   // Mobile selected player for compact score entry
   const [mobileSelectedPlayer, setMobileSelectedPlayer] = useState('');
-  // Persist mobile-selected hole per-competition so refresh/navigation restores last-edited hole.
-  const storageKey = compId ? `dth:mobileSelectedHole:${compId}` : 'dth:mobileSelectedHole:unknown';
-  const [mobileSelectedHole, setMobileSelectedHole] = useState(() => {
+  // --- Per-group mobile selected hole state ---
+  // mobileSelectedHoleByGroup: { [groupKey]: holeNumber }
+  const [mobileSelectedHoleByGroup, setMobileSelectedHoleByGroup] = useState(() => {
+    // Try to load from localStorage (per comp, per group)
+    const obj = {};
     try {
-      const raw = compId ? localStorage.getItem(`dth:mobileSelectedHole:${compId}`) : null;
-      const n = raw ? parseInt(raw, 10) : NaN;
-      if (Number.isFinite(n) && n >= 1 && n <= 18) return n;
+      if (compId && groups && groups.length) {
+        groups.forEach((g, idx) => {
+          const gk = g?.id || g?.group_id || g?.groupId || g?.name || g?.label || String(idx);
+          const raw = localStorage.getItem(`dth:mobileSelectedHole:${compId}:${gk}`);
+          const n = raw ? parseInt(raw, 10) : NaN;
+          obj[gk] = (Number.isFinite(n) && n >= 1 && n <= 18) ? n : 1;
+        });
+      }
     } catch (e) {}
-    return 1;
+    return obj;
   });
+  // Helper: get current group key (robust fallback)
+  // (reuse groupKey from above)
+  const mobileSelectedHole = mobileSelectedHoleByGroup[groupKey] || 1;
+  const setMobileSelectedHole = (holeNumOrUpdater) => {
+    setMobileSelectedHoleByGroup(prev => {
+      const val = typeof holeNumOrUpdater === 'function' ? holeNumOrUpdater(prev[groupKey] || 1) : holeNumOrUpdater;
+      // Persist to localStorage
+      try { if (compId && groupKey) localStorage.setItem(`dth:mobileSelectedHole:${compId}:${groupKey}`, String(val)); } catch (e) {}
+      return { ...prev, [groupKey]: val };
+    });
+  };
 
   // Ref to the mobile hole entry container so we can scroll it into view when returning
   const mobileHoleRef = useRef(null);
@@ -298,27 +342,16 @@ export default function MedalScorecard(props) {
   const autoNavigatedHolesRef = useRef(new Set());
   const autoNavTimerRef = useRef(null);
 
-  // Keep localStorage in sync when compId changes (switching competitions) — load saved hole for new comp.
+  // When group or comp changes, if no hole is set for this group, default to 1
   useEffect(() => {
-    try {
-      if (!compId) return;
-      const raw = localStorage.getItem(`dth:mobileSelectedHole:${compId}`);
-      const n = raw ? parseInt(raw, 10) : NaN;
-      if (Number.isFinite(n) && n >= 1 && n <= 18) {
-        setMobileSelectedHole(n);
-      } else {
-        setMobileSelectedHole(1);
-      }
-    } catch (e) {}
-  }, [compId]);
-
-  // Persist whenever mobileSelectedHole changes
-  useEffect(() => {
-    try {
-      if (!compId) return;
-      localStorage.setItem(`dth:mobileSelectedHole:${compId}`, String(mobileSelectedHole));
-    } catch (e) {}
-  }, [compId, mobileSelectedHole]);
+    if (!groupKey) return;
+    setMobileSelectedHoleByGroup(prev => {
+      if (prev[groupKey]) return prev;
+      // Persist to localStorage
+      try { if (compId && groupKey) localStorage.setItem(`dth:mobileSelectedHole:${compId}:${groupKey}`, '1'); } catch (e) {}
+      return { ...prev, [groupKey]: 1 };
+    });
+  }, [groupKey, compId]);
 
   // Generate dummy test data (admin only)
   const generateDummyData = async () => {
