@@ -503,52 +503,7 @@ export default function MedalScorecard(props) {
     } catch (e) {}
   }, [mobileSelectedHole]);
 
-  // Auto-navigate to next hole when all players have entered scores on mobile
-  useEffect(() => {
-    try {
-      // Only auto-navigate on mobile viewports
-      if (typeof window === 'undefined') return;
-      const isMobile = window.matchMedia('(max-width: 640px)').matches;
-      if (!isMobile) return;
-      
-      // Check if all players have a score for the current hole
-      const currentHoleIdx = mobileSelectedHole - 1;
-      if (currentHoleIdx < 0 || currentHoleIdx >= 18) return;
-      
-      const holeKey = `${compId}:${currentHoleIdx}`;
-      
-      const allPlayersHaveScore = players.every(pName => {
-        const scores = playerData?.[pName]?.scores;
-        if (!Array.isArray(scores)) return false;
-        const score = scores[currentHoleIdx];
-        return score !== '' && score != null;
-      });
-      
-      // Only auto-navigate if all players have scores AND we haven't done it for this hole yet
-      if (allPlayersHaveScore && players.length > 0 && !autoNavigatedHolesRef.current.has(holeKey)) {
-        // Mark this hole as having triggered auto-navigation
-        autoNavigatedHolesRef.current.add(holeKey);
-        
-        // Clear any existing timer
-        if (autoNavTimerRef.current) {
-          clearTimeout(autoNavTimerRef.current);
-        }
-        
-        // Show "Saving Scores..." on the button
-        setSaveStatus('saving');
-        
-        // Wait 2 seconds then navigate to next hole
-        autoNavTimerRef.current = setTimeout(() => {
-          if (mobileSelectedHole < 18) {
-            setMobileSelectedHole(mobileSelectedHole + 1);
-          }
-          // Reset button status after navigation
-          setSaveStatus('idle');
-          autoNavTimerRef.current = null;
-        }, 2000);
-      }
-    } catch (e) {}
-  }, [mobileSelectedHole, playerData, players, compId]);
+  // Auto-navigate to next hole when all players have entered scores is fully disabled.
 
   // Use holes from the competition payload when available (map stroke_index -> index),
   // otherwise fall back to the defaultHoles constant.
@@ -928,11 +883,7 @@ export default function MedalScorecard(props) {
       // Set per-cell saving spinner for this cell
       setCellSaving(prev => ({ ...prev, [`${name}:${idx}`]: true }));
     if (!canEdit(name)) return;
-    // remember last-edited hole for this competition (so refresh/navigation returns here)
-    // BUT skip auto-advance if skipMobileAdvance flag is set OR if suppressMobileAdvanceRef is true (batch operations)
-    if (!skipMobileAdvance && !suppressMobileAdvanceRef.current) {
-      try { setMobileSelectedHole(idx + 1); localStorage.setItem(`dth:mobileSelectedHole:${compId}`, String(idx + 1)); } catch (e) {}
-    }
+    // No auto-advance on score change. Only advance on explicit Save button click.
     // mark this hole as a recent local save so we can ignore immediate server echoes
     try {
       const key = `${name}:${idx}`;
@@ -1153,26 +1104,7 @@ export default function MedalScorecard(props) {
       setError('Failed to flush saves: ' + (err.message || err));
     }
     
-    // Auto-navigate to next hole on mobile after saving if all players have scores
-    try {
-      if (typeof window === 'undefined') return;
-      const isMobile = window.matchMedia('(max-width: 640px)').matches;
-      if (!isMobile) return;
-      
-      const currentHoleIdx = mobileSelectedHole - 1;
-      if (currentHoleIdx < 0 || currentHoleIdx >= 18) return;
-      
-      const allPlayersHaveScore = players.every(pName => {
-        const scores = playerData?.[pName]?.scores;
-        if (!Array.isArray(scores)) return false;
-        const score = scores[currentHoleIdx];
-        return score !== '' && score != null;
-      });
-      
-      if (allPlayersHaveScore && mobileSelectedHole < 18) {
-        setMobileSelectedHole(mobileSelectedHole + 1);
-      }
-    } catch (e) {}
+    // Auto-navigation after saving is fully disabled. Only advance on explicit user action.
   }
 
   // ...existing code...
@@ -1755,12 +1687,18 @@ export default function MedalScorecard(props) {
                                             value={selectVal}
                                             onChange={(e) => {
                                               if (!canEdit(pName)) return;
-                                              handleScoreChange(pName, mobileSelectedHole - 1, e.target.value);
+                                              // If user selects par, treat as not played (empty string)
+                                              const val = e.target.value;
+                                              if (val === String(hole?.par)) {
+                                                handleScoreChange(pName, mobileSelectedHole - 1, '');
+                                              } else {
+                                                handleScoreChange(pName, mobileSelectedHole - 1, val);
+                                              }
                                             }}
                                             disabled={!canEdit(pName)}
                                           >
                                             <option value="" disabled>{displayPar}</option>
-                                            {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
+                                            {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
                                               <option key={num} value={num}>{num}</option>
                                             ))}
                                           </select>
@@ -1835,8 +1773,8 @@ export default function MedalScorecard(props) {
                                             }}
                                             disabled={!canEdit(pName)}
                                           >
-                                            <option value="" disabled>{displayPar}</option>
-                                            {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
+                                            <option value="" disabled>{hole?.par ?? ''}</option>
+                                            {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
                                               <option key={num} value={num}>{num}</option>
                                             ))}
                                           </select>
@@ -1856,7 +1794,23 @@ export default function MedalScorecard(props) {
                                     onClick={() => { flushAndSaveAll(); }}
                                     disabled={saveStatus === 'saving'}
                                   >
-                                    {saveStatus === 'saving' ? 'Saving scores and going to next hole...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save')}
+                                    {saveStatus === 'saving'
+                                      ? 'Saving scores and going to next hole...'
+                                      : (saveStatus === 'saved'
+                                        ? 'Scores Saved!'
+                                        : (() => {
+                                            const allHaveScores = players.length === 4 && players.every(pName => {
+                                              const scores = playerData?.[pName]?.scores;
+                                              if (!Array.isArray(scores)) return false;
+                                              const score = scores[mobileSelectedHole - 1];
+                                              return score !== '' && score != null;
+                                            });
+                                            if (allHaveScores && mobileSelectedHole < 18) {
+                                              return `Save and Go to Hole ${mobileSelectedHole + 1}`;
+                                            }
+                                            return 'Save';
+                                          })()
+                                        )}
                                   </button>
                                 </div>
                               )}
@@ -1870,10 +1824,54 @@ export default function MedalScorecard(props) {
                             <button
                               className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
                               style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                              onClick={() => { flushAndSaveAll(); }}
+                              onClick={async () => {
+                                console.log('[MedalScorecard] [ALLIANCE/4BBB] Save button clicked. Current hole:', mobileSelectedHole);
+                                console.log('[MedalScorecard] [ALLIANCE/4BBB] DEBUG: players:', players, 'playerData:', playerData, 'mobileSelectedHole:', mobileSelectedHole, 'groupKey:', groupKey, 'groupIdx:', groupIdx);
+                                if (!Array.isArray(players) || players.length !== 4) {
+                                  console.log('[MedalScorecard] [ALLIANCE/4BBB] Not advancing: players array is not length 4:', players);
+                                }
+                                const allHaveScores = players.length === 4 && players.every(pName => {
+                                  const scores = playerData?.[pName]?.scores;
+                                  if (!Array.isArray(scores)) return false;
+                                  const score = scores[mobileSelectedHole - 1];
+                                  return score !== '' && score != null;
+                                });
+                                console.log('[MedalScorecard] [ALLIANCE/4BBB] allHaveScores:', allHaveScores, 'playerData:', playerData, 'players:', players, 'current hole:', mobileSelectedHole);
+                                setSaveStatus('saving');
+                                await flushAndSaveAll();
+                                if (allHaveScores && mobileSelectedHole < 18) {
+                                  console.log('[MedalScorecard] [ALLIANCE/4BBB] Advancing to next hole:', mobileSelectedHole + 1);
+                                  setMobileSelectedHole(h => {
+                                    console.log('[MedalScorecard] [ALLIANCE/4BBB] setMobileSelectedHole called. Previous:', h, 'Next:', h + 1);
+                                    return h + 1;
+                                  });
+                                } else {
+                                  if (!allHaveScores) {
+                                    console.log('[MedalScorecard] [ALLIANCE/4BBB] Not advancing: not all scores present for this hole.');
+                                  } else if (mobileSelectedHole >= 18) {
+                                    console.log('[MedalScorecard] [ALLIANCE/4BBB] Not advancing: already at last hole.');
+                                  }
+                                }
+                              }}
                               disabled={saveStatus === 'saving'}
                             >
-                              {saveStatus === 'saving' ? 'Saving scores and going to next hole...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save')}
+                              {saveStatus === 'saving'
+                                ? 'Saving scores and going to next hole...'
+                                : (saveStatus === 'saved'
+                                  ? 'Scores Saved!'
+                                  : (() => {
+                                      const allHaveScores = players.length === 4 && players.every(pName => {
+                                        const scores = playerData?.[pName]?.scores;
+                                        if (!Array.isArray(scores)) return false;
+                                        const score = scores[mobileSelectedHole - 1];
+                                        return score !== '' && score != null;
+                                      });
+                                      if (allHaveScores && mobileSelectedHole < 18) {
+                                        return `Save and Go to Hole ${mobileSelectedHole + 1}`;
+                                      }
+                                      return 'Save';
+                                    })()
+                                  )}
                             </button>
                           </div>
                         )}
@@ -1968,7 +1966,7 @@ export default function MedalScorecard(props) {
                                 // Medal: use dropdown select (same as Individual Stableford)
                                 const selectVal = curVal !== '' ? String(curVal) : '';
                                 const hasScore = curVal !== '';
-                                const displayPar = hole?.par ?? '';
+                                    const displayPar = hole?.par ?? '';
                                 
                                 // Color coding based on score relative to par
                                 let labelColor = '#ffffff';
@@ -1976,35 +1974,41 @@ export default function MedalScorecard(props) {
                                 let textColor = '#ffffff';
                                 let borderColor = 'none';
                                 
-                                if (hasScore) {
-                                  const scoreNum = parseInt(curVal, 10);
-                                  const par = hole?.par || 0;
-                                  if (scoreNum <= par - 2) {
-                                    // Eagle or better - pink
-                                    labelColor = '#FFC0CB';
-                                    bgColor = '#1B3A6B';
-                                    textColor = '#FFC0CB';
-                                    borderColor = '2px solid #FFC0CB';
-                                  } else if (scoreNum === par - 1) {
-                                    // Birdie - green
-                                    labelColor = '#16a34a';
-                                    bgColor = '#1B3A6B';
-                                    textColor = '#16a34a';
-                                    borderColor = '2px solid #16a34a';
-                                  } else if (scoreNum >= par + 3) {
-                                    // Triple bogey or worse - red
-                                    labelColor = '#ef4444';
-                                    bgColor = '#1B3A6B';
-                                    textColor = '#ef4444';
-                                    borderColor = '2px solid #ef4444';
-                                  } else {
-                                    // Par through double bogey - gold
-                                    labelColor = '#FFD700';
-                                    bgColor = '#1B3A6B';
-                                    textColor = '#FFD700';
-                                    borderColor = '2px solid #FFD700';
-                                  }
-                                }
+                                    if (hasScore) {
+                                      const scoreNum = parseInt(curVal, 10);
+                                      const par = hole?.par || 0;
+                                      if (curVal === String(par)) {
+                                        // Par selected as 'not played' (do not color)
+                                        labelColor = '#ffffff';
+                                        bgColor = '#6B7280';
+                                        textColor = '#ffffff';
+                                        borderColor = 'none';
+                                      } else if (scoreNum <= par - 2) {
+                                        // Eagle or better - pink
+                                        labelColor = '#FFC0CB';
+                                        bgColor = '#1B3A6B';
+                                        textColor = '#FFC0CB';
+                                        borderColor = '2px solid #FFC0CB';
+                                      } else if (scoreNum === par - 1) {
+                                        // Birdie - green
+                                        labelColor = '#16a34a';
+                                        bgColor = '#1B3A6B';
+                                        textColor = '#16a34a';
+                                        borderColor = '2px solid #16a34a';
+                                      } else if (scoreNum >= par + 3) {
+                                        // Triple bogey or worse - red
+                                        labelColor = '#ef4444';
+                                        bgColor = '#1B3A6B';
+                                        textColor = '#ef4444';
+                                        borderColor = '2px solid #ef4444';
+                                      } else {
+                                        // Par through double bogey - gold
+                                        labelColor = '#FFD700';
+                                        bgColor = '#1B3A6B';
+                                        textColor = '#FFD700';
+                                        borderColor = '2px solid #FFD700';
+                                      }
+                                    }
                                 
                                 return (
                                   <div className="flex items-center gap-2">
@@ -2023,17 +2027,18 @@ export default function MedalScorecard(props) {
                                         border: borderColor,
                                         minWidth: '70px' 
                                       }}
-                                      value={selectVal}
-                                      onChange={(e) => {
-                                        if (!canEdit(pName)) return;
-                                        handleScoreChange(pName, mobileSelectedHole - 1, e.target.value);
-                                      }}
-                                      disabled={!canEdit(pName)}
-                                    >
-                                      <option value="" disabled>{displayPar}</option>
-                                      {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
-                                        <option key={num} value={num}>{num}</option>
-                                      ))}
+                                            value={selectVal === '' ? '' : selectVal}
+                                            onChange={(e) => {
+                                              if (!canEdit(pName)) return;
+                                              const val = e.target.value;
+                                              handleScoreChange(pName, mobileSelectedHole - 1, val);
+                                            }}
+                                            disabled={!canEdit(pName)}
+                                          >
+                                            <option value="" disabled>{displayPar}</option>
+                                            {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(num => (
+                                              <option key={num} value={num}>{num}</option>
+                                            ))}
                                     </select>
                                   </div>
                                 );
@@ -2047,14 +2052,54 @@ export default function MedalScorecard(props) {
                           <button
                             className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
                             style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                            onClick={() => { flushAndSaveAll(); }}
                             disabled={saveStatus === 'saving'}
+                            onClick={async () => {
+                              console.log('[MedalScorecard] Save button clicked. Current hole:', mobileSelectedHole);
+                              console.log('[MedalScorecard] DEBUG: players:', players, 'playerData:', playerData, 'mobileSelectedHole:', mobileSelectedHole, 'groupKey:', groupKey, 'groupIdx:', groupIdx);
+                              if (!Array.isArray(players) || players.length !== 4) {
+                                console.log('[MedalScorecard] Not advancing: players array is not length 4:', players);
+                              }
+                              const allHaveScores = players.length === 4 && players.every(pName => {
+                                const scores = playerData?.[pName]?.scores;
+                                if (!Array.isArray(scores)) return false;
+                                const score = scores[mobileSelectedHole - 1];
+                                return score !== '' && score != null;
+                              });
+                              console.log('[MedalScorecard] allHaveScores:', allHaveScores, 'playerData:', playerData, 'players:', players, 'current hole:', mobileSelectedHole);
+                              setSaveStatus('saving');
+                              await flushAndSaveAll();
+                              if (allHaveScores && mobileSelectedHole < 18) {
+                                console.log('[MedalScorecard] Advancing to next hole:', mobileSelectedHole + 1);
+                                setMobileSelectedHole(h => {
+                                  console.log('[MedalScorecard] setMobileSelectedHole called. Previous:', h, 'Next:', h + 1);
+                                  return h + 1;
+                                });
+                              } else {
+                                if (!allHaveScores) {
+                                  console.log('[MedalScorecard] Not advancing: not all scores present for this hole.');
+                                } else if (mobileSelectedHole >= 18) {
+                                  console.log('[MedalScorecard] Not advancing: already at last hole.');
+                                }
+                              }
+                            }}
                           >
                             {saveStatus === 'saving'
                               ? 'Saving scores and going to next hole...'
                               : (saveStatus === 'saved'
                                 ? 'Scores Saved!'
-                                : 'Save')}
+                                : (() => {
+                                    const allHaveScores = players.length === 4 && players.every(pName => {
+                                      const scores = playerData?.[pName]?.scores;
+                                      if (!Array.isArray(scores)) return false;
+                                      const score = scores[mobileSelectedHole - 1];
+                                      return score !== '' && score != null;
+                                    });
+                                    if (allHaveScores && mobileSelectedHole < 18) {
+                                      return `Save and Go to Hole ${mobileSelectedHole + 1}`;
+                                    }
+                                    return 'Save';
+                                  })()
+                                )}
                           </button>
                         </div>
                         {/* Mobile Leaderboard button for medal/alliance/4bbb mobile view */}
@@ -2109,12 +2154,8 @@ export default function MedalScorecard(props) {
                                     value={playerData[name]?.scores?.[hIdx] ?? ''}
                                     onChange={e => {
                                       if (!canEdit(name)) return;
-                                      const v = (e.target.value || '').replace(/[^0-9]/g, '');
-                                      try { lastActionValueRef.current[`${name}:${hIdx}`] = { value: v, ts: Date.now() }; } catch (err) {}
-                                      handleScoreChange(name, hIdx, v);
+                                      handleScoreChange(name, hIdx, e.target.value);
                                     }}
-                                    disabled={!canEdit(name)}
-                                    onFocus={handleInputFocus}
                                   />
                                   {/* Spinner removed: now global overlay */}
                                 </div>
