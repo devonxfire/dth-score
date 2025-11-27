@@ -2035,7 +2035,7 @@ export default function MedalScorecard(props) {
                                     onClick={() => { flushAndSaveAll(); }}
                                     disabled={saveStatus === 'saving'}
                                   >
-                                    {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save Scores')}
+                                    {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save and Go to Next Hole')}
                                   </button>
                                 </div>
                               )}
@@ -2052,7 +2052,7 @@ export default function MedalScorecard(props) {
                               onClick={() => { flushAndSaveAll(); }}
                               disabled={saveStatus === 'saving'}
                             >
-                              {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save Scores')}
+                              {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save and Go to Next Hole')}
                             </button>
                           </div>
                         )}
@@ -2229,7 +2229,11 @@ export default function MedalScorecard(props) {
                             onClick={() => { flushAndSaveAll(); }}
                             disabled={saveStatus === 'saving'}
                           >
-                            {saveStatus === 'saving' ? 'Saving Scores...' : (saveStatus === 'saved' ? 'Scores Saved!' : 'Save Scores')}
+                            {saveStatus === 'saving'
+                              ? 'Saving Scores...'
+                              : (saveStatus === 'saved'
+                                ? 'Scores Saved!'
+                                : 'Save and Go to Next Hole')}
                           </button>
                         </div>
                         {/* Mobile Leaderboard button for medal/alliance/4bbb mobile view */}
