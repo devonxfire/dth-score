@@ -467,6 +467,7 @@ app.get('/', (req, res) => {
 
       
 app.patch('/api/competitions/:id/groups', async (req, res) => {
+    console.log('[GROUP PATCH] received', JSON.stringify(req.body));
   const { id } = req.params;
   const { groups } = req.body;
   if (!groups) {
@@ -480,6 +481,41 @@ app.patch('/api/competitions/:id/groups', async (req, res) => {
     // Fetch existing competition so we can preserve per-player data (scores, teeboxes, handicaps, waters, dog, two_clubs, fines, displayNames)
     const existingComp = await prisma.competitions.findUnique({ where: { id: compId } });
     const existingGroups = Array.isArray(existingComp?.groups) ? existingComp.groups : [];
+
+    // --- Concise logging for score debug ---
+    const now = new Date().toISOString();
+    const reqIp = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.ip || 'unknown';
+    (Array.isArray(groups) ? groups : []).forEach((newG, idx) => {
+      const groupIdx = newG.groupIndex ?? idx;
+      const players = Array.isArray(newG.players) ? newG.players : [];
+      // Find previous group by best overlap (same as merge logic)
+      let bestIdx = -1, bestOverlap = 0;
+      for (let j = 0; j < existingGroups.length; j++) {
+        const eg = existingGroups[j];
+        if (!eg || !Array.isArray(eg.players)) continue;
+        const overlap = eg.players.filter(p => players.some(ip => (ip||'').toLowerCase().trim() === (p||'').toLowerCase().trim())).length;
+        if (overlap > bestOverlap) { bestOverlap = overlap; bestIdx = j; }
+      }
+      const prev = bestIdx !== -1 && existingGroups[bestIdx] ? existingGroups[bestIdx] : null;
+      const prevScores = prev && prev.scores ? prev.scores : {};
+      const newScores = newG && newG.scores ? newG.scores : {};
+      // Only log if there is a score change
+      let changed = false;
+      for (const p of players) {
+        if ((prevScores[p] || '').toString() !== (newScores[p] || '').toString()) { changed = true; break; }
+      }
+      if (changed) {
+        console.log(`[SCORE-UPDATE] ${now} compId=${compId} groupIdx=${groupIdx} ip=${reqIp}`);
+        players.forEach(p => {
+          const before = prevScores[p] !== undefined ? prevScores[p] : '';
+          const after = newScores[p] !== undefined ? newScores[p] : '';
+          if (before !== after) {
+            console.log(`  Player: ${p} | Before: ${before} | After: ${after}`);
+          }
+        });
+      }
+    });
+    // --- End concise logging ---
 
     // Best-match merging: for each incoming group, find the existing group with the highest player overlap
     const mappingProps = ['scores', 'teeboxes', 'handicaps', 'waters', 'dog', 'two_clubs', 'fines'];
@@ -1851,8 +1887,37 @@ app.post('/api/competitions', async (req, res) => {
 
 // Medal: Update player data (teebox, handicap, scores) in a group
 app.patch('/api/competitions/:id/groups/:groupId/player/:playerName', async (req, res) => {
+  // Destructure params and body at the top so all variables are available for logging and logic
   const { id, groupId, playerName } = req.params;
-  const { teebox, handicap, scores, waters, dog, two_clubs } = req.body; // scores: array of 18 numbers/nulls
+  const { teebox, handicap, scores, waters, dog, two_clubs } = req.body;
+  const logTime = new Date().toISOString();
+  const reqIp = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.ip || 'unknown';
+  if (Array.isArray(scores) && scores.length === 18) {
+    // Fetch previous scores for this player in this group
+    let prevScores = [];
+    try {
+      const comp = await prisma.competitions.findUnique({ where: { id: Number(id) } });
+      if (comp && Array.isArray(comp.groups)) {
+        const groupIdx = comp.groups.findIndex((g, idx) => String(idx) === String(groupId));
+        if (groupIdx !== -1) {
+          const group = comp.groups[groupIdx];
+          if (group && group.scores && group.scores[playerName]) {
+            prevScores = group.scores[playerName];
+          }
+        }
+      }
+    } catch (e) {}
+    // Only log if there is a score change
+    let changed = false;
+    for (let i = 0; i < 18; i++) {
+      if ((prevScores[i] || '') !== (scores[i] || '')) { changed = true; break; }
+    }
+    if (changed) {
+      console.log(`[SCORE-PLAYER] ${logTime} compId=${id} groupId=${groupId} player=${playerName} ip=${reqIp}`);
+      console.log(`  before: [${(prevScores||[]).join(', ')}]`);
+      console.log(`  after:  [${scores.join(', ')}]`);
+    }
+  }
   try {
     const comp = await prisma.competitions.findUnique({ where: { id: Number(id) } });
     if (!comp || !Array.isArray(comp.groups)) {
