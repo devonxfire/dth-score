@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // prisma-ignore-next-line
   url      = env("DATABASE_URL")
 }
 
@@ -18,7 +19,7 @@ model competitions {
   groups            Json?
   course_id         Int?
   created_at        DateTime? @default(now()) @db.Timestamp(6)
-  fourballs         String?   @db.VarChar(10) // <-- Add this line
+  fourballs         String?   @db.VarChar(10)
   status            String    @default("Open") @db.VarChar(20)
   holes             holes[]
   scores            scores[]
