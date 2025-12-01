@@ -1680,8 +1680,16 @@ export default function MedalScorecard(props) {
                           className="px-3 py-2 rounded text-lg mr-4"
                           style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }}
                           onClick={() => {
-                            const valid = allPlayersHaveCH();
-                            if (!valid) {
+                            // Check if all active players have scores before checking CH
+                            const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                            const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
+                              const scores = playerData?.[pName]?.scores;
+                              if (!Array.isArray(scores)) return false;
+                              const score = scores[mobileSelectedHole - 1];
+                              return score !== '' && score != null;
+                            });
+                            // Only check CH if all scores are entered
+                            if (allHaveScores && !allPlayersHaveCH()) {
                               setShowCHWarning(true);
                               return;
                             }
@@ -1968,7 +1976,8 @@ export default function MedalScorecard(props) {
                                   >
                                     {saveStatus === 'saving'
                                       ? (() => {
-                                          const allHaveScores = players.length === 4 && players.every(pName => {
+                                          const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                                          const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
                                             const scores = playerData?.[pName]?.scores;
                                             if (!Array.isArray(scores)) return false;
                                             const score = scores[mobileSelectedHole - 1];
@@ -2047,7 +2056,8 @@ export default function MedalScorecard(props) {
                             >
                               {saveStatus === 'saving'
                                 ? (() => {
-                                    const allHaveScores = players.length === 4 && players.every(pName => {
+                                    const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                                    const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
                                       const scores = playerData?.[pName]?.scores;
                                       if (!Array.isArray(scores)) return false;
                                       const score = scores[mobileSelectedHole - 1];
@@ -2109,8 +2119,16 @@ export default function MedalScorecard(props) {
                         className="px-3 py-2 rounded text-lg mr-4"
                         style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }}
                         onClick={() => {
-                          const valid = allPlayersHaveCH();
-                          if (!valid) {
+                          // Check if all active players have scores before checking CH
+                          const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                          const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
+                            const scores = playerData?.[pName]?.scores;
+                            if (!Array.isArray(scores)) return false;
+                            const score = scores[mobileSelectedHole - 1];
+                            return score !== '' && score != null;
+                          });
+                          // Only check CH if all scores are entered
+                          if (allHaveScores && !allPlayersHaveCH()) {
                             setShowCHWarning(true);
                             return;
                           }
@@ -2287,21 +2305,23 @@ export default function MedalScorecard(props) {
                             onClick={async () => {
                               console.log('[MedalScorecard] [MEDAL] Save button clicked. Current hole:', mobileSelectedHole);
                               console.log('[MedalScorecard] [MEDAL] DEBUG: players:', players, 'playerData:', playerData, 'mobileSelectedHole:', mobileSelectedHole, 'groupKey:', groupKey, 'groupIdx:', groupIdx);
-                              if (!allPlayersHaveCH()) {
-                                setShowCHWarning(true);
-                                console.log('[MedalScorecard] [MEDAL] Not advancing: not all CH present for all players.');
-                                return;
-                              }
                               if (!Array.isArray(players) || players.length !== 4) {
                                 console.log('[MedalScorecard] [MEDAL] Not advancing: players array is not length 4:', players);
                                 return;
                               }
-                              const allHaveScores = players.length === 4 && players.every(pName => {
+                              const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                              const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
                                 const scores = playerData?.[pName]?.scores;
                                 if (!Array.isArray(scores)) return false;
                                 const score = scores[mobileSelectedHole - 1];
                                 return score !== '' && score != null;
                               });
+                              // Only check CH if we're going to advance to next hole
+                              if (allHaveScores && mobileSelectedHole < 18 && !allPlayersHaveCH()) {
+                                setShowCHWarning(true);
+                                console.log('[MedalScorecard] [MEDAL] Not advancing: not all CH present for all players.');
+                                return;
+                              }
                               console.log('[MedalScorecard] allHaveScores:', allHaveScores, 'playerData:', playerData, 'players:', players, 'current hole:', mobileSelectedHole);
                               setSaveStatus('saving');
                               await flushAndSaveAll();
@@ -2321,11 +2341,24 @@ export default function MedalScorecard(props) {
                             }}
                           >
                             {saveStatus === 'saving'
-                              ? 'Saving scores and going to next hole...'
+                              ? (() => {
+                                  const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                                  const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
+                                    const scores = playerData?.[pName]?.scores;
+                                    if (!Array.isArray(scores)) return false;
+                                    const score = scores[mobileSelectedHole - 1];
+                                    return score !== '' && score != null;
+                                  });
+                                  if (allHaveScores && mobileSelectedHole < 18) {
+                                    return 'Saving scores and going to next hole...';
+                                  }
+                                  return 'Saving scores...';
+                                })()
                               : (saveStatus === 'saved'
                                 ? 'Scores Saved!'
                                 : (() => {
-                                    const allHaveScores = players.length === 4 && players.every(pName => {
+                                    const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                                    const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
                                       const scores = playerData?.[pName]?.scores;
                                       if (!Array.isArray(scores)) return false;
                                       const score = scores[mobileSelectedHole - 1];
