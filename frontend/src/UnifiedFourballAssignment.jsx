@@ -395,13 +395,13 @@ export default function UnifiedFourballAssignment(props) {
     return '4 Ball Assignment';
   };
 
-  return (
-    <PageBackground hideFooter>
-      <div className="max-w-4xl w-full min-h-screen flex flex-col justify-start p-8 text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', background: '#0e3764' }}>
-        <h1 className="text-4xl font-extrabold drop-shadow-lg text-center mb-4" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
+  const content = (
+    <div className="w-full mx-auto" style={{ maxWidth: props.nested ? '100%' : '1024px' }}>
+      <div className="w-full rounded-2xl shadow-lg p-8 flex flex-col gap-6 border-4 border-[#FFD700] text-white" style={{ fontFamily: 'Lato, Arial, sans-serif', background: 'rgba(0,47,95,0.95)', boxShadow: '0 2px 8px 0 rgba(0,47,95,0.10)' }}>
+        <h1 className="text-2xl md:text-4xl font-extrabold drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif', letterSpacing: '1px' }}>
           {getTitle()}
         </h1>
-        <div className="mx-auto mt-2 mb-4" style={{height: '2px', maxWidth: 340, width: '100%', background: 'white', opacity: 0.7, borderRadius: 2}}></div>
+        <div className="mx-auto" style={{height: '2px', maxWidth: 340, width: '100%', background: 'white', opacity: 0.7, borderRadius: 2}}></div>
 
         {error && <div className="text-red-300 mb-2 font-semibold">{error}</div>}
         
@@ -513,6 +513,8 @@ export default function UnifiedFourballAssignment(props) {
           Reset All
         </button>
       </div>
-    </PageBackground>
+    </div>
   );
+
+  return props.nested ? content : <PageBackground hideFooter>{content}</PageBackground>;
 }

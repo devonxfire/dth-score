@@ -301,6 +301,7 @@ function CreateCompetition({ user, onSignOut }) {
                     onSignOut={onSignOut}
                     onAssign={handleAssign}
                     competitionType="alliance"
+                    nested={true}
                   />
                 ) : (
                   <UnifiedFourballAssignment
@@ -310,6 +311,7 @@ function CreateCompetition({ user, onSignOut }) {
                     onSignOut={onSignOut}
                     onAssign={handleAssign}
                     competitionType="medal"
+                    nested={true}
                   />
                 )
               ) : (
@@ -318,6 +320,7 @@ function CreateCompetition({ user, onSignOut }) {
                   onAssign={handleAssign}
                   initialGroups={groups && groups.length > 0 ? groups : (editingComp?.groups || [])}
                   competitionType="fourball"
+                  nested={true}
                 />
               ))}
             </div>

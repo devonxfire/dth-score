@@ -1688,7 +1688,6 @@ export default function MedalScorecard(props) {
                             }
                             setMobileSelectedHole(h => (h === 1 ? 18 : h - 1));
                           }}
-                          disabled={!allPlayersHaveCH()}
                         >◀</button>
                         <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
                         <button
@@ -1714,7 +1713,6 @@ export default function MedalScorecard(props) {
                             }
                             setMobileSelectedHole(h => (h === 18 ? 1 : h + 1));
                           }}
-                          disabled={!allPlayersHaveCH()}
                         >▶</button>
 
                       </div>
@@ -1932,11 +1930,6 @@ export default function MedalScorecard(props) {
                                     style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
                                     onClick={async () => {
                                       console.log('[MedalScorecard] [4BBB] Save button clicked. Current hole:', mobileSelectedHole);
-                                      if (!allPlayersHaveCH()) {
-                                        setShowCHWarning(true);
-                                        console.log('[MedalScorecard] [4BBB] Not advancing: not all CH present for all players.');
-                                        return;
-                                      }
                                       if (!Array.isArray(players) || players.length !== 4) {
                                         console.log('[MedalScorecard] [4BBB] Not advancing: players array is not length 4:', players);
                                         return;
@@ -1947,6 +1940,12 @@ export default function MedalScorecard(props) {
                                         const score = scores[mobileSelectedHole - 1];
                                         return score !== '' && score != null;
                                       });
+                                      // Only check CH if we're going to advance to next hole
+                                      if (allHaveScores && mobileSelectedHole < 18 && !allPlayersHaveCH()) {
+                                        setShowCHWarning(true);
+                                        console.log('[MedalScorecard] [4BBB] Not advancing: not all CH present for all players.');
+                                        return;
+                                      }
                                       console.log('[MedalScorecard] [4BBB] allHaveScores:', allHaveScores, 'playerData:', playerData, 'players:', players, 'current hole:', mobileSelectedHole);
                                       setSaveStatus('saving');
                                       await flushAndSaveAll();
@@ -1967,7 +1966,18 @@ export default function MedalScorecard(props) {
                                     disabled={saveStatus === 'saving'}
                                   >
                                     {saveStatus === 'saving'
-                                      ? 'Saving scores and going to next hole...'
+                                      ? (() => {
+                                          const allHaveScores = players.length === 4 && players.every(pName => {
+                                            const scores = playerData?.[pName]?.scores;
+                                            if (!Array.isArray(scores)) return false;
+                                            const score = scores[mobileSelectedHole - 1];
+                                            return score !== '' && score != null;
+                                          });
+                                          if (allHaveScores && mobileSelectedHole < 18) {
+                                            return 'Saving scores and going to next hole...';
+                                          }
+                                          return 'Saving scores...';
+                                        })()
                                       : (saveStatus === 'saved'
                                         ? 'Scores Saved!'
                                         : (() => {
@@ -1999,11 +2009,6 @@ export default function MedalScorecard(props) {
                               onClick={async () => {
                                 console.log('[MedalScorecard] [ALLIANCE/4BBB] Save button clicked. Current hole:', mobileSelectedHole);
                                 console.log('[MedalScorecard] [ALLIANCE/4BBB] DEBUG: players:', players, 'playerData:', playerData, 'mobileSelectedHole:', mobileSelectedHole, 'groupKey:', groupKey, 'groupIdx:', groupIdx);
-                                if (!allPlayersHaveCH()) {
-                                  setShowCHWarning(true);
-                                  console.log('[MedalScorecard] [ALLIANCE/4BBB] Not advancing: not all CH present for all players.');
-                                  return;
-                                }
                                 if (!Array.isArray(players) || players.length !== 4) {
                                   console.log('[MedalScorecard] [ALLIANCE/4BBB] Not advancing: players array is not length 4:', players);
                                   return;
@@ -2014,6 +2019,12 @@ export default function MedalScorecard(props) {
                                   const score = scores[mobileSelectedHole - 1];
                                   return score !== '' && score != null;
                                 });
+                                // Only check CH if we're going to advance to next hole
+                                if (allHaveScores && mobileSelectedHole < 18 && !allPlayersHaveCH()) {
+                                  setShowCHWarning(true);
+                                  console.log('[MedalScorecard] [ALLIANCE/4BBB] Not advancing: not all CH present for all players.');
+                                  return;
+                                }
                                 console.log('[MedalScorecard] [ALLIANCE/4BBB] allHaveScores:', allHaveScores, 'playerData:', playerData, 'players:', players, 'current hole:', mobileSelectedHole);
                                 setSaveStatus('saving');
                                 await flushAndSaveAll();
@@ -2034,7 +2045,18 @@ export default function MedalScorecard(props) {
                               disabled={saveStatus === 'saving'}
                             >
                               {saveStatus === 'saving'
-                                ? 'Saving scores and going to next hole...'
+                                ? (() => {
+                                    const allHaveScores = players.length === 4 && players.every(pName => {
+                                      const scores = playerData?.[pName]?.scores;
+                                      if (!Array.isArray(scores)) return false;
+                                      const score = scores[mobileSelectedHole - 1];
+                                      return score !== '' && score != null;
+                                    });
+                                    if (allHaveScores && mobileSelectedHole < 18) {
+                                      return 'Saving scores and going to next hole...';
+                                    }
+                                    return 'Saving scores...';
+                                  })()
                                 : (saveStatus === 'saved'
                                   ? 'Scores Saved!'
                                   : (() => {
@@ -2092,7 +2114,6 @@ export default function MedalScorecard(props) {
                           }
                           setMobileSelectedHole(h => (h === 1 ? 18 : h - 1));
                         }}
-                        disabled={!allPlayersHaveCH()}
                       >◀</button>
                       <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
                       <button
@@ -2118,7 +2139,6 @@ export default function MedalScorecard(props) {
                           }
                           setMobileSelectedHole(h => (h === 18 ? 1 : h + 1));
                         }}
-                        disabled={!allPlayersHaveCH()}
                       >▶</button>
                     </div>
                     <div className="space-y-3">

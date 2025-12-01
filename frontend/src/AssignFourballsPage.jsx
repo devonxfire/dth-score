@@ -18,7 +18,7 @@ export default function AssignFourballsPage({ user }) {
 
   useEffect(() => {
     if (!compId) return;
-    // If no initialGroups were passed, fetch competition to get groups
+    // Always fetch competition to get type and groups
     async function fetchComp() {
       setLoading(true);
       try {
@@ -36,7 +36,7 @@ export default function AssignFourballsPage({ user }) {
         setLoading(false);
       }
     }
-    if (!initialGroups || initialGroups.length === 0) fetchComp();
+    fetchComp();
   }, [compId]);
 
   async function handleAssign(groupsData) {
@@ -143,25 +143,18 @@ export default function AssignFourballsPage({ user }) {
     <PageBackground>
       <TopMenu user={user} userComp={comp} competitionList={comp ? [comp] : []} />
       <div className="flex flex-col items-center px-4 mt-12">
-        <div className="w-full max-w-4xl">
+        <div className="w-full max-w-2xl">
           {/* Title removed per UI request */}
           {loading && <div className="text-white">Loading groups...</div>}
           {!loading && (
-            <div className="w-full p-6">
-              <button
-                className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                onClick={() => setShowOCR(true)}
-              >
-                Import screenshot of 'Yes' Votes
-              </button>
-
-              <UnifiedFourballAssignment
-                fourballs={(initialGroups && initialGroups.length) || 1}
-                initialGroups={initialGroups}
-                onAssign={handleAssign}
-                competitionType="fourball"
-              />
-            </div>
+            <UnifiedFourballAssignment
+              fourballs={(initialGroups && initialGroups.length) || 1}
+              initialGroups={initialGroups}
+              onAssign={handleAssign}
+              competitionType={comp?.type || "fourball"}
+              compId={compId}
+              nested={true}
+            />
           )}
         </div>
       </div>
