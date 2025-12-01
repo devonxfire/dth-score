@@ -198,20 +198,7 @@ function getPlayingHandicap(entry, comp) {
                           return { ...en, handicap: chMap[k] };
                         }
                       }
-                      // 3) last-name heuristic: try to find any chMap key containing the last token of the entry name
-                      try {
-                        const parts = (en.name || '').split(' ').filter(Boolean);
-                        const last = parts.length > 0 ? makeKey(parts[parts.length - 1]) : '';
-                        if (last) {
-                          for (const k of Object.keys(chMap)) {
-                            if (!k) continue;
-                            if (k.includes(last) || last.includes(k)) {
-                              updated = true;
-                              return { ...en, handicap: chMap[k] };
-                            }
-                          }
-                        }
-                      } catch (e) {}
+                      // Removed problematic last-name heuristic that caused Jon Horn to match Jason Horn
                       return en;
                     });
                     if (updated) setEntries(newEntries.slice());
@@ -604,7 +591,14 @@ function getPlayingHandicap(entry, comp) {
         }
 
       function isAdmin(user) {
-        return user && (user.role === 'admin' || user.isAdmin || user.isadmin || (user.username && ['devon','arno','arno_cap'].includes(user.username.toLowerCase())) );
+        if (!user) return false;
+        if (user.role === 'admin' || user.isAdmin || user.isadmin) return true;
+        const username = (user.username || '').toLowerCase();
+        const name = (user.name || '').toLowerCase();
+        // Check for exact matches or 'dev ' (with space) to avoid matching 'devon haantjes'
+        if (username === 'dev' || name === 'dev' || username.startsWith('dev ') || name.startsWith('dev ')) return true;
+        if (username === 'arno' || name === 'arno' || username === 'arno_cap' || name.includes('arno erasmus')) return true;
+        return false;
       }
 
       async function saveFines(teamId, userId, fines, playerName, compId) {

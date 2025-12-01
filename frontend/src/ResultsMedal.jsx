@@ -7,7 +7,14 @@ import './pdfExportPlain.css';
 
 // Helper: check if user is admin
 function isAdmin(user) {
-  return user && (user.role === 'admin' || user.isAdmin || user.isadmin);
+  if (!user) return false;
+  if (user.role === 'admin' || user.isAdmin || user.isadmin) return true;
+  const username = (user.username || '').toLowerCase();
+  const name = (user.name || '').toLowerCase();
+  // Check for exact matches or 'dev ' (with space) to avoid matching 'devon haantjes'
+  if (username === 'dev' || name === 'dev' || username.startsWith('dev ') || name.startsWith('dev ')) return true;
+  if (username === 'arno' || name === 'arno' || username === 'arno_cap' || name.includes('arno erasmus')) return true;
+  return false;
 }
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';

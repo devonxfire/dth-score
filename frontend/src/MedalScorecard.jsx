@@ -49,6 +49,15 @@ function getPlayerColorsFor(props) {
 export default function MedalScorecard(props) {
     // State for CH warning popup (must be top-level to avoid closure bugs)
     const [showCHWarning, setShowCHWarning] = useState(false);
+    // State for incomplete scores warning popup
+    const [showIncompleteScoresWarning, setShowIncompleteScoresWarning] = useState(false);
+    const [hideIncompleteScoresWarning, setHideIncompleteScoresWarning] = useState(() => {
+      try {
+        return localStorage.getItem('hideIncompleteScoresWarning') === 'true';
+      } catch (e) {
+        return false;
+      }
+    });
 
     // Helper: true if all players have a non-empty CH
     function allPlayersHaveCH() {
@@ -1323,6 +1332,36 @@ export default function MedalScorecard(props) {
           </div>
         </div>
       )}
+      {/* Incomplete scores warning popup */}
+      {showIncompleteScoresWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-6 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle max-w-sm w-full">
+            <span className="text-5xl mb-3" role="img" aria-label="Warning">⚠️</span>
+            <h2 className="text-2xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif' }}>Not all scores entered</h2>
+            <div className="text-sm text-white mb-4 text-center" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>
+              Not all 4 players have entered their scores for this hole. Click Ignore if you're playing with less than 4 players.
+            </div>
+            <div className="flex gap-3 w-full">
+              <button
+                className="flex-1 px-4 py-2 rounded-2xl font-bold shadow border border-white"
+                style={{ backgroundColor: '#FFD700', color: '#002F5F' }}
+                onClick={() => setShowIncompleteScoresWarning(false)}
+              >OK</button>
+              <button
+                className="flex-1 px-4 py-2 rounded-2xl font-bold shadow border border-white"
+                style={{ backgroundColor: '#666', color: 'white' }}
+                onClick={() => {
+                  try {
+                    localStorage.setItem('hideIncompleteScoresWarning', 'true');
+                  } catch (e) {}
+                  setHideIncompleteScoresWarning(true);
+                  setShowIncompleteScoresWarning(false);
+                }}
+              >Ignore & Don't Show Again</button>
+            </div>
+          </div>
+        </div>
+      )}
       <PageBackground>
         <TopMenu {...props} userComp={comp} competitionList={comp ? [comp] : []} />
         <div className={`flex flex-col items-center px-4 mt-12 transition-all duration-200 ${anyCellSaving ? 'blur-[3px] pointer-events-none select-none' : ''}`} style={anyCellSaving ? { filter: 'blur(3px)', pointerEvents: 'none', userSelect: 'none' } : {}}>
@@ -1659,6 +1698,18 @@ export default function MedalScorecard(props) {
                             const valid = allPlayersHaveCH();
                             if (!valid) {
                               setShowCHWarning(true);
+                              return;
+                            }
+                            // Check if all scores are entered
+                            const allHaveScores = players.length === 4 && players.every(pName => {
+                              const scores = playerData?.[pName]?.scores;
+                              if (!Array.isArray(scores)) return false;
+                              const score = scores[mobileSelectedHole - 1];
+                              return score !== '' && score != null;
+                            });
+                            // Show warning if not all scores entered (unless user disabled it)
+                            if (!allHaveScores && !hideIncompleteScoresWarning) {
+                              setShowIncompleteScoresWarning(true);
                               return;
                             }
                             setMobileSelectedHole(h => (h === 18 ? 1 : h + 1));
@@ -2051,6 +2102,18 @@ export default function MedalScorecard(props) {
                           const valid = allPlayersHaveCH();
                           if (!valid) {
                             setShowCHWarning(true);
+                            return;
+                          }
+                          // Check if all scores are entered
+                          const allHaveScores = players.length === 4 && players.every(pName => {
+                            const scores = playerData?.[pName]?.scores;
+                            if (!Array.isArray(scores)) return false;
+                            const score = scores[mobileSelectedHole - 1];
+                            return score !== '' && score != null;
+                          });
+                          // Show warning if not all scores entered (unless user disabled it)
+                          if (!allHaveScores && !hideIncompleteScoresWarning) {
+                            setShowIncompleteScoresWarning(true);
                             return;
                           }
                           setMobileSelectedHole(h => (h === 18 ? 1 : h + 1));

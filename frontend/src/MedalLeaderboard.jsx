@@ -670,7 +670,14 @@ function MedalLeaderboard() {
   const showThru = entries.some(e => (e.scores?.filter(s => s && s !== '').length || 0) < 18);
 
   function isAdmin(user) {
-    return user && (user.role === 'admin' || user.isAdmin || user.isadmin || (user.username && ['devon','arno','arno_cap'].includes(user.username.toLowerCase())) );
+    if (!user) return false;
+    if (user.role === 'admin' || user.isAdmin || user.isadmin) return true;
+    const username = (user.username || '').toLowerCase();
+    const name = (user.name || '').toLowerCase();
+    // Check for exact matches or 'dev ' (with space) to avoid matching 'devon haantjes'
+    if (username === 'dev' || name === 'dev' || username.startsWith('dev ') || name.startsWith('dev ')) return true;
+    if (username === 'arno' || name === 'arno' || username === 'arno_cap' || name.includes('arno erasmus')) return true;
+    return false;
   }
   async function saveFines(teamId, userId, fines, playerName, compId) {
     try {
