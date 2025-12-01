@@ -5,6 +5,7 @@ import UnifiedFourballAssignment from './UnifiedFourballAssignment';
 import { apiUrl } from './api';
 import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
+import ConfirmNavigationPopup from './ConfirmNavigationPopup';
 
 export default function AssignFourballsPage({ user }) {
   const navigate = useNavigate();
@@ -15,6 +16,9 @@ export default function AssignFourballsPage({ user }) {
 
   const [comp, setComp] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [blocking, setBlocking] = useState(true);
+  const [showNavConfirm, setShowNavConfirm] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(null);
 
   useEffect(() => {
     if (!compId) return;
@@ -132,16 +136,73 @@ export default function AssignFourballsPage({ user }) {
         const txt = await res.text();
         throw new Error(txt || 'Failed to save groups');
       }
-      // After success, navigate back to competition page
+      // After success, allow navigation back to competition page
+      setBlocking(false);
       navigate(`/competition/${compId}`);
     } catch (err) {
       alert('Failed to save groups: ' + (err.message || err));
     }
   }
 
+  // Warn when navigating away while editing groups without saving
+  useEffect(() => {
+    const shouldWarn = blocking;
+    function beforeUnload(e) {
+      if (!shouldWarn) return;
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
+    function onDocClick(e) {
+      if (!shouldWarn) return;
+      const a = e.target.closest && e.target.closest('a[href]');
+      if (a && !a.getAttribute('href').startsWith('#')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setPendingNavigation(() => () => {
+          const href = a.getAttribute('href');
+          if (href) window.location.href = href;
+        });
+        setShowNavConfirm(true);
+      }
+    }
+    window.addEventListener('beforeunload', beforeUnload);
+    document.addEventListener('click', onDocClick, true);
+    // Provide a global navigation guard for TopMenu button navigations
+    window.confirmNavigation = (callback) => {
+      if (!shouldWarn) return true;
+      setPendingNavigation(() => callback);
+      setShowNavConfirm(true);
+      return false;
+    };
+    return () => {
+      window.removeEventListener('beforeunload', beforeUnload);
+      document.removeEventListener('click', onDocClick, true);
+      if (window.confirmNavigation) delete window.confirmNavigation;
+    };
+  }, [blocking]);
+
   return (
     <PageBackground>
       <TopMenu user={user} userComp={comp} competitionList={comp ? [comp] : []} />
+      {showNavConfirm && (
+        <ConfirmNavigationPopup
+          title="Discard Changes?"
+          message="Are you sure you want to discard editing this competition?"
+          onConfirm={() => {
+            setShowNavConfirm(false);
+            setBlocking(false);
+            if (pendingNavigation) {
+              pendingNavigation();
+              setPendingNavigation(null);
+            }
+          }}
+          onCancel={() => {
+            setShowNavConfirm(false);
+            setPendingNavigation(null);
+          }}
+        />
+      )}
       <div className="flex flex-col items-center px-4 mt-12">
         <div className="w-full max-w-2xl">
           {/* Title removed per UI request */}

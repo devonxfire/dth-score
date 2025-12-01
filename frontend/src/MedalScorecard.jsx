@@ -61,17 +61,16 @@ export default function MedalScorecard(props) {
 
     // Helper: true if all players have a non-empty CH
     function allPlayersHaveCH() {
-      // Debug: log current playerData and CHs
+      // Consider only active player slots (non-empty names)
+      const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
       if (typeof window !== 'undefined') {
         console.log('[CH CHECK] playerData:', playerData);
-        if (Array.isArray(players)) {
-          players.forEach(pName => {
-            const ch = playerData?.[pName]?.handicap;
-            console.log(`[CH CHECK] ${pName}:`, ch, '| valid:', ch !== undefined && ch !== null && String(ch).trim() !== '' && !isNaN(Number(ch)));
-          });
-        }
+        activePlayers.forEach(pName => {
+          const ch = playerData?.[pName]?.handicap;
+          console.log(`[CH CHECK] ${pName}:`, ch, '| valid:', ch !== undefined && ch !== null && String(ch).trim() !== '' && !isNaN(Number(ch)));
+        });
       }
-      return Array.isArray(players) && players.length > 0 && players.every(pName => {
+      return activePlayers.length > 0 && activePlayers.every(pName => {
         const ch = playerData?.[pName]?.handicap;
         return ch !== undefined && ch !== null && String(ch).trim() !== '' && !isNaN(Number(ch));
       });
@@ -1700,7 +1699,8 @@ export default function MedalScorecard(props) {
                               return;
                             }
                             // Check if all scores are entered
-                            const allHaveScores = players.length === 4 && players.every(pName => {
+                            const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                            const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
                               const scores = playerData?.[pName]?.scores;
                               if (!Array.isArray(scores)) return false;
                               const score = scores[mobileSelectedHole - 1];
@@ -1934,7 +1934,8 @@ export default function MedalScorecard(props) {
                                         console.log('[MedalScorecard] [4BBB] Not advancing: players array is not length 4:', players);
                                         return;
                                       }
-                                      const allHaveScores = players.length === 4 && players.every(pName => {
+                                      const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                                      const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
                                         const scores = playerData?.[pName]?.scores;
                                         if (!Array.isArray(scores)) return false;
                                         const score = scores[mobileSelectedHole - 1];
@@ -2060,7 +2061,8 @@ export default function MedalScorecard(props) {
                                 : (saveStatus === 'saved'
                                   ? 'Scores Saved!'
                                   : (() => {
-                                      const allHaveScores = players.length === 4 && players.every(pName => {
+                                      const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                                      const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
                                         const scores = playerData?.[pName]?.scores;
                                         if (!Array.isArray(scores)) return false;
                                         const score = scores[mobileSelectedHole - 1];
@@ -2126,7 +2128,8 @@ export default function MedalScorecard(props) {
                             return;
                           }
                           // Check if all scores are entered
-                          const allHaveScores = players.length === 4 && players.every(pName => {
+                                            const activePlayers = Array.isArray(players) ? players.filter(Boolean) : [];
+                                            const allHaveScores = activePlayers.length > 0 && activePlayers.every(pName => {
                             const scores = playerData?.[pName]?.scores;
                             if (!Array.isArray(scores)) return false;
                             const score = scores[mobileSelectedHole - 1];

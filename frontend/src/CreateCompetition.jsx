@@ -11,6 +11,7 @@ import OpenCompModal from './OpenCompModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import TopMenu from './TopMenu';
 import UnifiedFourballAssignment from './UnifiedFourballAssignment';
+import ConfirmNavigationPopup from './ConfirmNavigationPopup';
 
 // Display mapping for all comp types
 const COMP_TYPE_DISPLAY = {
@@ -94,6 +95,9 @@ function CreateCompetition({ user, onSignOut }) {
   const [groups, setGroups] = useState(editingComp?.groups || []);
   const [openComps, setOpenComps] = useState([]);
   const [showOpenCompModal, setShowOpenCompModal] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showNavConfirm, setShowNavConfirm] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(null);
 
   // Fetch open competitions on mount
   useEffect(() => {
@@ -109,6 +113,7 @@ function CreateCompetition({ user, onSignOut }) {
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
+    setIsDirty(true);
   }
 
   async function handleSubmit(e) {
@@ -179,32 +184,33 @@ function CreateCompetition({ user, onSignOut }) {
       }
       return;
     }
-    // Always show group assignment after creating comp
-    try {
-  const res = await fetch(apiUrl('/api/competitions'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form })
-      });
-      if (!res.ok) throw new Error('Failed to create competition');
-      const data = await res.json();
-      // Store backend id and joinCode
-      if (data.competition) {
-        setCompId(data.competition.id);
-        setJoinCode(data.competition.joinCode || data.competition.joincode || '');
-      }
-      setShowGroups(true);
-    } catch (err) {
-      alert('Error creating competition: ' + err.message);
-    }
+    // For new competitions: DO NOT create immediately.
+    // Show group assignment first; comp is created when groups are saved.
+    setShowGroups(true);
+    setIsDirty(true);
   }
 
   async function handleAssign(groupsData) {
     setGroups(groupsData);
-    const idToUse = compId || editingComp?.id;
-    if (!idToUse) {
-      alert('Competition id not found. Please create the competition first.');
-      return;
+    let idToUse = compId || editingComp?.id;
+    // If creating a new comp, create it now before saving groups
+    if (!idToUse && !editingComp) {
+      try {
+        const res = await fetch(apiUrl('/api/competitions'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...form })
+        });
+        if (!res.ok) throw new Error('Failed to create competition');
+        const data = await res.json();
+        if (!data || !data.competition || !data.competition.id) throw new Error('Invalid response creating competition');
+        idToUse = data.competition.id;
+        setCompId(idToUse);
+        setJoinCode(data.competition.joinCode || data.competition.joincode || '');
+      } catch (err) {
+        alert('Error creating competition: ' + err.message);
+        return;
+      }
     }
     try {
       // Always PATCH groups endpoint so teams table is updated
@@ -219,10 +225,51 @@ function CreateCompetition({ user, onSignOut }) {
       });
       if (!res.ok) throw new Error('Failed to save groups');
       setCreated(true);
+      setIsDirty(false);
     } catch (err) {
       alert('Error saving groups: ' + err.message);
     }
   }
+
+  // Warn on navigation away if in the middle of create/edit and not saved
+  useEffect(() => {
+    // consider dirty when editing or creating and not yet confirmed created
+    const shouldWarn = isDirty || (!created && (showGroups || true));
+
+    function beforeUnload(e) {
+      if (!shouldWarn) return;
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
+    function onDocClick(e) {
+      if (!shouldWarn) return;
+      const a = e.target.closest && e.target.closest('a[href]');
+      if (a && !a.getAttribute('href').startsWith('#')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setPendingNavigation(() => () => {
+          const href = a.getAttribute('href');
+          if (href) window.location.href = href;
+        });
+        setShowNavConfirm(true);
+      }
+    }
+    window.addEventListener('beforeunload', beforeUnload);
+    document.addEventListener('click', onDocClick, true);
+    // Provide a global navigation guard for TopMenu button navigations
+    window.confirmNavigation = (callback) => {
+      if (!shouldWarn) return true;
+      setPendingNavigation(() => callback);
+      setShowNavConfirm(true);
+      return false;
+    };
+    return () => {
+      window.removeEventListener('beforeunload', beforeUnload);
+      document.removeEventListener('click', onDocClick, true);
+      if (window.confirmNavigation) delete window.confirmNavigation;
+    };
+  }, [isDirty, created, showGroups, editingComp]);
 
   if (created) {
     const isEdit = !!editingComp;
@@ -273,6 +320,46 @@ function CreateCompetition({ user, onSignOut }) {
     <PageBackground>
       <TopMenu user={user} onSignOut={onSignOut} />
       <OpenCompModal open={showOpenCompModal} onClose={() => setShowOpenCompModal(false)} />
+      {showNavConfirm && (
+        <ConfirmNavigationPopup
+          title="Discard Changes?"
+          message={editingComp
+            ? 'Are you sure you want to discard editing this competition?'
+            : 'Are you sure you want to discard creating this competition?'}
+          onConfirm={() => {
+            setShowNavConfirm(false);
+            setIsDirty(false);
+            if (pendingNavigation) {
+              pendingNavigation();
+              setPendingNavigation(null);
+            }
+          }}
+          onCancel={() => {
+            setShowNavConfirm(false);
+            setPendingNavigation(null);
+          }}
+        />
+      )}
+      {showNavConfirm && (
+        <ConfirmNavigationPopup
+          title="Discard Changes?"
+          message={editingComp
+            ? 'Are you sure you want to discard editing this competition?'
+            : 'Are you sure you want to discard creating this competition?'}
+          onConfirm={() => {
+            setShowNavConfirm(false);
+            setIsDirty(false);
+            if (pendingNavigation) {
+              pendingNavigation();
+              setPendingNavigation(null);
+            }
+          }}
+          onCancel={() => {
+            setShowNavConfirm(false);
+            setPendingNavigation(null);
+          }}
+        />
+      )}
       {(!showGroups) && (
         <div className="flex flex-col items-center px-4 mt-12">
           <div className="mb-10 w-full flex flex-col items-center">
@@ -432,9 +519,39 @@ function CreateCompetition({ user, onSignOut }) {
                 <div className="w-full max-w-2xl mb-2 px-0">
                   <button
                     type="button"
-                    onClick={() => {
-                      // Navigate to assign page with current groups preloaded
-                      navigate(`/assign-4balls/${editingComp.id}`, { state: { initialGroups: editingComp.groups || [] } });
+                    onClick={async () => {
+                      // Save competition changes first before navigating to 4-balls assignment
+                      try {
+                        const adminSecret = import.meta.env.VITE_ADMIN_SECRET || window.REACT_APP_ADMIN_SECRET || '';
+                        const updateData = {};
+                        if (form.type) updateData.type = form.type;
+                        if (form.date) {
+                          updateData.date = (form.date instanceof Date)
+                            ? form.date.toISOString()
+                            : form.date;
+                        }
+                        if (form.club) updateData.club = form.club;
+                        if (form.handicapAllowance) updateData.handicapAllowance = form.handicapAllowance;
+                        if (form.notes) updateData.notes = form.notes;
+                        const res = await fetch(apiUrl(`/api/competitions/${editingComp.id}`), {
+                          method: 'PATCH',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'X-Admin-Secret': adminSecret
+                          },
+                          body: JSON.stringify(updateData)
+                        });
+                        if (!res.ok) {
+                          const errText = await res.text();
+                          throw new Error('Failed to update competition: ' + errText);
+                        }
+                        // Clear dirty state since we saved
+                        setIsDirty(false);
+                        // Navigate to assign page with current groups preloaded
+                        navigate(`/assign-4balls/${editingComp.id}`, { state: { initialGroups: editingComp.groups || [] } });
+                      } catch (err) {
+                        alert('Error saving competition changes: ' + err.message);
+                      }
                     }}
                     className="w-full py-3 px-4 border border-white text-[#1B3A6B] font-extrabold rounded-2xl transition text-lg"
                     style={{ backgroundColor: '#FFD700', boxShadow: '0 2px 8px 0 rgba(255,215,0,0.10)', fontFamily: 'Merriweather, Georgia, serif' }}

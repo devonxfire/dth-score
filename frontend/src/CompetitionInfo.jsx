@@ -210,14 +210,19 @@ export default function CompetitionInfo({ user }) {
                                     </span>
                                   );
                                 } else if (typeof name === 'string') {
-                                  const parts = name.trim().split(/\s+/);
+                                  const trimmed = name.trim();
+                                  if (!trimmed) {
+                                    return null;
+                                  }
+                                  const parts = trimmed.split(/\s+/);
                                   let initial = '', surname = '';
-                                  if (parts.length > 1) {
-                                    initial = parts[0][0].toUpperCase();
-                                    surname = parts[parts.length - 1].toUpperCase();
-                                  } else {
-                                    initial = parts[0][0].toUpperCase();
-                                    surname = '';
+                                  const first = parts[0] || '';
+                                  const last = parts.length > 1 ? (parts[parts.length - 1] || '') : '';
+                                  if (first) {
+                                    initial = first[0].toUpperCase();
+                                  }
+                                  if (last) {
+                                    surname = last.toUpperCase();
                                   }
                                   return (
                                     <span key={i} style={{ whiteSpace: 'nowrap' }}>

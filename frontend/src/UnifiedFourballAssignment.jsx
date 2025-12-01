@@ -318,11 +318,27 @@ export default function UnifiedFourballAssignment(props) {
     }));
     
     // Validation
+    const normalizedType = (competitionType || '').toLowerCase().replace(/[_\s-]+/g, '');
+    const requireFourPlayers = normalizedType.includes('alliance') || normalizedType.includes('4bbb');
     for (const g of groupsWithDisplay) {
-      if (!Array.isArray(g.players) || g.players.length !== 4) {
-        setError('Each group must have 4 players assigned.');
+      // For Alliance/4BBB: exactly 4 players required. For Medal/Individual: allow 1-4 players (at least 1).
+      if (!Array.isArray(g.players)) {
+        setError('Group players are invalid.');
         setSaving(false);
         return;
+      }
+      if (requireFourPlayers) {
+        if (g.players.length !== 4) {
+          setError('Each 4-ball must contain exactly 4 players for Alliance/4BBB.');
+          setSaving(false);
+          return;
+        }
+      } else {
+        if (g.players.length < 1 || g.players.length > 4) {
+          setError('Each 4-ball must contain between 1 and 4 players for Medal/Individual.');
+          setSaving(false);
+          return;
+        }
       }
       if (!g.teeTime) {
         setError('Each group must have a tee time.');
@@ -452,7 +468,7 @@ export default function UnifiedFourballAssignment(props) {
                 );
               })}
             </div>
-            <div className="flex gap-2 mt-2">
+            <div className="flex flex-col sm:flex-row gap-2 mt-2">
               <button
                 className="px-4 py-2 rounded bg-red-700 text-white font-bold"
                 onClick={() => removeGroup(idx)}

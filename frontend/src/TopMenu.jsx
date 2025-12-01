@@ -245,7 +245,13 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
             <button
               className={`w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150`}
                 style={location.pathname === '/dashboard' ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif' } : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
-              onClick={() => navigate('/dashboard')}
+              onClick={() => {
+                if (typeof window.confirmNavigation === 'function') {
+                  const ok = window.confirmNavigation(() => navigate('/dashboard'));
+                  if (!ok) return;
+                }
+                navigate('/dashboard');
+              }}
             >
               Dashboard
             </button>
@@ -256,6 +262,37 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                   style={{ color: (location.pathname.startsWith('/scorecard') || (location.pathname.startsWith('/scorecard') && compId)) ? '#FFD700' : (allowCompLinks ? 'white' : '#888'), background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: allowCompLinks ? 1 : 0.5, pointerEvents: allowCompLinks ? 'auto' : 'none' }}
                   disabled={!allowCompLinks}
                 onClick={() => {
+                  if (typeof window.confirmNavigation === 'function') {
+                    const ok = window.confirmNavigation(() => {
+                      if (openComp && compId && resolvedName) {
+                        let group = null;
+                        let playerObj = null;
+                        if (openComp.groups) {
+                          group = openComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
+                          if (group && Array.isArray(group.members)) {
+                            playerObj = group.members.find(m => (m.name === resolvedName || m.displayName === resolvedName)) || null;
+                          }
+                          if (!playerObj) {
+                            const teamId = group?.teamId || group?.id || group?.team_id || group?.group_id;
+                            playerObj = {
+                              name: resolvedName,
+                              id: resolvedUser?.id,
+                              user_id: resolvedUser?.id,
+                              team_id: teamId,
+                              teebox: group?.teeboxes?.[resolvedName] || '',
+                              course_handicap: group?.handicaps?.[resolvedName] || '',
+                            };
+                          }
+                        }
+                        navigate(`/scorecard/${compId}`, { state: { player: playerObj, competition: openComp } });
+                      } else if (compId) {
+                        navigate(`/scorecard/${compId}`);
+                      } else {
+                        navigate('/dashboard');
+                      }
+                    });
+                    if (!ok) return;
+                  }
                   if (openComp && compId && resolvedName) {
                       let group = null;
                       let playerObj = null;
@@ -293,7 +330,8 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                 className={`w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150`}
                 style={isLeaderboardPath ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif', opacity: allowCompLinks ? 1 : 0.5, pointerEvents: allowCompLinks ? 'auto' : 'none' } : { color: allowCompLinks ? 'white' : '#888', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif', opacity: allowCompLinks ? 1 : 0.5, pointerEvents: allowCompLinks ? 'auto' : 'none' }}
               disabled={!allowCompLinks}
-              onClick={async () => {
+                onClick={async () => {
+                  const doNavigate = async () => {
                     // Always fetch the authoritative competitions list and navigate
                     // only when a current OPEN competition is found.
                     try {
@@ -330,6 +368,12 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                     } catch (e) {
                       // ignore
                     }
+                  };
+                  if (typeof window.confirmNavigation === 'function') {
+                    const ok = window.confirmNavigation(doNavigate);
+                    if (!ok) return;
+                  }
+                  doNavigate();
               }}
             >
               Leaderboard
@@ -339,7 +383,13 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
             <button
               className={`w-full text-sm font-semibold py-1 cursor-pointer transition-colors duration-150`}
                 style={location.pathname === '/recent' ? { color: '#FFD700', background: 'none', border: 'none', fontFamily: 'Merriweather, Georgia, serif' } : { color: 'white', background: 'none', border: 'none', fontFamily: 'Lato, Arial, sans-serif' }}
-              onClick={() => navigate('/recent')}
+              onClick={() => {
+                if (typeof window.confirmNavigation === 'function') {
+                  const ok = window.confirmNavigation(() => navigate('/recent'));
+                  if (!ok) return;
+                }
+                navigate('/recent');
+              }}
             >
               Competitions
             </button>
@@ -378,7 +428,11 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
           <div ref={menuRef} className="absolute top-0 left-0 right-0 bottom-0 bg-[#002F5F] p-4 overflow-auto">
               <div className="flex flex-col">
                 <button
-                  onClick={() => { setMenuOpen(false); navigate('/dashboard'); }}
+                  onClick={() => { 
+                    const ok = typeof window.confirmNavigation === 'function' ? window.confirmNavigation(() => { setMenuOpen(false); navigate('/dashboard'); }) : true;
+                    if (!ok) return;
+                    setMenuOpen(false); navigate('/dashboard'); 
+                  }}
                   className="text-left py-3 text-lg font-semibold"
                   style={{ color: isDashboardPath ? '#FFD700' : 'white' }}
                   aria-current={isDashboardPath ? 'page' : undefined}
@@ -386,39 +440,44 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                   Dashboard
                 </button>
                 <button onClick={() => {
-                setMenuOpen(false);
-                // Allow navigation if there's either an open competition OR the user has a scorecardComp
-                if (!allowCompLinks && !scorecardComp) return; // disabled
-                // Prefer openComp when available; otherwise use scorecardComp
-                const targetComp = openComp || scorecardComp || null;
-                const targetCompId = targetComp ? (targetComp.id || targetComp._id || targetComp.joinCode || targetComp.joincode) : null;
-                if (targetComp && targetCompId && resolvedName) {
-                  let group = null;
-                  let playerObj = null;
-                  if (targetComp.groups) {
-                    group = targetComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
-                    if (group && Array.isArray(group.members)) {
-                      playerObj = group.members.find(m => (m.name === resolvedName || m.displayName === resolvedName)) || null;
+                const doScorecard = () => {
+                  setMenuOpen(false);
+                  // Allow navigation if there's either an open competition OR the user has a scorecardComp
+                  if (!allowCompLinks && !scorecardComp) return; // disabled
+                  // Prefer openComp when available; otherwise use scorecardComp
+                  const targetComp = openComp || scorecardComp || null;
+                  const targetCompId = targetComp ? (targetComp.id || targetComp._id || targetComp.joinCode || targetComp.joincode) : null;
+                  if (targetComp && targetCompId && resolvedName) {
+                    let group = null;
+                    let playerObj = null;
+                    if (targetComp.groups) {
+                      group = targetComp.groups.find(g => Array.isArray(g.players) && g.players.includes(resolvedName));
+                      if (group && Array.isArray(group.members)) {
+                        playerObj = group.members.find(m => (m.name === resolvedName || m.displayName === resolvedName)) || null;
+                      }
+                      if (!playerObj) {
+                        const teamId = group?.teamId || group?.id || group?.team_id || group?.group_id;
+                        playerObj = {
+                          name: resolvedName,
+                          id: resolvedUser?.id,
+                          user_id: resolvedUser?.id,
+                          team_id: teamId,
+                          teebox: group?.teeboxes?.[resolvedName] || '',
+                          course_handicap: group?.handicaps?.[resolvedName] || '',
+                        };
+                      }
                     }
-                    if (!playerObj) {
-                      const teamId = group?.teamId || group?.id || group?.team_id || group?.group_id;
-                      playerObj = {
-                        name: resolvedName,
-                        id: resolvedUser?.id,
-                        user_id: resolvedUser?.id,
-                        team_id: teamId,
-                        teebox: group?.teeboxes?.[resolvedName] || '',
-                        course_handicap: group?.handicaps?.[resolvedName] || '',
-                      };
-                    }
+                    navigate(`/scorecard/${targetCompId}`, { state: { player: playerObj, competition: targetComp } });
+                  } else if (compId) {
+                    // Admins/fallback: allow opening scorecard without a player state
+                    navigate(`/scorecard/${compId}`);
+                  } else {
+                    navigate('/dashboard');
                   }
-                  navigate(`/scorecard/${targetCompId}`, { state: { player: playerObj, competition: targetComp } });
-                } else if (compId) {
-                  // Admins/fallback: allow opening scorecard without a player state
-                  navigate(`/scorecard/${compId}`);
-                } else {
-                  navigate('/dashboard');
-                }
+                };
+                const ok = typeof window.confirmNavigation === 'function' ? window.confirmNavigation(doScorecard) : true;
+                if (!ok) return;
+                doScorecard();
               }}
                 className="text-left py-3 text-lg font-semibold"
                 style={{ color: isScorecardPath ? '#FFD700' : (allowCompLinks ? 'white' : '#888'), opacity: allowCompLinks ? 1 : 0.5 }}
@@ -427,8 +486,10 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                 My Scorecard
               </button>
               <button
-                onClick={async () => { setMenuOpen(false);
-                  if (!allowCompLinks) return; // disabled
+                onClick={async () => { 
+                  const doLeaderboard = async () => {
+                    setMenuOpen(false);
+                    if (!allowCompLinks) return; // disabled
                     try {
                       const listRes = await fetch(apiUrl('/api/competitions'));
                       if (listRes.ok) {
@@ -448,24 +509,24 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                             const compRes = await fetch(apiUrl(`/api/competitions/${pickId}`));
                             if (compRes.ok) {
                               const compData = await compRes.json();
-                                  try { console.debug('TopMenu: navigating to leaderboard (mobile) pickId:', pickId, 'compData:', compData); } catch (e) {}
-                                  try { console.debug('TopMenu: navigating to leaderboard (mobile) pickId:', pickId, 'compData:', compData); } catch (e) {}
-                                  navigate(`/leaderboard/${pickId}`, { state: { competition: compData } });
-                                  return;
-                                }
-                              } catch (e) {
-                                try { console.debug('TopMenu: navigating to leaderboard (mobile) fallback pickId:', pickId, 'pick:', pick); } catch (e) {}
-                                navigate(`/leaderboard/${pickId}`, { state: { competition: pick } });
-                                return;
-                              }
+                              try { console.debug('TopMenu: navigating to leaderboard (mobile) pickId:', pickId, 'compData:', compData); } catch (e) {}
+                              try { console.debug('TopMenu: navigating to leaderboard (mobile) pickId:', pickId, 'compData:', compData); } catch (e) {}
+                              navigate(`/leaderboard/${pickId}`, { state: { competition: compData } });
+                              return;
+                            }
+                          } catch (e) {
+                            try { console.debug('TopMenu: navigating to leaderboard (mobile) fallback pickId:', pickId, 'pick:', pick); } catch (e) {}
+                            navigate(`/leaderboard/${pickId}`, { state: { competition: pick } });
+                            return;
+                          }
                         }
                       }
                     } catch (e) {}
-          if (!compId) return;
-          try {
-            const res = await fetch(apiUrl(`/api/competitions/${compId}`));
-            if (res.ok) {
-              const data = await res.json();
+                    if (!compId) return;
+                    try {
+                      const res = await fetch(apiUrl(`/api/competitions/${compId}`));
+                      if (res.ok) {
+                        const data = await res.json();
               try { console.debug('TopMenu: navigating to leaderboard (mobile) fallback compId:', compId, 'data:', data); } catch (e) {}
               const dType = (data?.type || '').toString().toLowerCase();
               const dIsMedal = dType.includes('medal') || dType.includes('stroke');
@@ -476,7 +537,11 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
           try { console.debug('TopMenu: navigating to leaderboard (mobile) final fallback compId:', compId, 'leaderboardComp:', leaderboardComp); } catch (e) {}
           const lbType = (leaderboardComp?.type || '').toString().toLowerCase();
           const lbIsMedal = lbType.includes('medal') || lbType.includes('stroke');
-      navigate(`/leaderboard/${compId}`, { state: { competition: leaderboardComp } });
+          navigate(`/leaderboard/${compId}`, { state: { competition: leaderboardComp } });
+                  };
+                  const ok = typeof window.confirmNavigation === 'function' ? window.confirmNavigation(doLeaderboard) : true;
+                  if (!ok) return;
+                  doLeaderboard();
                 }}
                 className="text-left py-3 text-lg font-semibold"
                 style={{ color: isLeaderboardPath ? '#FFD700' : (allowCompLinks ? 'white' : '#888'), opacity: allowCompLinks ? 1 : 0.5 }}
@@ -485,7 +550,11 @@ export default function TopMenu({ user, userComp, isPlayerInComp, onSignOut, com
                 Leaderboard
               </button>
               <button
-                onClick={() => { setMenuOpen(false); navigate('/recent'); }}
+                onClick={() => { 
+                  const ok = typeof window.confirmNavigation === 'function' ? window.confirmNavigation(() => { setMenuOpen(false); navigate('/recent'); }) : true;
+                  if (!ok) return;
+                  setMenuOpen(false); navigate('/recent'); 
+                }}
                 className="text-left py-3 text-lg font-semibold"
                 style={{ color: isRecentPath ? '#FFD700' : 'white' }}
                 aria-current={isRecentPath ? 'page' : undefined}

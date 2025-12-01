@@ -730,7 +730,12 @@ function getPlayingHandicap(entry, comp) {
         }
 
         (groups || []).forEach((group, idx) => {
-          const groupPlayers = (group.players || []).map((name, i) => {
+          const groupPlayers = (group.players || [])
+            .filter(n => {
+              const s = (n == null ? '' : String(n)).trim();
+              return s.length > 0;
+            })
+            .map((name, i) => {
             let ent = entries.find(e => (e.name || '').trim().toLowerCase() === (name || '').trim().toLowerCase());
             // Check if there's a custom displayName for this guest
             let customDisplayName = '';
