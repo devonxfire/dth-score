@@ -7,6 +7,7 @@ import PageBackground from './PageBackground';
 import TopMenu from './TopMenu';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { getDisplayName } from './displayNameHelper';
 
 const COMP_TYPE_DISPLAY = {
   fourBbbStableford: '4 Ball Better Ball',
@@ -129,7 +130,8 @@ function MedalLeaderboard() {
       userId,
       displayName: customDisplayName || displayNameFromUser,
       nick: nickFromUser,
-                  groupIdx
+                  groupIdx,
+                  group
                 });
               });
             }
@@ -742,11 +744,54 @@ function MedalLeaderboard() {
   // Playing Handicap (PH) = CH * allowance%
   const allowance = comp?.handicapallowance ? parseFloat(comp.handicapallowance) : 100;
   const ph = Math.round(ch * (allowance / 100));
-    // DTH Net = Gross - CH
-    const dthNet = entry.total - ch;
-  // Net = gross total minus playing handicap (PH). For full rounds this equals sum(gross - strokesReceived).
-  const totalGross = parseInt(entry.total || 0);
-  const net = totalGross - ph;
+  
+  // Calculate proper hole-by-hole net scores using stroke allocation
+  let dthNet = 0; // Net using CH
+  let net = 0;    // Net using PH
+  const holes = comp?.holes || [];
+  
+  if (Array.isArray(entry.scores) && holes.length === 18) {
+    for (let i = 0; i < entry.scores.length; i++) {
+      const scoreStr = entry.scores[i];
+      if (!scoreStr || scoreStr === '') continue; // Skip unplayed holes
+      
+      const gross = parseInt(scoreStr, 10);
+      if (isNaN(gross)) continue;
+      
+      const hole = holes[i];
+      if (!hole) continue;
+      
+      const strokeIndex = hole.stroke_index || 0;
+      
+      // Calculate strokes received on this hole for CH
+      // For hcp=36: every hole gets 2 strokes (36/18=2)
+      // For hcp=20: SI 1-18 get 1 stroke, SI 1-2 get a 2nd stroke
+      let strokesOnHoleCH = 0;
+      if (strokeIndex > 0) {
+        strokesOnHoleCH = Math.floor(ch / 18);
+        const remainderCH = ch % 18;
+        if (strokeIndex <= remainderCH) strokesOnHoleCH++;
+      }
+      const holeDthNet = gross - strokesOnHoleCH;
+      dthNet += holeDthNet;
+      
+      // Calculate strokes received on this hole for PH
+      let strokesOnHolePH = 0;
+      if (strokeIndex > 0) {
+        strokesOnHolePH = Math.floor(ph / 18);
+        const remainderPH = ph % 18;
+        if (strokeIndex <= remainderPH) strokesOnHolePH++;
+      }
+      const holeNet = gross - strokesOnHolePH;
+      net += holeNet;
+    }
+  } else {
+    // Fallback if holes data not available: use simple subtraction
+    const totalGross = parseInt(entry.total || 0);
+    dthNet = totalGross - ch;
+    net = totalGross - ph;
+  }
+  
     return {
       ...entry,
       thru,
@@ -923,7 +968,7 @@ function MedalLeaderboard() {
                     <tr key={entry.name} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
                       <td className="border px-0.5 sm:px-2 py-0.5 font-bold">{entry.position}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5 text-left" style={{ textTransform: 'uppercase' }}>
-                        <div className="max-w-none truncate">{(compactDisplayName(entry) || entry.name).toUpperCase()}{entry.handicap ? ` (${entry.handicap})` : ''}</div>
+                        <div className="max-w-none truncate">{getDisplayName(entry.name, entry.group)}{typeof entry.ch === 'number' ? ` (${entry.ch})` : ''}</div>
                       </td>
                       <td className="border px-0.5 sm:px-2 py-0.5">{entry.thru}</td>
                       <td className="border px-0.5 sm:px-2 py-0.5">{entry.total}</td>

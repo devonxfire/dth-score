@@ -46,6 +46,45 @@ function getPlayingHandicap(entry, comp) {
   return Math.round(ch * (allowance / 100));
 }
 
+// Calculate hole-by-hole net score using stroke allocation
+function calculateNetScore(scores, handicap, holes) {
+  if (!Array.isArray(scores) || !Array.isArray(holes) || holes.length !== 18) {
+    // Fallback: simple subtraction
+    const totalGross = scores ? scores.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0) : 0;
+    return totalGross - (parseFloat(handicap) || 0);
+  }
+  
+  const hcp = parseFloat(handicap) || 0;
+  let netTotal = 0;
+  
+  for (let i = 0; i < scores.length; i++) {
+    const scoreStr = scores[i];
+    if (!scoreStr || scoreStr === '') continue;
+    
+    const gross = parseInt(scoreStr, 10);
+    if (isNaN(gross)) continue;
+    
+    const hole = holes[i];
+    if (!hole) continue;
+    
+    const strokeIndex = hole.stroke_index || 0;
+    // Calculate strokes received on this hole
+    // For hcp=36: every hole gets 2 strokes (36/18=2)
+    // For hcp=20: SI 1-18 get 1 stroke, SI 1-2 get a 2nd stroke
+    let strokesOnHole = 0;
+    if (strokeIndex > 0) {
+      strokesOnHole = Math.floor(hcp / 18);
+      const remainder = hcp % 18;
+      if (strokeIndex <= remainder) strokesOnHole++;
+    }
+    
+    const holeNet = gross - strokesOnHole;
+    netTotal += holeNet;
+  }
+  
+  return netTotal;
+}
+
     function stablefordPoints(net, par) {
       if (net == null || Number.isNaN(net)) return 0;
       if (net <= par - 4) return 6;
@@ -704,8 +743,8 @@ function getPlayingHandicap(entry, comp) {
                 handicap: ent.handicap !== undefined ? ent.handicap : '',
                 ph: getPlayingHandicap(ent, comp),
                 ch: ent.handicap !== '' ? parseFloat(ent.handicap) || 0 : 0,
-                net: (ent.total || 0) - getPlayingHandicap(ent, comp),
-                dthNet: (ent.total || 0) - (ent.handicap !== '' ? parseFloat(ent.handicap) || 0 : 0),
+                net: calculateNetScore(ent.scores, getPlayingHandicap(ent, comp), comp?.holes),
+                dthNet: calculateNetScore(ent.scores, ent.handicap !== '' ? parseFloat(ent.handicap) || 0 : 0, comp?.holes),
                 points: stable.total,
                 perHole: stable.perHole
               };
@@ -754,7 +793,7 @@ function getPlayingHandicap(entry, comp) {
             }
             const ch = ent.handicap !== '' ? parseFloat(ent.handicap) || 0 : 0;
             const ph = getPlayingHandicap(ent, comp);
-            const dthNet = (ent.total || 0) - ch;
+            const dthNet = calculateNetScore(ent.scores, ch, comp?.holes);
             const stable = playerStableford(ent);
             return {
               name: ent.name,
@@ -770,7 +809,7 @@ function getPlayingHandicap(entry, comp) {
               handicap: ent.handicap !== undefined ? ent.handicap : '',
               ph,
               ch,
-              net: (ent.total || 0) - ph,
+              net: calculateNetScore(ent.scores, ph, comp?.holes),
               dthNet,
               points: stable.total,
               perHole: stable.perHole

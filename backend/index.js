@@ -821,8 +821,9 @@ app.get('/api/competitions/:id', async (req, res) => {
         // For 4-player groups, we may have stored two teamIds (pairA and pairB)
           if (group.teamIds && Array.isArray(group.teamIds) && group.teamIds.length > 0) {
           // Populate handicaps/teeboxes by searching teams_users for each player across assigned teams
-          group.handicaps = {};
-          group.teeboxes = {};
+          // Preserve existing handicaps/teeboxes from groups JSON
+          group.handicaps = group.handicaps || {};
+          group.teeboxes = group.teeboxes || {};
           for (const playerName of group.players) {
             const user = findUserByName(playerName);
             if (user) {
@@ -863,8 +864,9 @@ app.get('/api/competitions/:id', async (req, res) => {
           // Single team mapping (old behavior)
           group.teamId = foundTeam ? foundTeam.id : null;
           if (foundTeam && Array.isArray(group.players)) {
-            group.handicaps = {};
-            group.teeboxes = {};
+            // Preserve existing handicaps/teeboxes from groups JSON
+            group.handicaps = group.handicaps || {};
+            group.teeboxes = group.teeboxes || {};
             for (const playerName of group.players) {
               const user = findUserByName(playerName);
               if (user) {
