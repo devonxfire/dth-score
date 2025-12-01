@@ -47,6 +47,26 @@ function getPlayerColorsFor(props) {
 }
 
 export default function MedalScorecard(props) {
+    // State for CH warning popup (must be top-level to avoid closure bugs)
+    const [showCHWarning, setShowCHWarning] = useState(false);
+
+    // Helper: true if all players have a non-empty CH
+    function allPlayersHaveCH() {
+      // Debug: log current playerData and CHs
+      if (typeof window !== 'undefined') {
+        console.log('[CH CHECK] playerData:', playerData);
+        if (Array.isArray(players)) {
+          players.forEach(pName => {
+            const ch = playerData?.[pName]?.handicap;
+            console.log(`[CH CHECK] ${pName}:`, ch, '| valid:', ch !== undefined && ch !== null && String(ch).trim() !== '' && !isNaN(Number(ch)));
+          });
+        }
+      }
+      return Array.isArray(players) && players.length > 0 && players.every(pName => {
+        const ch = playerData?.[pName]?.handicap;
+        return ch !== undefined && ch !== null && String(ch).trim() !== '' && !isNaN(Number(ch));
+      });
+    }
   // Compute Playing Handicap (PH) given a course handicap and comp allowance
   function computePH(courseHandicap) {
     if (!comp || !comp.handicapallowance || isNaN(Number(comp.handicapallowance))) {
@@ -732,14 +752,29 @@ export default function MedalScorecard(props) {
     setError('');
     const data = playerData[name];
     const mini = miniTableStats[name] || {};
-  try {
+    try {
+      // Fetch latest backend scores for this player
+      let backendScores = Array(18).fill('');
+      try {
+        const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
+        if (res.ok) {
+          const d = await res.json();
+          backendScores = Array.isArray(d.scores) ? d.scores.map(v => v == null ? '' : v) : Array(18).fill('');
+        }
+      } catch {}
+      // Merge local changes into backend scores
+      const localScores = Array.isArray(data.scores) ? data.scores : Array(18).fill('');
+      const mergedScores = localScores.map((local, i) => {
+        if (local !== '' && local != null) return local;
+        return backendScores[i] !== '' && backendScores[i] != null ? backendScores[i] : '';
+      });
       const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teebox: data.teebox,
           handicap: data.handicap,
-          scores: data.scores,
+          scores: mergedScores,
           waters: mini.waters ?? '',
           dog: mini.dog ?? false,
           two_clubs: mini.twoClubs ?? ''
@@ -750,12 +785,8 @@ export default function MedalScorecard(props) {
         console.error('Save failed:', errText);
         throw new Error('Failed to save: ' + errText);
       }
-      
       try {
-        // Immediately notify server to rebroadcast this saved medal update so other
-        // clients see popups instantly (optimistic global popups). The server will
-        // rebroadcast this as `medal-player-updated` to the competition room.
-  const payload = { competitionId: Number(compId), groupId: Number(groupIdx), playerName: name, group: groups[groupIdx], _clientBroadcast: true };
+        const payload = { competitionId: Number(compId), groupId: Number(groupIdx), playerName: name, group: groups[groupIdx], _clientBroadcast: true };
         try { socket.emit('client-medal-saved', payload); } catch (e) { /* ignore socket emit errors */ }
       } catch (e) { }
     } catch (e) {
@@ -1036,7 +1067,6 @@ export default function MedalScorecard(props) {
   async function flushAndSaveAll() {
     if (!compId || !groups.length) return;
     try {
-      // set saving state for button
       setSaveStatus('saving');
       if (saveStatusTimeoutRef.current) { try { clearTimeout(saveStatusTimeoutRef.current); } catch (e) {} }
     } catch (e) {}
@@ -1051,13 +1081,31 @@ export default function MedalScorecard(props) {
     const saves = [];
     const now = Date.now();
     try {
+      // Step 1: Fetch latest backend scores for all players
+      const latestBackendData = {};
       for (const name of players) {
-        const latestScores = (playerDataRef.current && playerDataRef.current[name] && Array.isArray(playerDataRef.current[name].scores)) ? playerDataRef.current[name].scores : Array.from({ length: 18 }, () => '');
-        const newScores = Array.isArray(latestScores) ? latestScores.map(v => (v == null ? '' : v)) : Array(18).fill('');
+        try {
+          const res = await fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`));
+          if (res.ok) {
+            const data = await res.json();
+            latestBackendData[name] = Array.isArray(data.scores) ? data.scores.map(v => v == null ? '' : v) : Array(18).fill('');
+          } else {
+            latestBackendData[name] = Array(18).fill('');
+          }
+        } catch {
+          latestBackendData[name] = Array(18).fill('');
+        }
+      }
+      // Step 2: Merge local changes into latest backend scores
+      for (const name of players) {
+        const localScores = (playerDataRef.current && playerDataRef.current[name] && Array.isArray(playerDataRef.current[name].scores)) ? playerDataRef.current[name].scores : Array(18).fill('');
+        const mergedScores = localScores.map((local, i) => {
+          if (local !== '' && local != null) return local;
+          return latestBackendData[name][i] !== '' && latestBackendData[name][i] != null ? latestBackendData[name][i] : '';
+        });
         // mark as pending to avoid reacting to immediate server echoes
-        for (let i = 0; i < newScores.length; i++) {
-          try { pendingLocalSavesRef.current[`${name}:${i}`] = { value: String(newScores[i] ?? ''), ts: now }; } catch (e) {}
-          // expire after 5s
+        for (let i = 0; i < mergedScores.length; i++) {
+          try { pendingLocalSavesRef.current[`${name}:${i}`] = { value: String(mergedScores[i] ?? ''), ts: now }; } catch (e) {}
           setTimeout(((key, ts) => () => {
             try { if (pendingLocalSavesRef.current[key] && pendingLocalSavesRef.current[key].ts === ts) delete pendingLocalSavesRef.current[key]; } catch (e) {}
           })(`${name}:${i}`, now), 5000);
@@ -1065,20 +1113,20 @@ export default function MedalScorecard(props) {
         const p = fetch(apiUrl(`/api/competitions/${compId}/groups/${groupIdx}/player/${encodeURIComponent(name)}`), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scores: newScores })
+          body: JSON.stringify({ scores: mergedScores })
         });
         saves.push(p);
       }
-  const results = await Promise.allSettled(saves);
-  // Ask server to rebroadcast this saved medal update so other clients see it
-  try {
-    const payload = { competitionId: Number(compId), groupId: Number(groupIdx), group: groups[groupIdx], _clientBroadcast: true };
-    try { socket.emit && socket.emit('client-medal-saved', payload); } catch (e) {}
-  } catch (e) {}
-  // update inline status: show saved briefly
-  try { setSaveStatus('saved'); } catch (e) {}
-  try { if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current); } catch (e) {}
-  try { saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000); } catch (e) {}
+      const results = await Promise.allSettled(saves);
+      // Ask server to rebroadcast this saved medal update so other clients see it
+      try {
+        const payload = { competitionId: Number(compId), groupId: Number(groupIdx), group: groups[groupIdx], _clientBroadcast: true };
+        try { socket.emit && socket.emit('client-medal-saved', payload); } catch (e) {}
+      } catch (e) {}
+      // update inline status: show saved briefly
+      try { setSaveStatus('saved'); } catch (e) {}
+      try { if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current); } catch (e) {}
+      try { saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000); } catch (e) {}
       // After saving, re-fetch the competition to sync any server-side aggregates
       try {
         const res = await fetch(apiUrl(`/api/competitions/${compId}`));
@@ -1257,6 +1305,21 @@ export default function MedalScorecard(props) {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
             </svg>
             <div className="text-2xl font-extrabold text-yellow-300 drop-shadow-lg" style={{ fontFamily: 'Merriweather, Georgia, serif' }}>Saving entry...</div>
+          </div>
+        </div>
+      )}
+      {/* CH warning popup (top level - applies to all comp types) */}
+      {showCHWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-[#002F5F] rounded-2xl shadow-2xl p-6 flex flex-col items-center border-4 border-[#FFD700] popup-jiggle max-w-sm w-full">
+            <span className="text-5xl mb-3" role="img" aria-label="Warning">⚠️</span>
+            <h2 className="text-2xl font-extrabold mb-2 drop-shadow-lg text-center" style={{ color: '#FFD700', fontFamily: 'Merriweather, Georgia, serif' }}>Enter CH for all players</h2>
+            <div className="text-sm text-white mb-4 text-center" style={{ fontFamily: 'Lato, Arial, sans-serif' }}>You must enter a Course Handicap (CH) for every player before moving to the next hole.</div>
+            <button
+              className="px-6 py-2 rounded-2xl font-bold shadow border border-white"
+              style={{ backgroundColor: '#FFD700', color: '#002F5F' }}
+              onClick={() => setShowCHWarning(false)}
+            >OK</button>
           </div>
         </div>
       )}
@@ -1575,9 +1638,34 @@ export default function MedalScorecard(props) {
 
                     <div ref={mobileHoleRef} data-mobile-hole className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
                       <div className="flex items-center justify-center mb-3">
-                        <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 1 ? 18 : h - 1))}>◀</button>
+                        <button
+                          className="px-3 py-2 rounded text-lg mr-4"
+                          style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }}
+                          onClick={() => {
+                            const valid = allPlayersHaveCH();
+                            if (!valid) {
+                              setShowCHWarning(true);
+                              return;
+                            }
+                            setMobileSelectedHole(h => (h === 1 ? 18 : h - 1));
+                          }}
+                          disabled={!allPlayersHaveCH()}
+                        >◀</button>
                         <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
-                        <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 18 ? 1 : h + 1))}>▶</button>
+                        <button
+                          className="px-3 py-2 rounded text-lg ml-4"
+                          style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }}
+                          onClick={() => {
+                            const valid = allPlayersHaveCH();
+                            if (!valid) {
+                              setShowCHWarning(true);
+                              return;
+                            }
+                            setMobileSelectedHole(h => (h === 18 ? 1 : h + 1));
+                          }}
+                          disabled={!allPlayersHaveCH()}
+                        >▶</button>
+
                       </div>
 
                       <div className="space-y-4">
@@ -1791,7 +1879,40 @@ export default function MedalScorecard(props) {
                                   <button
                                     className="w-full sm:w-auto py-2 px-4 rounded-2xl font-semibold transition shadow border border-white"
                                     style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-                                    onClick={() => { flushAndSaveAll(); }}
+                                    onClick={async () => {
+                                      console.log('[MedalScorecard] [4BBB] Save button clicked. Current hole:', mobileSelectedHole);
+                                      if (!allPlayersHaveCH()) {
+                                        setShowCHWarning(true);
+                                        console.log('[MedalScorecard] [4BBB] Not advancing: not all CH present for all players.');
+                                        return;
+                                      }
+                                      if (!Array.isArray(players) || players.length !== 4) {
+                                        console.log('[MedalScorecard] [4BBB] Not advancing: players array is not length 4:', players);
+                                        return;
+                                      }
+                                      const allHaveScores = players.length === 4 && players.every(pName => {
+                                        const scores = playerData?.[pName]?.scores;
+                                        if (!Array.isArray(scores)) return false;
+                                        const score = scores[mobileSelectedHole - 1];
+                                        return score !== '' && score != null;
+                                      });
+                                      console.log('[MedalScorecard] [4BBB] allHaveScores:', allHaveScores, 'playerData:', playerData, 'players:', players, 'current hole:', mobileSelectedHole);
+                                      setSaveStatus('saving');
+                                      await flushAndSaveAll();
+                                      if (allHaveScores && mobileSelectedHole < 18) {
+                                        console.log('[MedalScorecard] [4BBB] Advancing to next hole:', mobileSelectedHole + 1);
+                                        setMobileSelectedHole(h => {
+                                          console.log('[MedalScorecard] [4BBB] setMobileSelectedHole called. Previous:', h, 'Next:', h + 1);
+                                          return h + 1;
+                                        });
+                                      } else {
+                                        if (!allHaveScores) {
+                                          console.log('[MedalScorecard] [4BBB] Not advancing: not all scores present for this hole.');
+                                        } else if (mobileSelectedHole >= 18) {
+                                          console.log('[MedalScorecard] [4BBB] Not advancing: already at last hole.');
+                                        }
+                                      }
+                                    }}
                                     disabled={saveStatus === 'saving'}
                                   >
                                     {saveStatus === 'saving'
@@ -1827,8 +1948,14 @@ export default function MedalScorecard(props) {
                               onClick={async () => {
                                 console.log('[MedalScorecard] [ALLIANCE/4BBB] Save button clicked. Current hole:', mobileSelectedHole);
                                 console.log('[MedalScorecard] [ALLIANCE/4BBB] DEBUG: players:', players, 'playerData:', playerData, 'mobileSelectedHole:', mobileSelectedHole, 'groupKey:', groupKey, 'groupIdx:', groupIdx);
+                                if (!allPlayersHaveCH()) {
+                                  setShowCHWarning(true);
+                                  console.log('[MedalScorecard] [ALLIANCE/4BBB] Not advancing: not all CH present for all players.');
+                                  return;
+                                }
                                 if (!Array.isArray(players) || players.length !== 4) {
                                   console.log('[MedalScorecard] [ALLIANCE/4BBB] Not advancing: players array is not length 4:', players);
+                                  return;
                                 }
                                 const allHaveScores = players.length === 4 && players.every(pName => {
                                   const scores = playerData?.[pName]?.scores;
@@ -1903,9 +2030,33 @@ export default function MedalScorecard(props) {
                 return (
                   <div ref={mobileHoleRef} data-mobile-hole className="mb-4 p-3 rounded border text-white" style={{ background: '#002F5F', borderColor: '#FFD700' }}>
                     <div className="flex items-center justify-center mb-3">
-                      <button className="px-3 py-2 rounded text-lg mr-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 1 ? 18 : h - 1))}>◀</button>
+                      <button
+                        className="px-3 py-2 rounded text-lg mr-4"
+                        style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }}
+                        onClick={() => {
+                          const valid = allPlayersHaveCH();
+                          if (!valid) {
+                            setShowCHWarning(true);
+                            return;
+                          }
+                          setMobileSelectedHole(h => (h === 1 ? 18 : h - 1));
+                        }}
+                        disabled={!allPlayersHaveCH()}
+                      >◀</button>
                       <div className="flex-1 text-base font-bold text-white text-center truncate" style={{ whiteSpace: 'nowrap' }}>Hole {hole?.number || mobileSelectedHole} • Par {hole?.par || '-'} • SI {hole?.index ?? '-'}</div>
-                      <button className="px-3 py-2 rounded text-lg ml-4" style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }} onClick={() => setMobileSelectedHole(h => (h === 18 ? 1 : h + 1))}>▶</button>
+                      <button
+                        className="px-3 py-2 rounded text-lg ml-4"
+                        style={{ background: 'rgba(255,215,0,0.12)', color: '#FFD700' }}
+                        onClick={() => {
+                          const valid = allPlayersHaveCH();
+                          if (!valid) {
+                            setShowCHWarning(true);
+                            return;
+                          }
+                          setMobileSelectedHole(h => (h === 18 ? 1 : h + 1));
+                        }}
+                        disabled={!allPlayersHaveCH()}
+                      >▶</button>
                     </div>
                     <div className="space-y-3">
                       {players.map((pName, pIdx) => {
@@ -1977,13 +2128,7 @@ export default function MedalScorecard(props) {
                                     if (hasScore) {
                                       const scoreNum = parseInt(curVal, 10);
                                       const par = hole?.par || 0;
-                                      if (curVal === String(par)) {
-                                        // Par selected as 'not played' (do not color)
-                                        labelColor = '#ffffff';
-                                        bgColor = '#6B7280';
-                                        textColor = '#ffffff';
-                                        borderColor = 'none';
-                                      } else if (scoreNum <= par - 2) {
+                                      if (scoreNum <= par - 2) {
                                         // Eagle or better - pink
                                         labelColor = '#FFC0CB';
                                         bgColor = '#1B3A6B';
@@ -2054,10 +2199,16 @@ export default function MedalScorecard(props) {
                             style={{ backgroundColor: '#FFD700', color: '#002F5F', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
                             disabled={saveStatus === 'saving'}
                             onClick={async () => {
-                              console.log('[MedalScorecard] Save button clicked. Current hole:', mobileSelectedHole);
-                              console.log('[MedalScorecard] DEBUG: players:', players, 'playerData:', playerData, 'mobileSelectedHole:', mobileSelectedHole, 'groupKey:', groupKey, 'groupIdx:', groupIdx);
+                              console.log('[MedalScorecard] [MEDAL] Save button clicked. Current hole:', mobileSelectedHole);
+                              console.log('[MedalScorecard] [MEDAL] DEBUG: players:', players, 'playerData:', playerData, 'mobileSelectedHole:', mobileSelectedHole, 'groupKey:', groupKey, 'groupIdx:', groupIdx);
+                              if (!allPlayersHaveCH()) {
+                                setShowCHWarning(true);
+                                console.log('[MedalScorecard] [MEDAL] Not advancing: not all CH present for all players.');
+                                return;
+                              }
                               if (!Array.isArray(players) || players.length !== 4) {
-                                console.log('[MedalScorecard] Not advancing: players array is not length 4:', players);
+                                console.log('[MedalScorecard] [MEDAL] Not advancing: players array is not length 4:', players);
+                                return;
                               }
                               const allHaveScores = players.length === 4 && players.every(pName => {
                                 const scores = playerData?.[pName]?.scores;

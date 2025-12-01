@@ -439,6 +439,25 @@ export default function Scorecard(props) {
       setSaveStatus('saving');
       if (saveStatusTimeoutRef.current) { try { clearTimeout(saveStatusTimeoutRef.current); } catch (e) {} }
       const saves = [];
+      // Step 1: Fetch latest backend scores for all players
+      const latestScores = await Promise.all(groupPlayers.map(async (name, idx) => {
+        let userId = null;
+        if (competition.users) {
+          const user = competition.users.find(u => u.name === name);
+          if (user) userId = user.id || user.user_id || user.userId;
+        }
+        if (!userId) return Array(18).fill('');
+        const url = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores?competitionId=${competition.id}`);
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return Array(18).fill('');
+          const data = await res.json();
+          return Array.isArray(data.scores) && data.scores.length === 18 ? data.scores.map(v => v == null ? '' : v) : Array(18).fill('');
+        } catch (err) {
+          return Array(18).fill('');
+        }
+      }));
+      // Step 2: Merge local changes into latest backend scores
       for (let idx = 0; idx < groupPlayers.length; idx++) {
         const name = groupPlayers[idx];
         let userId = null;
@@ -447,9 +466,13 @@ export default function Scorecard(props) {
           if (user) userId = user.id || user.user_id || user.userId;
         }
         if (!userId) continue;
-        const playerScores = (scores[idx] || Array(18).fill('')).map(v => v === '' ? null : Number(v));
+        // Merge: prefer local non-blank, else backend
+        const mergedScores = (scores[idx] || Array(18).fill('')).map((local, i) => {
+          if (local !== '' && local != null) return local;
+          return latestScores[idx][i] !== '' && latestScores[idx][i] != null ? latestScores[idx][i] : '';
+        });
         const patchUrl = apiUrl(`/api/teams/${groupTeamId}/users/${userId}/scores`);
-        const patchBody = { competitionId: competition.id, scores: playerScores };
+        const patchBody = { competitionId: competition.id, scores: mergedScores.map(v => v === '' ? null : Number(v)) };
         saves.push(fetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody) }));
       }
       await Promise.allSettled(saves);
