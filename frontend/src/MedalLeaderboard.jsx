@@ -577,14 +577,14 @@ function MedalLeaderboard() {
     pdf.text('Good Scores', margin, y);
     y += lineHeight;
     pdf.setFont(undefined, 'normal');
-    // Print good scores (use leaderboardRows filtered earlier) - show nickname when available
+    // Print good scores (use leaderboardRows filtered earlier) - show full name with nickname
     if (goodScores && goodScores.length > 0) {
       goodScores.forEach(p => {
         if (y > pageHeight - margin - lineHeight) {
           pdf.addPage();
           y = margin;
         }
-        const displayName = (compactDisplayName(p) || p.name || '').toUpperCase();
+        const displayName = (p.name || '').toUpperCase();
         const line = `${displayName}: Net ${p.dthNet}`;
         pdf.text(line, margin, y);
         y += lineHeight;
@@ -906,7 +906,7 @@ function MedalLeaderboard() {
                 {goodScores.length === 0
                   ? <div style={{marginLeft: 0}}>No one. Everyone shit.</div>
                   : goodScores.map(p => (
-                      <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{(compactDisplayName(p) || p.name).toUpperCase()}: Net {p.dthNet}</div>
+                      <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>{(p.name || '').toUpperCase()}: Net {p.dthNet}</div>
                     ))}
               </div>
             </div>

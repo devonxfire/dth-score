@@ -982,7 +982,7 @@ function calculateNetScore(scores, handicap, holes) {
 
         const goodScores = rows.filter(r => typeof r.dthNet === 'number' && r.dthNet < 70 && r.thru === 'F');
         pdf.setFont(undefined, 'bold'); pdf.text('Good Scores', margin, y); y += lineHeight; pdf.setFont(undefined, 'normal');
-        if (goodScores && goodScores.length > 0) { goodScores.forEach(p => { if (y > pageHeight - margin - lineHeight) { pdf.addPage(); y = margin; } const displayName = (p.displayName || p.name || '').toUpperCase(); pdf.text(`${displayName}: Net ${p.dthNet}`, margin, y); y += lineHeight; }); } else { pdf.text('No one.', margin, y); y += lineHeight; }
+        if (goodScores && goodScores.length > 0) { goodScores.forEach(p => { if (y > pageHeight - margin - lineHeight) { pdf.addPage(); y = margin; } const displayName = (p.name || '').toUpperCase(); pdf.text(`${displayName}: Net ${p.dthNet}`, margin, y); y += lineHeight; }); } else { pdf.text('No one.', margin, y); y += lineHeight; }
         y += lineHeight * 0.5;
 
   const scoreLabel = (comp && ((String(comp.type || '').toLowerCase().includes('individual') && String(comp.type || '').toLowerCase().includes('stableford')) || (String(comp.name || comp.title || '').toLowerCase().includes('individual') && String(comp.name || comp.title || '').toLowerCase().includes('stableford')))) ? 'Points' : 'Score';
@@ -1220,7 +1220,7 @@ function calculateNetScore(scores, handicap, holes) {
                     <div style={{marginBottom: 4, marginLeft: 0, textDecoration: 'underline', textUnderlineOffset: 3}}>Good Scores</div>
                     {goodScores.length === 0 ? <div style={{marginLeft: 0}}>No one.</div> : goodScores.map(p => (
                       <div key={p.name} style={{marginBottom: 2, marginLeft: 0}}>
-                        {getDisplayName(p.name, p).toUpperCase()}: Net {p.dthNet}
+                        {(p.name || '').toUpperCase()}: Net {p.dthNet}
                       </div>
                     ))}
                   </div>
