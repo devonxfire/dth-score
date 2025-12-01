@@ -121,7 +121,11 @@ export default function FourballAssignment({ fourballs, onAssign, initialGroups 
       const res = await fetch(apiUrl('/api/users'));
       if (!res.ok) throw new Error('failed');
       const users = await res.json();
-      const allNames = users.map(u => u.name || u.username || u.id).filter(Boolean).filter(n => !/^guest/i.test(n));
+      const allNames = users
+        .filter(u => !u.isadmin)
+        .map(u => u.name || u.username || u.id)
+        .filter(Boolean)
+        .filter(n => !/^guest/i.test(n));
       // gather names currently assigned to other groups (exclude this group's current players)
       const otherAssigned = groups.flatMap((g, i) => i === groupIdx ? [] : (Array.isArray(g.players) ? g.players : [])).filter(Boolean);
       // candidates exclude otherAssigned so we don't pick already-assigned players when possible

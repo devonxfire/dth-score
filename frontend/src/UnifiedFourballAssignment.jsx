@@ -277,7 +277,11 @@ export default function UnifiedFourballAssignment(props) {
       const res = await fetch(apiUrl('/api/users'));
       if (!res.ok) throw new Error('failed');
       const users = await res.json();
-      const allNames = users.map(u => u.name || u.username || u.id).filter(Boolean).filter(n => !/^guest/i.test(n));
+      const allNames = users
+        .filter(u => !u.isadmin)
+        .map(u => u.name || u.username || u.id)
+        .filter(Boolean)
+        .filter(n => !/^guest/i.test(n));
       const otherAssigned = groups.flatMap((g, i) => i === idx ? [] : (Array.isArray(g.players) ? g.players : [])).filter(Boolean);
       let candidates = allNames.filter(n => !otherAssigned.includes(n));
       if (candidates.length < 4) candidates = allNames.slice();
