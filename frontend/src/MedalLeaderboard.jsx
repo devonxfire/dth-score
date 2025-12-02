@@ -826,7 +826,7 @@ function MedalLeaderboard() {
         <div className="mx-auto mt-2" style={{height: '2px', maxWidth: 340, background: 'white', opacity: 0.7, borderRadius: 2}}></div>
       </div>
       <div className="flex flex-col items-center px-4 mt-8">
-        <div ref={exportRef} className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+        <div ref={exportRef} className="w-full max-w-4xl rounded-2xl bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
           <div className="flex justify-center mb-4">
             {currentUser && (() => {
               const today = new Date();

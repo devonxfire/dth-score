@@ -1152,7 +1152,7 @@ function calculateNetScore(scores, handicap, holes) {
           </div>
 
           <div className="flex flex-col items-center px-4 mt-8">
-            <div ref={exportRef} className="w-full max-w-4xl rounded-2xl shadow-lg bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
+            <div ref={exportRef} className="w-full max-w-4xl rounded-2xl bg-transparent text-white mb-8" style={{ backdropFilter: 'none' }}>
                 <div className="flex justify-center gap-3 mb-4">
                 {showMyScorecard && (
                   <button
@@ -1228,7 +1228,7 @@ function calculateNetScore(scores, handicap, holes) {
               )}
 
               {/* Always show refresh and extras controls above the table, for all screen sizes */}
-              <div className="w-full flex items-center mb-6" style={{ background: 'rgba(255,0,0,0.1)' }}>
+              <div className="w-full flex items-center mb-6">
                 <button
                   className="text-xs px-2 py-0.5 rounded font-semibold"
                   onClick={async () => {
