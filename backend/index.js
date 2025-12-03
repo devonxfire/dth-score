@@ -1263,9 +1263,15 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
         }
       } catch {}
       // 6. For each hole, find best Stableford points among all team members
+      //    For 4BBB Bonus competitions, if the sum of the two players' Stableford
+      //    points on a hole is >= 6, add +1 to the team hole score (no per-player attribution).
       let teamPoints = 0;
+      // Determine if this competition is 4BBB Bonus
+      const compTypeLowerSafe = (comp && comp.type ? String(comp.type).toLowerCase() : '');
+      const isFourBbbBonus = compTypeLowerSafe.includes('4bbb') && compTypeLowerSafe.includes('bonus');
       for (const hole of holes) {
         let bestPoints = 0;
+        let secondBestPoints = 0;
         for (const tu of team.teams_users) {
           const userId = tu.user_id;
           // Find score for this user/hole
@@ -1299,7 +1305,16 @@ app.patch('/api/teams/:teamId/users/:userId/scores', async (req, res) => {
             else if (net === hole.par) pts = 2;
             else if (net === hole.par + 1) pts = 1;
           }
-          if (pts > bestPoints) bestPoints = pts;
+          if (pts > bestPoints) {
+            secondBestPoints = bestPoints;
+            bestPoints = pts;
+          } else if (pts > secondBestPoints) {
+            secondBestPoints = pts;
+          }
+        }
+        // Apply 4BBB Bonus rule: if both players' points sum to >= 6, +1 to team hole score
+        if (isFourBbbBonus && (bestPoints + secondBestPoints) >= 6) {
+          bestPoints += 1;
         }
         teamPoints += bestPoints;
       }

@@ -16,7 +16,9 @@ import ConfirmNavigationPopup from './ConfirmNavigationPopup';
 // Display mapping for all comp types
 const COMP_TYPE_DISPLAY = {
   fourBbbStableford: '4BBB Stableford',
+  '4bbb bonus': '4BBB Bonus',
   '4bbb stableford': '4BBB Stableford',
+  '4bbb bonus': '4BBB Bonus',
   alliance: 'Alliance',
   medalStrokeplay: 'Medal Strokeplay',
   'medal strokeplay': 'Medal Strokeplay',
@@ -80,7 +82,7 @@ function CreateCompetition({ user, onSignOut }) {
   function handleTypeChange(e) {
     const type = e.target.value;
     let allowance = '95';
-    if (type === 'alliance' || type === 'fourBbbStableford') {
+    if (type === 'alliance' || type === 'fourBbbStableford' || type === '4bbb bonus') {
       allowance = '85';
     } else if (type === 'medal-strokeplay' || type === 'individual-stableford') {
       allowance = '95'; 
@@ -481,6 +483,7 @@ function CreateCompetition({ user, onSignOut }) {
                   style={{ fontFamily: 'Lato, Arial, sans-serif' }}
                 >
                   <option value="fourBbbStableford">4BBB Stableford</option>
+                  <option value="4bbb bonus">4BBB Bonus</option>
                   <option value="alliance">Alliance</option>
                   <option value="medalStrokeplay">Medal Strokeplay</option>
                   <option value="individualStableford">Individual Stableford</option>

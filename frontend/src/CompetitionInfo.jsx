@@ -25,6 +25,7 @@ const COMP_TYPE_DISPLAY = {
   stroke: 'Medal Strokeplay',
   individualStableford: 'Individual Stableford',
   'individual stableford': 'Individual Stableford',
+  '4bbb bonus': '4BBB Bonus',
 };
 
 
@@ -94,7 +95,7 @@ export default function CompetitionInfo({ user }) {
         <td className="px-3 py-3"><strong className="text-[#FFD700]">Course:</strong> <span className="text-white">{comp.club || '-'}</span></td>
       </tr>
       <tr className="border-b border-white/20">
-        <td className="px-3 py-3"><strong className="text-[#FFD700]">Type:</strong> <span className="text-white">{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</span></td>
+        <td className="px-3 py-3"><strong className="text-[#FFD700]">Type:</strong> <span className="text-white">{COMP_TYPE_DISPLAY[comp.type] || (comp.type ? comp.type.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/(Four\s+Bbb)/i, '4BBB').replace(/4bbb\s+Bonus/i, '4BBB Bonus') : '')}</span></td>
       </tr>
       {comp.handicapallowance && (
         <tr className="border-b border-white/20"><td className="px-3 py-3"><strong className="text-[#FFD700]">Handicap Allowance:</strong> <span className="text-white">{comp.handicapallowance}{typeof comp.handicapallowance === 'string' && comp.handicapallowance.includes('%') ? '' : '%'}</span></td></tr>
@@ -171,7 +172,7 @@ export default function CompetitionInfo({ user }) {
           <div className="mb-4">
               <div><span className="font-semibold">Date:</span> {formatDate(comp.date)}</div>
               <div><span className="font-semibold">Course:</span> {comp.club || '-'}</div>
-              <div><span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</div>
+              <div><span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp.type] || (comp.type ? comp.type.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/(Four\s+Bbb)/i, '4BBB').replace(/4bbb\s+Bonus/i, '4BBB Bonus') : '')}</div>
               {comp.handicapallowance && (
                 <div><span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance}{typeof comp.handicapallowance === 'string' && comp.handicapallowance.includes('%') ? '' : '%'}</div>
               )}

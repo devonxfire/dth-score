@@ -62,5 +62,6 @@ export default function Leaderboard4BBB(props) {
     return () => { cancelled = true; };
   }, []);
 
+  // Pass through overrideTitle if caller wants the header to say 4BBB Bonus
   return <AllianceLeaderboard initialComp={initialComp} {...props} />;
 }

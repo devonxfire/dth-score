@@ -96,7 +96,7 @@ function calculateNetScore(scores, handicap, holes) {
       return 0;
     }
 
-    export default function AllianceLeaderboard({ initialComp = null }) {
+    export default function AllianceLeaderboard({ initialComp = null, overrideTitle }) {
       const [comp, setComp] = useState(initialComp);
       const [groups, setGroups] = useState([]);
       const [entries, setEntries] = useState([]);
@@ -700,6 +700,7 @@ function calculateNetScore(scores, handicap, holes) {
           compTypeStr.includes('4bbb') || compTypeStr.includes('fourbbb') || compTypeStr.includes('fourball') || compTypeStr.includes('4bb') || compTypeStr.includes('4-ball') || !!comp.fourballs ||
           compNameStr.includes('4bbb') || compNameStr.includes('fourbbb') || compNameStr.includes('fourball') || compNameStr.includes('4bb') || compNameStr.includes('4-ball') || compNameStr.includes('four-ball')
         );
+        const is4bbbBonus = (overrideTitle && overrideTitle.toString().toLowerCase().includes('bonus')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('bonus'));
 
         const teams = [];
         const compTypeStrLocal = (comp && String(comp.type || '').toLowerCase()) || '';
@@ -827,7 +828,12 @@ function calculateNetScore(scores, handicap, holes) {
                 const vals = playersArr.map(p => (p.perHole && Number.isFinite(p.perHole[hIdx]) ? p.perHole[hIdx] : 0));
                 vals.sort((a,b) => b - a);
                 if (playersArr.length === 2) {
-                  return vals[0] || 0; // best-one (better ball)
+                  let bb = vals[0] || 0; // best-one (better ball)
+                  if (is4bbbBonus) {
+                    const sum = (vals[0] || 0) + (vals[1] || 0);
+                    if (sum >= 6) bb += 1;
+                  }
+                  return bb;
                 }
                 // sum top two for groups larger than 2
                 return (vals[0] || 0) + (vals[1] || 0);
@@ -864,9 +870,21 @@ function calculateNetScore(scores, handicap, holes) {
             const chosenA = (typeof backendA === 'number' && backendA === computedA) ? backendA : computedA;
             const chosenB = (typeof backendB === 'number' && backendB === computedB) ? backendB : computedB;
 
-            // Build debug per-hole arrays (max per-hole for pair)
-            const perHoleBestA = Array(18).fill(0).map((_, i) => Math.max((pairA[0].perHole?.[i] || 0), (pairA[1].perHole?.[i] || 0)));
-            const perHoleBestB = Array(18).fill(0).map((_, i) => Math.max((pairB[0].perHole?.[i] || 0), (pairB[1].perHole?.[i] || 0)));
+            // Build debug per-hole arrays (max per-hole for pair) and apply 4BBB Bonus rule if needed
+            const perHoleBestA = Array(18).fill(0).map((_, i) => {
+              const a = pairA[0].perHole?.[i] || 0;
+              const b = pairA[1].perHole?.[i] || 0;
+              let bb = Math.max(a, b);
+              if (is4bbbBonus && (a + b >= 6)) bb += 1;
+              return bb;
+            });
+            const perHoleBestB = Array(18).fill(0).map((_, i) => {
+              const a = pairB[0].perHole?.[i] || 0;
+              const b = pairB[1].perHole?.[i] || 0;
+              let bb = Math.max(a, b);
+              if (is4bbbBonus && (a + b >= 6)) bb += 1;
+              return bb;
+            });
             const back9A = perHoleBestA.slice(9, 18).reduce((s, v) => s + (v || 0), 0);
             const back9B = perHoleBestB.slice(9, 18).reduce((s, v) => s + (v || 0), 0);
             teams.push({ groupIdx: idx, players: pairA, teamPoints: chosenA, computedTeamPoints: computedA, backendTeamPoints: (typeof backendA === 'number' ? backendA : undefined), back9Points: back9A, teeTime: group.teeTime || '', teamId: teamIdA, debug: { perHoleBest: perHoleBestA, playersPerHole: [(pairA[0].perHole || []), (pairA[1].perHole || [])] } });
@@ -961,7 +979,7 @@ function calculateNetScore(scores, handicap, holes) {
         const pageHeight = pdf.internal.pageSize.getHeight();
         let y = margin;
         pdf.setFontSize(12); pdf.setTextColor(0,0,0);
-        const titleCompType = COMP_TYPE_DISPLAY[comp?.type] || comp?.type || 'Competition';
+        const titleCompType = COMP_TYPE_DISPLAY[comp?.type] || (comp?.type ? comp.type.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/(Four\s+Bbb)/i, '4BBB').replace(/4bbb\s+Bonus/i, '4BBB Bonus') : 'Competition');
         pdf.text(`${(comp?.name) || 'Competition'} - ${titleCompType}`, margin, y); y += lineHeight;
         pdf.setFontSize(10);
         let formattedDate = '-';
@@ -1177,7 +1195,7 @@ function calculateNetScore(scores, handicap, holes) {
               {comp && (
                 <div className="text-white/90 text-base mb-4" style={{minWidth: 260, textAlign: 'left'}}>
                   <span className="font-semibold">Date:</span> {comp.date ? (new Date(comp.date).toLocaleDateString('en-GB')) : '-'} <br />
-                  <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp?.type] || (comp?.type ? comp.type.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/(Four\s+Bbb)/i, '4BBB') : '')} <br />
+                  <span className="font-semibold">Type:</span> {COMP_TYPE_DISPLAY[comp?.type] || (comp?.type ? comp.type.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/(Four\s+Bbb)/i, '4BBB').replace(/4bbb\s+Bonus/i, '4BBB Bonus') : '')} <br />
                   <span className="font-semibold">Course:</span> {comp?.club || comp?.course || '-'} <br />
                   <span className="font-semibold">Handicap Allowance:</span> {comp.handicapallowance && comp.handicapallowance !== 'N/A' ? comp.handicapallowance + '%' : 'N/A'} <br />
                   <span className="font-semibold" style={{ marginTop: '0.5rem', display: 'inline-block' }}>Guests:</span> {(() => {

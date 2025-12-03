@@ -149,6 +149,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
     medal_strokeplay: 'Medal Strokeplay',
     individualStableford: 'Individual Stableford',
     individual_stableford: 'Individual Stableford',
+    '4bbb bonus': '4BBB Bonus',
     ...((typeof window !== 'undefined' && window.COMP_TYPE_DISPLAY) || {})
   };
   // (removed duplicate navigate and location)
@@ -402,7 +403,7 @@ function RecentCompetitions({ user = {}, comps = [] }) {
                 return (
                   <tr key={keyBase + '-info'} className={`border${status === 'Closed' ? ' bg-gray-800/60' : ''}`}> 
                     <td className={`border px-2 py-1 whitespace-nowrap${status === 'Closed' ? ' text-gray-300' : ''}`}>{formatDate(comp.date)}</td>
-                    <td className={`border px-2 py-1${status === 'Closed' ? ' text-gray-300' : ''}`} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{COMP_TYPE_DISPLAY[comp.type] || comp.type || ''}</td>
+                    <td className={`border px-2 py-1${status === 'Closed' ? ' text-gray-300' : ''}`} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{COMP_TYPE_DISPLAY[comp.type] || (comp.type ? comp.type.replace(/(^|\s|_)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase()).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/-/g, ' ').replace(/(Four\s+Bbb)/i, '4BBB').replace(/4bbb\s+Bonus/i, '4BBB Bonus') : '')}</td>
                     <td className={`border px-2 py-1${status === 'Closed' ? ' text-gray-300' : ''}`} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{comp.club || comp.joinCode || comp.joincode || '-'}</td>
                     <td className={
                       `border border-white px-2 py-1 text-center align-middle ${

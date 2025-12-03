@@ -1619,6 +1619,7 @@ export default function MedalScorecard(props) {
             {(() => {
               const isAlliance = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance'));
               const is4bbb = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('4bbb'));
+              const is4bbbBonus = is4bbb && ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('bonus')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('bonus')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('bonus')));
               const isMedalMobile = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('medal')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('medal'));
               const isIndividual = (props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('individual')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('individual')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('individual'));
               // Treat Individual Stableford as the same mobile entry mode as Alliance/4BBB
@@ -1647,7 +1648,12 @@ export default function MedalScorecard(props) {
                       const a = stabA.perHole?.[i];
                       const b = stabB.perHole?.[i];
                       if (a == null && b == null) return null;
-                      return Math.max(Number(a || 0), Number(b || 0));
+                      let bb = Math.max(Number(a || 0), Number(b || 0));
+                      if (is4bbbBonus) {
+                        const sum = Number(a || 0) + Number(b || 0);
+                        if (sum >= 6) bb += 1;
+                      }
+                      return bb;
                     });
                     const front = perHole.slice(0, 9).reduce((s, v) => s + (v != null ? v : 0), 0);
                     const back = perHole.slice(9, 18).reduce((s, v) => s + (v != null ? v : 0), 0);
@@ -2624,12 +2630,18 @@ export default function MedalScorecard(props) {
                     const nameB = players[pairStart + 1];
                     const stabA = computePlayerStablefordTotals(nameA) || { perHole: Array(18).fill(0) };
                     const stabB = computePlayerStablefordTotals(nameB) || { perHole: Array(18).fill(0) };
-                          const perHoleFront = holesArr.slice(0, 9).map((_, idx) => {
+                    const is4bbbBonus = ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('bonus')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('bonus')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('bonus')));
+                    const perHoleFront = holesArr.slice(0, 9).map((_, idx) => {
                       const holeIdx = idx;
                       const a = stabA.perHole?.[holeIdx];
                       const b = stabB.perHole?.[holeIdx];
                       if (a == null && b == null) return null;
-                      return Math.max(Number(a || 0), Number(b || 0));
+                      let bb = Math.max(Number(a || 0), Number(b || 0));
+                      if (is4bbbBonus) {
+                        const sum = Number(a || 0) + Number(b || 0);
+                        if (sum >= 6) bb += 1;
+                      }
+                      return bb;
                     });
                     const frontSum = perHoleFront.reduce((s, v) => s + (v != null ? v : 0), 0);
                     return (
@@ -2849,6 +2861,54 @@ export default function MedalScorecard(props) {
                         <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{Number.isFinite(stableB?.back) ? stableB.back : ''}</td>
                         <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{Number.isFinite(stableB?.total) ? stableB.total : ''}</td>
                       </tr>
+                      {/* BB Score row for back 9 under AB pair (4BBB only) */}
+                      {(((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('4bbb')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('4bbb'))) && !((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('alliance')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('alliance')))) && (
+                        (() => {
+                          const is4bbbBonus = ((props.overrideTitle && props.overrideTitle.toString().toLowerCase().includes('bonus')) || (comp && comp.type && comp.type.toString().toLowerCase().includes('bonus')) || (props.compTypeOverride && props.compTypeOverride.toString().toLowerCase().includes('bonus')));
+                          const perHoleBack = holesArr.slice(9, 18).map((_, idx) => {
+                            const holeIdx = 9 + idx;
+                            const a = stableA && stableA.perHole ? stableA.perHole[holeIdx] : 0;
+                            const b = stableB && stableB.perHole ? stableB.perHole[holeIdx] : 0;
+                            if (a == null && b == null) return null;
+                            let bb = Math.max(Number(a || 0), Number(b || 0));
+                            if (is4bbbBonus) {
+                              const sum = Number(a || 0) + Number(b || 0);
+                              if (sum >= 6) bb += 1;
+                            }
+                            return bb;
+                          });
+                          const backSum = perHoleBack.reduce((s, v) => s + (v != null ? v : 0), 0);
+                          const backCount = perHoleBack.filter(v => v != null).length;
+                          // Compute front 9 BB total with bonus for grand total column
+                          const perHoleFront = holesArr.slice(0, 9).map((_, idx) => {
+                            const holeIdx = idx;
+                            const a = stableA && stableA.perHole ? stableA.perHole[holeIdx] : 0;
+                            const b = stableB && stableB.perHole ? stableB.perHole[holeIdx] : 0;
+                            if (a == null && b == null) return null;
+                            let bb = Math.max(Number(a || 0), Number(b || 0));
+                            if (is4bbbBonus) {
+                              const sum = Number(a || 0) + Number(b || 0);
+                              if (sum >= 6) bb += 1;
+                            }
+                            return bb;
+                          });
+                          const frontSum = perHoleFront.reduce((s, v) => s + (v != null ? v : 0), 0);
+                          const grandTotal = frontSum + backSum;
+                          return (
+                            <tr key={`pair-score-back-${pairStart}`}>
+                              <td className="border px-2 py-1 bg-white/5" />
+                              <td className="border px-2 py-1 bg-white/10 text-base font-bold text-center align-middle" style={{ minWidth: 40, verticalAlign: 'middle', height: '44px' }}>BB Score</td>
+                              {perHoleBack.map((val, hIdx) => (
+                                <td key={hIdx} className="border px-1 py-1 bg-white/5 align-middle font-bold text-base" style={{ verticalAlign: 'middle', height: '44px' }}>
+                                  {val != null ? val : ''}
+                                </td>
+                              ))}
+                              <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{backCount ? backSum : ''}</td>
+                              <td className="border px-2 py-1 bg-white/5 align-middle text-base font-bold" style={{ verticalAlign: 'middle', height: '44px' }}>{backCount ? grandTotal : ''}</td>
+                            </tr>
+                          );
+                        })()
+                      )}
                     </React.Fragment>
                   );
                 })}
@@ -2876,6 +2936,7 @@ export default function MedalScorecard(props) {
                     );
                   })()
                 )}
+                {/* Back 9 BB rows are inserted inline under each pair above; no extra rows below. */}
               </tbody>
             </table>
           </div>

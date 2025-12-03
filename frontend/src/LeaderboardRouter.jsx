@@ -96,8 +96,9 @@ export default function LeaderboardRouter(props) {
 
   const compType = (competition?.type || '').toString().toLowerCase();
   const is4BBB = compType.includes('4bbb') || compType.includes('fourbbb');
+  const is4BBBBonus = is4BBB && compType.includes('bonus');
   if (is4BBB) {
-    return <Leaderboard4BBB {...props} competition={competition} />;
+    return <Leaderboard4BBB {...props} competition={competition} overrideTitle={is4BBBBonus ? '4BBB Bonus' : '4BBB Stableford'} />;
   }
   const isIndividual = (compType.includes('individual') && compType.includes('stableford')) || ((competition?.name || '').toString().toLowerCase().includes('individual') && (competition?.name || '').toString().toLowerCase().includes('stableford'));
   if (isIndividual) {

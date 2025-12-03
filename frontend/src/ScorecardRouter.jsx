@@ -45,13 +45,14 @@ export default function ScorecardRouter(props) {
   const compType = (props.compTypeOverride || competition?.type || '').toString();
   const compTypeLower = compType.toLowerCase();
   const is4BBB = compTypeLower.includes('4bbb') || compTypeLower.includes('fourbbb');
+  const is4BBBBonus = is4BBB && compTypeLower.includes('bonus');
   const chars = compTypeLower.split('');
   const charCodes = chars.map(c => c.charCodeAt(0));
   if (is4BBB) {
     // Render the Alliance scorecard UI for 4BBB competitions for visual parity.
     // Pass an explicit title override so the heading says "4BBB Stableford" while
     // keeping the Alliance component and MedalScorecard behavior untouched.
-    return <AllianceScorecard {...props} competition={competition} overrideTitle="4BBB Stableford" />;
+    return <AllianceScorecard {...props} competition={competition} overrideTitle={is4BBBBonus ? '4BBB Bonus' : '4BBB Stableford'} />;
   }
   const isAlliance = compTypeLower.includes('alliance');
   const isIndividual = (compTypeLower.includes('individual') && compTypeLower.includes('stableford')) || ((competition?.name || '').toString().toLowerCase().includes('individual') && (competition?.name || '').toString().toLowerCase().includes('stableford'));
