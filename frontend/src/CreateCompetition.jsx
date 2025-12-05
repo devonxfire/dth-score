@@ -93,6 +93,9 @@ function CreateCompetition({ user, onSignOut }) {
   const [joinCode, setJoinCode] = useState(editingComp?.joinCode || editingComp?.joincode || '');
   const [compId, setCompId] = useState(editingComp?.id || null);
   const [showGroups, setShowGroups] = useState(false);
+  // State for courses dropdown
+  const [courses, setCourses] = useState([]);
+  const [courseId, setCourseId] = useState(editingComp?.course_id || 1); // Default to Westlake (ID 1)
   // Preload groups if editing
   const [groups, setGroups] = useState(editingComp?.groups || []);
   const [openComps, setOpenComps] = useState([]);
@@ -111,6 +114,16 @@ function CreateCompetition({ user, onSignOut }) {
         setOpenComps(open);
       })
       .catch(() => setOpenComps([]));
+  }, []);
+
+  // Fetch available courses for dropdown
+  useEffect(() => {
+    fetch(apiUrl('/api/courses'))
+      .then(res => res.json())
+      .then(data => {
+        setCourses(data || []);
+      })
+      .catch(() => setCourses([]));
   }, []);
 
   function handleChange(e) {
@@ -140,6 +153,7 @@ function CreateCompetition({ user, onSignOut }) {
         if (form.club) updateData.club = form.club;
         if (form.handicapAllowance) updateData.handicapAllowance = form.handicapAllowance;
         if (form.notes) updateData.notes = form.notes;
+        if (courseId) updateData.course_id = courseId;
   const res = await fetch(apiUrl(`/api/competitions/${editingComp.id}`), {
           method: 'PATCH',
           headers: {
@@ -201,7 +215,7 @@ function CreateCompetition({ user, onSignOut }) {
         const res = await fetch(apiUrl('/api/competitions'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...form })
+          body: JSON.stringify({ ...form, course_id: courseId })
         });
         if (!res.ok) throw new Error('Failed to create competition');
         const data = await res.json();
@@ -461,16 +475,29 @@ function CreateCompetition({ user, onSignOut }) {
                 </div>
               </div>
               <div className="mb-4">
-                <label className="block mb-1 font-bold" htmlFor="club" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>Club</label>
-                <input
-                  id="club"
-                  name="club"
-                  type="text"
-                  value={form.club}
-                  onChange={handleChange}
-                  className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white placeholder-white/70"
+                <label className="block mb-1 font-bold" htmlFor="course" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>Course</label>
+                <select
+                  id="course"
+                  name="course"
+                  value={courseId}
+                  onChange={(e) => {
+                    const selectedId = Number(e.target.value);
+                    setCourseId(selectedId);
+                    const selectedCourse = courses.find(c => c.id === selectedId);
+                    if (selectedCourse) {
+                      setForm(prev => ({ ...prev, club: selectedCourse.name }));
+                    }
+                  }}
+                  className="w-full border border-white bg-transparent text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white"
                   style={{ fontFamily: 'Lato, Arial, sans-serif' }}
-                />
+                >
+                  <option value="">Select a course</option>
+                  {courses.map(course => (
+                    <option key={course.id} value={course.id} style={{ color: '#0e3764' }}>
+                      {course.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="mb-4">
                 <label className="block mb-1 font-bold" htmlFor="type" style={{ fontFamily: 'Lato, Arial, sans-serif', color: '#FFD700' }}>Competition Type</label>

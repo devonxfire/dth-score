@@ -669,29 +669,22 @@ app.post('/api/competitions', async (req, res) => {
   }
   try {
     const comp = await prisma.competitions.create({ data });
-    // Automatically seed 18 holes for this competition using Westlake hole data
-    const westlake = [
-      { number: 1, par: 4, stroke_index: 5 },
-      { number: 2, par: 4, stroke_index: 7 },
-      { number: 3, par: 3, stroke_index: 17 },
-      { number: 4, par: 5, stroke_index: 1 },
-      { number: 5, par: 4, stroke_index: 11 },
-      { number: 6, par: 3, stroke_index: 15 },
-      { number: 7, par: 5, stroke_index: 3 },
-      { number: 8, par: 4, stroke_index: 13 },
-      { number: 9, par: 4, stroke_index: 9 },
-      { number: 10, par: 4, stroke_index: 10 },
-      { number: 11, par: 4, stroke_index: 4 },
-      { number: 12, par: 4, stroke_index: 12 },
-      { number: 13, par: 5, stroke_index: 2 },
-      { number: 14, par: 4, stroke_index: 14 },
-      { number: 15, par: 3, stroke_index: 18 },
-      { number: 16, par: 5, stroke_index: 6 },
-      { number: 17, par: 3, stroke_index: 16 },
-      { number: 18, par: 4, stroke_index: 8 }
-    ];
-    const holesData = westlake.map(h => ({ ...h, competition_id: comp.id }));
-    await prisma.holes.createMany({ data: holesData });
+    // Automatically seed holes for this competition from course_holes table
+    if (data.course_id) {
+      const courseHoles = await prisma.course_holes.findMany({
+        where: { course_id: data.course_id },
+        orderBy: { number: 'asc' }
+      });
+      if (courseHoles && courseHoles.length > 0) {
+        const holesData = courseHoles.map(h => ({
+          number: h.number,
+          par: h.par,
+          stroke_index: h.index,
+          competition_id: comp.id
+        }));
+        await prisma.holes.createMany({ data: holesData });
+      }
+    }
     // If the client supplied groups on creation, ensure underlying teams are created
     try {
       if (data.groups && Array.isArray(data.groups) && data.groups.length > 0) {
@@ -1399,7 +1392,8 @@ app.patch('/api/competitions/:id', async (req, res) => {
     fourballs,
     notes,
     status,
-    groups
+    groups,
+    course_id
   } = req.body;
   // Build update data object dynamically
   const updateData = {};
@@ -1411,17 +1405,38 @@ app.patch('/api/competitions/:id', async (req, res) => {
   if (notes !== undefined) updateData.notes = notes;
   if (status !== undefined) updateData.status = status;
   if (groups !== undefined) updateData.groups = groups;
+  if (course_id !== undefined) updateData.course_id = course_id;
   console.log('PATCH /api/competitions/:id updateData:', updateData);
   if (Object.keys(updateData).length === 0) {
     return res.status(400).json({ error: 'No valid fields provided for update' });
   }
   try {
+    // If course_id is changing, update the holes for this competition
+    if (course_id !== undefined) {
+      // Delete existing holes
+      await prisma.holes.deleteMany({ where: { competition_id: Number(id) } });
+      // Create new holes from course_holes table
+      const courseHoles = await prisma.course_holes.findMany({
+        where: { course_id: course_id },
+        orderBy: { number: 'asc' }
+      });
+      if (courseHoles && courseHoles.length > 0) {
+        const holesData = courseHoles.map(h => ({
+          number: h.number,
+          par: h.par,
+          stroke_index: h.index,
+          competition_id: Number(id)
+        }));
+        await prisma.holes.createMany({ data: holesData });
+      }
+    }
     const updated = await prisma.competitions.update({
       where: { id: Number(id) },
       data: updateData,
     });
     res.json({ success: true, competition: updated });
   } catch (err) {
+    console.error('Error updating competition:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
@@ -2144,6 +2159,24 @@ app.get('/api/competitions/:id/groups/:groupId/player/:playerName', async (req, 
     res.json({ teebox, handicap, scores, waters, dog, two_clubs });
   } catch (err) {
     console.error('Error fetching Medal player data:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Get all courses
+app.get('/api/courses', async (req, res) => {
+  try {
+    const courses = await prisma.courses.findMany({
+      include: {
+        course_holes: {
+          orderBy: { number: 'asc' }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(courses);
+  } catch (err) {
+    console.error('Error fetching courses:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });

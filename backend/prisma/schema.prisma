@@ -4,8 +4,27 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // prisma-ignore-next-line
   url      = env("DATABASE_URL")
+}
+
+model courses {
+  id           Int            @id @default(autoincrement())
+  name         String         @db.VarChar(100)
+  location     String?        @db.VarChar(100)
+  competitions competitions[]
+  course_holes course_holes[]
+  created_at   DateTime?      @default(now()) @db.Timestamp(6)
+}
+
+model course_holes {
+  id        Int      @id @default(autoincrement())
+  course_id Int
+  number    Int
+  par       Int
+  index     Int
+  courses   courses  @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([course_id, number])
 }
 
 model competitions {
@@ -24,6 +43,7 @@ model competitions {
   holes             holes[]
   scores            scores[]
   teams             teams[]
+  courses           courses?  @relation(fields: [course_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 }
 
 model holes {
@@ -48,6 +68,7 @@ model scores {
   holes          holes?        @relation(fields: [hole_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   teams          teams?        @relation(fields: [team_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users          users?        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
   @@unique([competition_id, team_id, user_id, hole_id])
 }
 
@@ -65,8 +86,8 @@ model teams {
   competition_id Int?
   name           String?       @db.VarChar(100)
   players        String[]
+  team_points    Int?
   scores         scores[]
-  team_points    Int? 
   competitions   competitions? @relation(fields: [competition_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   teams_users    teams_users[]
 }
@@ -77,10 +98,11 @@ model teams_users {
   user_id         Int?
   teebox          String?  @db.VarChar(20)
   course_handicap Decimal? @db.Decimal(4, 1)
-  waters          Int?     @default(0)
   dog             Boolean? @default(false)
   two_clubs       Int?     @default(0)
+  waters          Int?     @default(0)
   fines           Int?     @default(0)
+  bb_score_total  Int?     @default(0)
   teams           teams?   @relation(fields: [team_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users           users?   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
