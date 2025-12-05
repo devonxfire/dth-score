@@ -1838,13 +1838,9 @@ export default function MedalScorecard(props) {
                                             value={selectVal}
                                             onChange={(e) => {
                                               if (!canEdit(pName)) return;
-                                              // If user selects par, treat as not played (empty string)
                                               const val = e.target.value;
-                                              if (val === String(hole?.par)) {
-                                                handleScoreChange(pName, mobileSelectedHole - 1, '');
-                                              } else {
-                                                handleScoreChange(pName, mobileSelectedHole - 1, val);
-                                              }
+                                              console.log('[INDIVIDUAL STABLEFORD SELECT]', { pName, hole: mobileSelectedHole, val, par: hole?.par });
+                                              handleScoreChange(pName, mobileSelectedHole - 1, val);
                                             }}
                                             disabled={!canEdit(pName)}
                                           >

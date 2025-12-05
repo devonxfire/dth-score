@@ -18,7 +18,7 @@ const COMP_TYPE_DISPLAY = {
   fourBbbStableford: '4BBB Stableford',
   '4bbb bonus': '4BBB Bonus',
   '4bbb stableford': '4BBB Stableford',
-  '4bbb bonus': '4BBB Bonus',
+  
   alliance: 'Alliance',
   medalStrokeplay: 'Medal Strokeplay',
   'medal strokeplay': 'Medal Strokeplay',
