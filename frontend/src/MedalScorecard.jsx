@@ -1731,7 +1731,7 @@ export default function MedalScorecard(props) {
 
                       </div>
 
-                      <div className="space-y-4">
+                      <div className="space-y-10">
                         {players.map((pName, idx) => {
                           const displayName = getDisplayName(pName, idx);
                           const stable = computePlayerStablefordTotals(pName);
@@ -1747,7 +1747,7 @@ export default function MedalScorecard(props) {
 
                           return (
                             <div key={`mob-wrap-${pName}`}>
-                              <div key={`mob-${pName}`} className="p-4 rounded border border-white/10 relative" style={{ minHeight: '180px' }}>
+                                  <div key={`mob-${pName}`} className="p-4 rounded border border-white/10 relative" style={{ minHeight: '180px' }}>
                                 <div className="flex items-center justify-between mb-2 pr-32">
                                   <div className="font-semibold text-base">{initialLabel}</div>
                                 </div>
@@ -2195,13 +2195,13 @@ export default function MedalScorecard(props) {
                         const initialLabel = (() => { try { const parts = (displayName || '').trim().split(/\s+/).filter(Boolean); if (!parts.length) return displayName; const first = parts[0].replace(/^['"\(]+|['"\)]+$/g, ''); const surname = parts[parts.length - 1].replace(/^['"\(]+|['"\)]+$/g, ''); const initial = (first && first[0]) ? first[0].toUpperCase() : ''; return initial ? `${initial}. ${surname}` : surname; } catch (e) { return displayName; } })();
 
                         return (
-                          <div key={`mob-medal-${pName}`} className="p-2 rounded border border-white/10 relative">
-                            <div className="flex items-center justify-between">
+                          <div key={`mob-medal-${pName}`} className="p-4 rounded border border-white/10 relative" style={{ minHeight: '200px' }}>
+                            <div className="flex items-center justify-between mb-3">
                               <div className="font-semibold">{initialLabel}</div>
                             </div>
-                            <div className="text-xs font-semibold mt-1" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
+                            <div className="text-xs font-semibold mb-4" style={{ color: '#FFD700' }}>PH {computePH(playerData[pName]?.handicap)}</div>
 
-                                <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                                <div className="grid grid-cols-2 gap-3 text-sm mt-8">
                                   {(() => {
                                     // show gross front/back on mobile for medal view as well
                                     const grossArrLocal = Array.isArray(playerData[pName]?.scores) ? playerData[pName].scores : Array(18).fill('');

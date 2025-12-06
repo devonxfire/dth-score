@@ -271,17 +271,19 @@ export default function AllianceAssignment(props) {
             >Randomise</button>
           </div>
         ))}
-        <button
-          className="w-full py-3 px-4 mt-2 rounded-2xl font-bold shadow border border-white transition text-lg"
-          style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-          onClick={addGroup}
-        >{groups.length === 0 ? 'Add A Tee Time' : 'Add Another Tee Time'}</button>
-        <button
-          className="w-full py-3 px-4 mt-4 rounded-2xl font-bold shadow border border-white transition text-lg"
-          style={{ backgroundColor: '#1B3A6B', color: 'white', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
-          onClick={handleSave}
-          disabled={saving}
-        >{saving ? 'Saving...' : 'Save & Continue'}</button>
+        <div className="flex flex-col gap-2">
+          <button
+            className="w-full py-3 px-4 rounded-2xl font-bold shadow border border-white transition text-lg"
+            style={{ backgroundColor: '#FFD700', color: '#002F5F', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+            onClick={addGroup}
+          >{groups.length === 0 ? 'Add A Tee Time' : 'Add Another Tee Time'}</button>
+          <button
+            className="w-full py-3 px-4 rounded-2xl font-bold shadow border border-white transition text-lg"
+            style={{ backgroundColor: '#1B3A6B', color: 'white', fontFamily: 'Lato, Arial, sans-serif', boxShadow: '0 2px 8px 0 rgba(27,58,107,0.10)' }}
+            onClick={handleSave}
+            disabled={saving}
+          >{saving ? 'Saving...' : 'Save & Continue'}</button>
+        </div>
       </div>
     </PageBackground>
   );
