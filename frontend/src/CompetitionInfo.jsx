@@ -34,6 +34,7 @@ export default function CompetitionInfo({ user }) {
   const navigate = useNavigate();
   const params = useParams();
   const [comp, setComp] = useState(location.state?.comp || null);
+  const [loading, setLoading] = useState(!location.state?.comp);
   const compId = comp?.id || params.id;
 
   // Determine if this competition is currently open (status or date-based)
@@ -42,15 +43,34 @@ export default function CompetitionInfo({ user }) {
 
   useEffect(() => {
     if (!compId) return;
+    setLoading(true);
     fetch(apiUrl(`/api/competitions/${compId}`))
       .then(res => res.ok ? res.json() : null)
-      .then(data => { if (data) setComp(data); });
+      .then(data => { 
+        if (data) setComp(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [compId]);
 
   // For TopMenu: pass user and comp as userComp if user is a player in this comp
   const isPlayerInComp = user && comp && comp.groups && comp.groups.some(g => Array.isArray(g.players) && g.players.includes(user.name));
   const isAdmin = user && (user.role === 'admin' || user.isAdmin || user.isadmin);
   const showMyScorecard = Boolean(isAdmin || isPlayerInComp);
+
+  if (loading) {
+    return (
+      <PageBackground>
+        <TopMenu user={user} userComp={null} isPlayerInComp={false} />
+        <div className="flex flex-col items-center min-h-screen justify-center px-4">
+          <div className="flex flex-col items-center px-4 mt-12">
+            <h2 className="text-5xl font-bold text-white mb-1 drop-shadow-lg text-center">Competition Info</h2>
+            <p className="text-xl text-white mb-6 drop-shadow text-center">Loading competition...</p>
+          </div>
+        </div>
+      </PageBackground>
+    );
+  }
 
   if (!comp) {
     return (
