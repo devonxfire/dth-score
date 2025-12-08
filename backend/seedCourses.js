@@ -26,36 +26,57 @@ async function main() {
     { number: 17, par: 3, index: 16 },
     { number: 18, par: 4, index: 8 }
   ];
+  
 
-  try {
-    // Check if Westlake course already exists
-    const existingCourse = await prisma.courses.findFirst({
-      where: { name: 'Westlake Golf Club' }
-    });
-
-    if (existingCourse) {
-      console.log('Westlake Golf Club already exists in the database.');
+  // Helper: seed a course by name, location and holes array
+  async function seedCourse({ name, location, holes }) {
+    if (!name) return;
+    const existing = await prisma.courses.findFirst({ where: { name } });
+    if (existing) {
+      console.log(`${name} already exists in the database. Skipping.`);
       return;
     }
 
-    // Create the Westlake course and its holes
     const course = await prisma.courses.create({
       data: {
-        name: 'Westlake Golf Club',
-        location: 'Sydney',
+        name,
+        location: location || null,
         course_holes: {
           createMany: {
-            data: westlakeHoles
+            data: holes || []
           }
         }
       },
-      include: {
-        course_holes: true
-      }
+      include: { course_holes: true }
     });
 
     console.log(`✓ Created course: ${course.name}`);
     console.log(`✓ Seeded ${course.course_holes.length} holes`);
+  }
+
+  try {
+    // If a seed file exists for courses in ./seed_courses/*.json, load and seed them.
+    const seedDir = require('path').join(__dirname, 'seed_courses');
+    const fs = require('fs');
+    if (fs.existsSync(seedDir)) {
+      const files = fs.readdirSync(seedDir).filter(f => f.endsWith('.json'));
+      if (files.length > 0) {
+        for (const f of files) {
+          try {
+            const content = fs.readFileSync(require('path').join(seedDir, f), 'utf8');
+            const obj = JSON.parse(content);
+            // expect { name, location, holes: [{number,par,index},...] }
+            await seedCourse({ name: obj.name, location: obj.location, holes: obj.holes });
+          } catch (e) {
+            console.warn('Failed to seed from file', f, e.message || e);
+          }
+        }
+        return;
+      }
+    }
+
+    // If no seed files found, do nothing to avoid seeding example data accidentally.
+    console.log('No seed files found in backend/seed_courses. Nothing to do.');
   } catch (error) {
     console.error('Error seeding courses:', error);
     process.exit(1);

@@ -1,19 +1,4 @@
-  // Helper: get par for holes played
-  function getParDiff(entry) {
-    const holesPlayed = entry.scores?.filter(s => s && s !== '').length || 0;
-    if (!holesPlayed) return '';
-    let gross = 0;
-    let par = 0;
-    for (let i = 0; i < holesPlayed; i++) {
-      gross += parseInt(entry.scores[i] || 0);
-      par += defaultHoles[i]?.par || 0;
-    }
-    const diff = gross - par;
-    if (holesPlayed === 0) return '';
-    if (diff === 0) return 'E';
-    if (diff > 0) return `+${diff}`;
-    return `${diff}`;
-  }
+  // (moved inside component to use competition holes when available)
 // Format date as DD/MM/YYYY
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -99,6 +84,23 @@ function Leaderboard() {
   const holes = (competition && Array.isArray(competition.holes) && competition.holes.length > 0)
     ? competition.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index ?? h.index ?? h.strokeIndex ?? h.index) }))
     : defaultHoles;
+
+  // Helper: get par for holes played — prefer competition holes when available
+  function getParDiff(entry) {
+    const holesPlayed = entry.scores?.filter(s => s && s !== '').length || 0;
+    if (!holesPlayed) return '';
+    let gross = 0;
+    let par = 0;
+    for (let i = 0; i < holesPlayed; i++) {
+      gross += parseInt(entry.scores[i] || 0);
+      par += holes[i]?.par || 0;
+    }
+    const diff = gross - par;
+    if (holesPlayed === 0) return '';
+    if (diff === 0) return 'E';
+    if (diff > 0) return `+${diff}`;
+    return `${diff}`;
+  }
 
   // Fetch teams and their BB Score from backend
   const backendTeams = useBackendTeams(compId);

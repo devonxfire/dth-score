@@ -541,6 +541,11 @@ export default function MedalScorecard(props) {
       ? props.competition.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)) }))
       : defaultHoles;
 
+      // Compute par front/back/total, prefer server-provided comp.par_* when present
+      const parFront = (comp && (comp.par_front != null)) ? Number(comp.par_front) : holesArr.slice(0,9).reduce((s,h) => s + (Number(h.par)||0), 0);
+      const parBack = (comp && (comp.par_back != null)) ? Number(comp.par_back) : (holesArr.length >= 18 ? holesArr.slice(9,18).reduce((s,h) => s + (Number(h.par)||0), 0) : 0);
+      const parTotal = (comp && (comp.par_total != null)) ? Number(comp.par_total) : (parFront + parBack);
+
   // Per-cell styling for gross score inputs: eagle (<= par-2) => pink, birdie (par-1) => green,
   // blowup (>= par+3) => maroon. Returns an inline style object to merge into the input's style.
   function scoreCellStyle(name, idx) {
@@ -2484,7 +2489,7 @@ export default function MedalScorecard(props) {
                       {holesArr.slice(0,9).map(hole => (
                     <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
                   ))}
-                  <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
+                  <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>{parFront}</th>
                 </tr>
                 <tr className="bg-gray-900/90">
                   <th className="border px-2 py-1 bg-white/5"></th>
@@ -2705,8 +2710,8 @@ export default function MedalScorecard(props) {
                   {holesArr.slice(9,18).map(hole => (
                     <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
                   ))}
-                  <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
-                  <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>72</th>
+                  <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>{parBack}</th>
+                  <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>{parTotal}</th>
                 </tr>
                 <tr className="bg-gray-900/90">
                   <th className="border px-2 py-1 bg-white/5"></th>

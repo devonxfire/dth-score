@@ -649,7 +649,9 @@ app.get('/api/users', async (req, res) => {
 app.get('/api/competitions', async (req, res) => {
   try {
     const competitions = await prisma.competitions.findMany({ orderBy: { date: 'desc' } });
-    res.json(competitions);
+    // Compute par totals for each competition if holes are present (note: holes may be fetched by client)
+    const out = competitions.map(c => ({ ...c }));
+    res.json(out);
   } catch (err) {
     console.error('Error fetching competitions:', err);
     res.status(500).json({ error: 'Database error' });
@@ -693,7 +695,16 @@ app.post('/api/competitions', async (req, res) => {
     } catch (e) {
       console.error('Error processing groups for new competition:', e);
     }
-    res.json({ success: true, competition: comp });
+    // Re-fetch competition with holes to compute par totals for immediate response
+    let compWithHoles = await prisma.competitions.findUnique({ where: { id: comp.id }, include: { holes: { orderBy: { number: 'asc' } } } });
+    if (compWithHoles && Array.isArray(compWithHoles.holes) && compWithHoles.holes.length === 18) {
+      const front = compWithHoles.holes.slice(0,9).reduce((s,h) => s + (Number(h.par)||0), 0);
+      const back = compWithHoles.holes.slice(9,18).reduce((s,h) => s + (Number(h.par)||0), 0);
+      compWithHoles.par_front = front;
+      compWithHoles.par_back = back;
+      compWithHoles.par_total = front + back;
+    }
+    res.json({ success: true, competition: compWithHoles || comp });
   } catch (err) {
     console.error('Error creating competition:', err);
     res.status(500).json({ error: 'Database error' });
@@ -711,6 +722,14 @@ app.get('/api/competitions/:id', async (req, res) => {
     }
     // Deep copy to avoid mutating DB object
   let compOut = JSON.parse(JSON.stringify(comp));
+    // Compute par front/back/total if holes exist
+    if (Array.isArray(compOut.holes) && compOut.holes.length >= 9) {
+      const front = compOut.holes.slice(0,9).reduce((s,h) => s + (Number(h.par)||0), 0);
+      const back = compOut.holes.length >= 18 ? compOut.holes.slice(9,18).reduce((s,h) => s + (Number(h.par)||0), 0) : 0;
+      compOut.par_front = front;
+      compOut.par_back = back;
+      compOut.par_total = front + back;
+    }
     let debug = [];
     let users = await prisma.users.findMany();
   // Helper to robustly match a player display name to a users row.

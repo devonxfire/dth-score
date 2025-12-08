@@ -194,6 +194,10 @@ export default function Scorecard(props) {
           const res = await fetch(apiUrl(`/api/competitions/${initialCompetition.id}`));
           if (res.ok) {
             const data = await res.json();
+            try {
+              console.log('[Scorecard] fetched competition:', { id: data && data.id, par_front: data && data.par_front, par_back: data && data.par_back, par_total: data && data.par_total, holes_len: Array.isArray(data.holes) ? data.holes.length : 0 });
+              console.log('[Scorecard] holes sample:', (data && Array.isArray(data.holes)) ? data.holes.slice(0,3) : []);
+            } catch (e) { /* safe no-op */ }
             setCompetition(data);
           }
         } catch (e) {
@@ -274,6 +278,15 @@ export default function Scorecard(props) {
     setShowTeeModal(false);
   }, [player, groupForPlayer]);
   const isAlliance = competition && competition.type?.toLowerCase().includes('alliance');
+  // Prefer holes from competition when available, otherwise fall back to defaultHoles
+  const holes = (competition && Array.isArray(competition.holes) && competition.holes.length === 18)
+    ? competition.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)) }))
+    : defaultHoles;
+
+  // Compute par front/back/total, prefer server-provided fields when present
+  const parFront = (competition && (competition.par_front != null)) ? Number(competition.par_front) : holes.slice(0,9).reduce((s,h) => s + (Number(h.par)||0), 0);
+  const parBack = (competition && (competition.par_back != null)) ? Number(competition.par_back) : (holes.length >= 18 ? holes.slice(9,18).reduce((s,h) => s + (Number(h.par)||0), 0) : 0);
+  const parTotal = (competition && (competition.par_total != null)) ? Number(competition.par_total) : (parFront + parBack);
   // Scores state: [playerIdx][holeIdx] = value
   const [scores, setScores] = useState(() => groupPlayers.map(() => Array(18).fill('')));
   // Track loading state for scores
@@ -1013,7 +1026,7 @@ export default function Scorecard(props) {
                     <tr className="bg-gray-800/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">HOLE</th>
-                      {defaultHoles.slice(0,9).map(hole => (
+                      {holes.slice(0,9).map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
                       ))}
                       <th className="border px-2 py-1 bg-white/5 font-bold">Out</th>
@@ -1021,15 +1034,15 @@ export default function Scorecard(props) {
                     <tr className="bg-blue-900/90">
                       <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}></th>
                       <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>PAR</th>
-                      {defaultHoles.slice(0,9).map(hole => (
+                      {holes.slice(0,9).map(hole => (
                         <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
                       ))}
-                      <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
+                      <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>{parFront}</th>
                     </tr>
                     <tr className="bg-gray-900/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">STROKE</th>
-                      {defaultHoles.slice(0,9).map(hole => (
+                      {holes.slice(0,9).map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.index}</th>
                       ))}
                       <th className="border px-2 py-1 bg-white/5"></th>
@@ -1044,7 +1057,7 @@ export default function Scorecard(props) {
                             {String.fromCharCode(65 + pIdx)}
                           </td>
                           <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
-                          {defaultHoles.slice(0,9).map((hole, hIdx) => (
+                          {holes.slice(0,9).map((hole, hIdx) => (
                             <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                               <div className="flex items-center justify-center">
                                 {(() => {
@@ -1115,7 +1128,7 @@ export default function Scorecard(props) {
                             }
                             let netFrontTotal = 0;
                             const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
-                            return defaultHoles.slice(0,9).map((hole, hIdx) => {
+                            return holes.slice(0,9).map((hole, hIdx) => {
                               const strokeIdx = hole.index;
                               let strokesReceived = 0;
                               if (adjHandicap > 0) {
@@ -1151,7 +1164,7 @@ export default function Scorecard(props) {
                               }
                               let netFrontTotal = 0;
                               const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
-                              defaultHoles.slice(0,9).forEach((hole, hIdx) => {
+                              holes.slice(0,9).forEach((hole, hIdx) => {
                                 const strokeIdx = hole.index;
                                 let strokesReceived = 0;
                                 if (adjHandicap > 0) {
@@ -1183,7 +1196,7 @@ export default function Scorecard(props) {
                     <tr className="bg-gray-800/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
                       <th className="border px-2 py-1 bg-white/5">HOLE</th>
-                      {defaultHoles.slice(9,18).map(hole => (
+                      {holes.slice(9,18).map(hole => (
                         <th key={hole.number} className="border px-2 py-1 bg-white/5">{hole.number}</th>
                       ))}
                         <th className="border px-2 py-1 bg-white/5 font-bold">In</th>
@@ -1192,11 +1205,11 @@ export default function Scorecard(props) {
                     <tr className="bg-blue-900/90">
                       <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}></th>
                       <th className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>PAR</th>
-                      {defaultHoles.slice(9,18).map(hole => (
+                      {holes.slice(9,18).map(hole => (
                         <th key={hole.number} className="border px-2 py-1" style={{background:'#1B3A6B',color:'white'}}>{hole.par}</th>
                       ))}
-                        <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>36</th>
-                        <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>72</th>
+                        <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>{parBack}</th>
+                        <th className="border px-2 py-1 font-bold" style={{background:'#1B3A6B',color:'white'}}>{parTotal}</th>
                     </tr>
                     <tr className="bg-gray-900/90">
                       <th className="border px-2 py-1 bg-white/5"></th>
@@ -1217,7 +1230,7 @@ export default function Scorecard(props) {
                             {String.fromCharCode(65 + pIdx)}
                           </td>
                           <td className="border px-2 py-1 text-base font-bold bg-white/10 text-center" style={{ minWidth: 40 }}>Gross</td>
-                          {defaultHoles.slice(9,18).map((hole, hIdx) => (
+                          {holes.slice(9,18).map((hole, hIdx) => (
                             <td key={hIdx} className="border py-1 text-center align-middle font-bold text-base">
                               <div className="flex items-center justify-center">
                                 {(() => {
@@ -1306,7 +1319,7 @@ export default function Scorecard(props) {
                             }
                             let netBackTotal = 0;
                             const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
-                            return defaultHoles.slice(9,18).map((hole, hIdx) => {
+                            return holes.slice(9,18).map((hole, hIdx) => {
                               const strokeIdx = hole.index;
                               let strokesReceived = 0;
                               if (adjHandicap > 0) {
@@ -1342,7 +1355,7 @@ export default function Scorecard(props) {
                               }
                               let netBackTotal = 0;
                               const row = Array.isArray(scores[pIdx]) ? scores[pIdx] : [];
-                              defaultHoles.slice(9,18).forEach((hole, hIdx) => {
+                              holes.slice(9,18).forEach((hole, hIdx) => {
                                 const strokeIdx = hole.index;
                                 let strokesReceived = 0;
                                 if (adjHandicap > 0) {
