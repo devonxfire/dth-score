@@ -541,6 +541,8 @@ export default function MedalScorecard(props) {
       ? props.competition.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)) }))
       : defaultHoles;
 
+      console.log('holesArr', holesArr, 'comp', comp);
+
       // Compute par front/back/total, prefer server-provided comp.par_* when present
       const parFront = (comp && (comp.par_front != null)) ? Number(comp.par_front) : holesArr.slice(0,9).reduce((s,h) => s + (Number(h.par)||0), 0);
       const parBack = (comp && (comp.par_back != null)) ? Number(comp.par_back) : (holesArr.length >= 18 ? holesArr.slice(9,18).reduce((s,h) => s + (Number(h.par)||0), 0) : 0);
