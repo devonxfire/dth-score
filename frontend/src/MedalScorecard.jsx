@@ -536,10 +536,12 @@ export default function MedalScorecard(props) {
   // Use holes from the competition payload when available (map stroke_index -> index),
   // otherwise fall back to the defaultHoles constant.
   const holesArr = (comp && Array.isArray(comp.holes) && comp.holes.length === 18)
-    ? comp.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)) }))
-    : (props && props.competition && Array.isArray(props.competition.holes) && props.competition.holes.length === 18)
-      ? props.competition.holes.map(h => ({ number: h.number, par: Number(h.par), index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined)) }))
-      : defaultHoles;
+    ? comp.holes.map(h => ({
+        number: h.number,
+        par: Number(h.par),
+        index: (h.stroke_index != null ? Number(h.stroke_index) : (h.index != null ? Number(h.index) : undefined))
+      }))
+    : defaultHoles;
 
       console.log('holesArr', holesArr, 'comp', comp);
 
