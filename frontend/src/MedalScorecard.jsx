@@ -283,7 +283,25 @@ export default function MedalScorecard(props) {
   
   // --- Per-group selected hole state for desktop/tablet navigation ---
   // selectedHoleByGroup: { [groupKey]: holeNumber }
-  const [selectedHoleByGroup, setSelectedHoleByGroup] = useState({});
+  const [selectedHoleByGroup, setSelectedHoleByGroup] = useState(() => {
+    const obj = {};
+    try {
+      if (compId && groups && groups.length) {
+        // try group-specific key, fall back to per-comp last key
+        const fallbackRaw = localStorage.getItem(`dth:selectedHole:${compId}:last`);
+        const fallback = (fallbackRaw ? parseInt(fallbackRaw, 10) : NaN);
+        groups.forEach((g, idx) => {
+          const gk = g?.id || g?.group_id || g?.groupId || g?.name || g?.label || String(idx);
+          const raw = localStorage.getItem(`dth:selectedHole:${compId}:${gk}`);
+          const n = raw ? parseInt(raw, 10) : NaN;
+          if (Number.isFinite(n) && n >= 1 && n <= 18) obj[gk] = n;
+          else if (Number.isFinite(fallback) && fallback >= 1 && fallback <= 18) obj[gk] = fallback;
+          else obj[gk] = 1;
+        });
+      }
+    } catch (e) {}
+    return obj;
+  });
   // Helper: get current group key (robust fallback)
   const group = groups[groupIdx] || {};
   const groupKey = group.id || group.group_id || group.groupId || group.name || group.label || String(groupIdx);
@@ -293,10 +311,14 @@ export default function MedalScorecard(props) {
   // Handler for hole navigation (prev/next/select) -- per group
   const handleHoleChange = (holeNum) => {
     if (!groupKey) return;
-    setSelectedHoleByGroup((prev) => ({
-      ...prev,
-      [groupKey]: holeNum,
-    }));
+    setSelectedHoleByGroup((prev) => {
+      const next = { ...prev, [groupKey]: holeNum };
+      try {
+        if (compId && groupKey) localStorage.setItem(`dth:selectedHole:${compId}:${groupKey}`, String(holeNum));
+        if (compId) localStorage.setItem(`dth:selectedHole:${compId}:last`, String(holeNum));
+      } catch (e) {}
+      return next;
+    });
   };
 
   // When group changes, if no hole is set for this group, default to 1
@@ -304,9 +326,51 @@ export default function MedalScorecard(props) {
     if (!groupKey) return;
     setSelectedHoleByGroup((prev) => {
       if (prev[groupKey]) return prev;
-      return { ...prev, [groupKey]: 1 };
+      try {
+        const fallbackRaw = localStorage.getItem(`dth:selectedHole:${compId}:last`);
+        const fallback = (fallbackRaw ? parseInt(fallbackRaw, 10) : NaN);
+        const val = (Number.isFinite(fallback) && fallback >= 1 && fallback <= 18) ? fallback : 1;
+        if (compId && groupKey) localStorage.setItem(`dth:selectedHole:${compId}:${groupKey}`, String(val));
+        return { ...prev, [groupKey]: val };
+      } catch (e) {
+        return { ...prev, [groupKey]: 1 };
+      }
     });
   }, [groupKey]);
+
+  // Rehydrate selected holes from localStorage when comp/groups become available
+  useEffect(() => {
+    try {
+      if (!compId || !groups || !groups.length) return;
+      setSelectedHoleByGroup(prev => {
+        const next = { ...prev };
+        let changed = false;
+        const fallbackRaw = localStorage.getItem(`dth:selectedHole:${compId}:last`);
+        const fallback = (fallbackRaw ? parseInt(fallbackRaw, 10) : NaN);
+        groups.forEach((g, idx) => {
+          const gk = g?.id || g?.group_id || g?.groupId || g?.name || g?.label || String(idx);
+          if (next[gk] && Number.isFinite(Number(next[gk]))) return; // already set
+          const raw = localStorage.getItem(`dth:selectedHole:${compId}:${gk}`);
+          const n = raw ? parseInt(raw, 10) : NaN;
+          if (Number.isFinite(n) && n >= 1 && n <= 18) {
+            // If stored per-group value is the default 1 but we have a meaningful
+            // per-competition fallback, prefer the fallback so returning users
+            // are taken back to their last hole.
+            if (n === 1 && Number.isFinite(fallback) && fallback >= 1 && fallback <= 18) {
+              next[gk] = fallback;
+            } else {
+              next[gk] = n;
+            }
+            changed = true;
+          } else if (Number.isFinite(fallback) && fallback >= 1 && fallback <= 18) {
+            next[gk] = fallback;
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    } catch (e) {}
+  }, [compId, JSON.stringify(groups || [])]);
   // Mobile selected player for compact score entry
   const [mobileSelectedPlayer, setMobileSelectedPlayer] = useState('');
   // --- Per-group mobile selected hole state ---
@@ -316,11 +380,24 @@ export default function MedalScorecard(props) {
     const obj = {};
     try {
       if (compId && groups && groups.length) {
+        // per-competition fallback (last viewed hole)
+        const fallbackRaw = localStorage.getItem(`dth:selectedHole:${compId}:last`);
+        const fallback = (fallbackRaw ? parseInt(fallbackRaw, 10) : NaN);
         groups.forEach((g, idx) => {
           const gk = g?.id || g?.group_id || g?.groupId || g?.name || g?.label || String(idx);
           const raw = localStorage.getItem(`dth:mobileSelectedHole:${compId}:${gk}`);
           const n = raw ? parseInt(raw, 10) : NaN;
-          obj[gk] = (Number.isFinite(n) && n >= 1 && n <= 18) ? n : 1;
+          if (Number.isFinite(n) && n >= 1 && n <= 18) {
+            // If the stored mobile value is the default 1 but we have a meaningful
+            // per-competition fallback, prefer the fallback so returning users
+            // are taken back to their last hole.
+            if (n === 1 && Number.isFinite(fallback) && fallback >= 1 && fallback <= 18) obj[gk] = fallback;
+            else obj[gk] = n;
+          } else if (Number.isFinite(fallback) && fallback >= 1 && fallback <= 18) {
+            obj[gk] = fallback;
+          } else {
+            obj[gk] = 1;
+          }
         });
       }
     } catch (e) {}
@@ -333,7 +410,12 @@ export default function MedalScorecard(props) {
     setMobileSelectedHoleByGroup(prev => {
       const val = typeof holeNumOrUpdater === 'function' ? holeNumOrUpdater(prev[groupKey] || 1) : holeNumOrUpdater;
       // Persist to localStorage
-      try { if (compId && groupKey) localStorage.setItem(`dth:mobileSelectedHole:${compId}:${groupKey}`, String(val)); } catch (e) {}
+      try {
+        if (compId && groupKey) {
+          localStorage.setItem(`dth:mobileSelectedHole:${compId}:${groupKey}`, String(val));
+          localStorage.setItem(`dth:selectedHole:${compId}:last`, String(val));
+        }
+      } catch (e) {}
       return { ...prev, [groupKey]: val };
     });
   };
@@ -353,11 +435,34 @@ export default function MedalScorecard(props) {
     if (!groupKey) return;
     setMobileSelectedHoleByGroup(prev => {
       if (prev[groupKey]) return prev;
-      // Persist to localStorage
-      try { if (compId && groupKey) localStorage.setItem(`dth:mobileSelectedHole:${compId}:${groupKey}`, '1'); } catch (e) {}
-      return { ...prev, [groupKey]: 1 };
+      try {
+        const fallbackRaw = localStorage.getItem(`dth:selectedHole:${compId}:last`);
+        const fallback = (fallbackRaw ? parseInt(fallbackRaw, 10) : NaN);
+        const val = (Number.isFinite(fallback) && fallback >= 1 && fallback <= 18) ? fallback : 1;
+        // Persist to localStorage
+        try { if (compId && groupKey) localStorage.setItem(`dth:mobileSelectedHole:${compId}:${groupKey}`, String(val)); } catch (e) {}
+        try { if (compId) localStorage.setItem(`dth:selectedHole:${compId}:last`, String(val)); } catch (e) {}
+        return { ...prev, [groupKey]: val };
+      } catch (e) {
+        try { if (compId && groupKey) localStorage.setItem(`dth:mobileSelectedHole:${compId}:${groupKey}`, '1'); } catch (er) {}
+        return { ...prev, [groupKey]: 1 };
+      }
     });
   }, [groupKey, compId]);
+
+  // Save current mobile selected holes to per-competition last key on unload as a safeguard
+  useEffect(() => {
+    const handler = () => {
+      try {
+        if (!compId) return;
+        const gk = groupKey || '0';
+        const val = mobileSelectedHoleByGroup[gk] || 1;
+        localStorage.setItem(`dth:selectedHole:${compId}:last`, String(val));
+      } catch (e) {}
+    };
+    try { window.addEventListener('beforeunload', handler); } catch (e) {}
+    return () => { try { window.removeEventListener('beforeunload', handler); } catch (e) {} };
+  }, [compId, groupKey, mobileSelectedHoleByGroup]);
 
   // Generate dummy test data (admin only)
   const generateDummyData = async () => {
